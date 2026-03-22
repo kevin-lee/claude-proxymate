@@ -25,7 +25,19 @@ ThisBuild / scmInfo :=
 lazy val root = (project in file("."))
   .settings(name := props.ProjectName)
   .settings(noPublish)
-  .aggregate(coreJvm, coreJs, coreNative, proxyServer, electron)
+  .settings(
+    cleanFiles ++= {
+      val electronApp = baseDirectory.value / "electron-app"
+      List(
+        electronApp / "claude-proxymate",
+        electronApp / "public",
+        electronApp / "assets",
+        electronApp / "main.js",
+        electronApp / "preload.js",
+      )
+    },
+  )
+  .aggregate(coreJvm, coreJs, coreNative, proxyServer, electron, preload, renderer)
 
 // Core cross-project: JVM + JS + Native
 // Note: hedgehog tests only run on JVM and JS (hedgehog does not publish for SN 0.4)
@@ -47,11 +59,16 @@ lazy val core =
         libs.circeGeneric.value,
       ),
     )
-    .jvmSettings(libraryDependencies ++= libs.tests.hedgehog.value)
+    .jvmSettings(
+      libraryDependencies ++= libs.tests.hedgehog.value ++ List(
+        libs.scalatags.value,
+      ),
+      Test / javaOptions += s"-Di18n.dir=${(ThisBuild / baseDirectory).value / "i18n"}",
+    )
     .jsSettings(libraryDependencies ++= libs.tests.hedgehog.value)
 
-lazy val coreJvm = core.jvm
-lazy val coreJs = core.js.settings(jsSettingsForFuture)
+lazy val coreJvm    = core.jvm
+lazy val coreJs     = core.js.settings(jsSettingsForFuture)
 lazy val coreNative = core.native.settings(nativeSettings)
 
 lazy val proxyServer = (project in file("modules/claude-proxymate-server"))
@@ -94,6 +111,120 @@ lazy val electron = (project in file("modules/claude-proxymate-electron"))
   .settings(noPublish)
   .dependsOn(coreJs)
 
+lazy val preload = (project in file("modules/claude-proxymate-preload"))
+  .enablePlugins(ScalaJSPlugin)
+  .settings(
+    name := prefixedProjectName("preload"),
+    scalaVersion := props.ScalaVersion,
+    scalacOptions ++= List("-no-indent", "-explain"),
+    scalaJSUseMainModuleInitializer := true,
+  )
+  .settings(jsSettingsForFuture)
+  .settings(noPublish)
+  .dependsOn(coreJs)
+
+lazy val renderer = (project in file("modules/claude-proxymate-renderer"))
+  .enablePlugins(ScalaJSPlugin)
+  .settings(
+    name := prefixedProjectName("renderer"),
+    scalaVersion := props.ScalaVersion,
+    scalacOptions ++= List("-no-indent", "-explain"),
+    libraryDependencies ++= List(
+      libs.scalaJsDom.value,
+      libs.scalatags.value,
+    ) ++ libs.tests.hedgehog.value,
+    scalaJSUseMainModuleInitializer := true,
+  )
+  .settings(jsSettingsForFuture)
+  .settings(
+    // Override CommonJSModule from jsSettingsForFuture: renderer runs in a browser
+    // <script> tag (Electron renderer process), not Node.js, so it needs NoModule.
+    scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.NoModule) },
+  )
+  .settings(noPublish)
+  .dependsOn(coreJs)
+
+// ===== Generate HTML task =====
+
+lazy val generateHtml = taskKey[Unit]("Generate index.html from ScalaTags into electron-app/public/")
+generateHtml := Def.taskDyn {
+  val base       = baseDirectory.value
+  val outputFile = (base / "electron-app" / "public" / "index.html").absolutePath
+  val i18nDir    = (base / "i18n").absolutePath
+  Def.task {
+    (coreJvm / Compile / runMain).toTask(s" claudeproxymate.core.IndexHtmlGeneratorMain $outputFile $i18nDir").value
+  }
+}.value
+
+lazy val generateI18n = taskKey[Unit]("Generate i18n JSON files from .properties into electron-app/public/i18n/")
+generateI18n := Def.taskDyn {
+  val base      = baseDirectory.value
+  val inputDir  = (base / "i18n").absolutePath
+  val outputDir = (base / "electron-app" / "public" / "i18n").absolutePath
+  Def.task {
+    (coreJvm / Compile / runMain).toTask(s" claudeproxymate.core.I18nGenerator $inputDir $outputDir").value
+  }
+}.value
+
+// ===== Dev UI task =====
+
+lazy val devUi = taskKey[Unit]("Clean, build all modules, and assemble electron-app/ for development")
+devUi := Def.taskDyn {
+  // 1. clean — runs first; the inner Def.task starts only after clean completes
+  clean.value
+  Def.task {
+    val log         = streams.value.log
+    val base        = baseDirectory.value
+    val electronApp = base / "electron-app"
+
+    // 2. proxyServer/nativeLink, electron/fastLinkJS, preload/fastLinkJS, renderer/fastLinkJS
+    val nativeBinary = (proxyServer / Compile / nativeLink).value
+    val electronDir  = (electron / Compile / fastLinkJS / scalaJSLinkerOutputDirectory).value
+    val preloadDir   = (preload / Compile / fastLinkJS / scalaJSLinkerOutputDirectory).value
+    (electron / Compile / fastLinkJS).value
+    (preload / Compile / fastLinkJS).value
+    val rendererDir = (renderer / Compile / fastLinkJS / scalaJSLinkerOutputDirectory).value
+    (renderer / Compile / fastLinkJS).value
+
+    // 3-4. Copy native binary
+    val binaryDest = electronApp / "claude-proxymate"
+    IO.copyFile(nativeBinary, binaryDest)
+    binaryDest.setExecutable(true)
+    log.info(s"Copied native binary to $binaryDest")
+
+    // 5. Copy electron main.js
+    IO.copyFile(electronDir / "main.js", electronApp / "main.js")
+    log.info(s"Copied electron main.js")
+
+    // 6. Copy preload.js
+    IO.copyFile(preloadDir / "main.js", electronApp / "preload.js")
+    log.info(s"Copied preload.js")
+
+    // 7. Generate index.html via ScalaTags
+    IO.createDirectory(electronApp / "public")
+    generateHtml.value
+    log.info(s"Generated index.html")
+
+    // 8. Generate i18n JSON files
+    generateI18n.value
+    log.info(s"Generated i18n JSON files")
+
+    // 9. Copy styles.css
+    IO.copyFile(base / "public" / "styles.css", electronApp / "public" / "styles.css")
+    log.info(s"Copied styles.css")
+
+    // 10. Copy assets/
+    IO.copyDirectory(base / "assets", electronApp / "assets")
+    log.info(s"Copied assets/")
+
+    // 11. Copy renderer.js into public/
+    IO.copyFile(rendererDir / "main.js", electronApp / "public" / "renderer.js")
+    log.info(s"Copied renderer.js")
+
+    log.info(s"electron-app/ assembled. Run: cd electron-app && npm install && npm start")
+  }
+}.value
+
 // ===== Props =====
 
 lazy val props = new {
@@ -101,12 +232,12 @@ lazy val props = new {
   private val gitHubRepo = findRepoOrgAndName
 
   val GitHubUsername = gitHubRepo.fold("kevin-lee")(_.orgToString)
-  val RepoName = gitHubRepo.fold("claude-proxymate")(_.nameToString)
-  val ProjectName = RepoName
+  val RepoName       = gitHubRepo.fold("claude-proxymate")(_.nameToString)
+  val ProjectName    = RepoName
 
   val ScalaVersion = "3.3.7"
 
-  val Org = "io.kevinlee"
+  val Org     = "io.kevinlee"
   val OrgName = "Kevin's Code"
 
   val ProjectVersion = "0.1.0"
@@ -126,6 +257,8 @@ lazy val props = new {
 
   val HedgehogVersion = "0.13.0"
 
+  val ScalatagsVersion = "0.13.1"
+
   lazy val licenses = List(License.MIT)
 }
 
@@ -133,9 +266,9 @@ lazy val props = new {
 
 lazy val libs = new {
 
-  lazy val circeCore =
+  lazy val circeCore    =
     Def.setting("io.circe" %%% "circe-core" % props.CirceVersion)
-  lazy val circeParser =
+  lazy val circeParser  =
     Def.setting("io.circe" %%% "circe-parser" % props.CirceVersion)
   lazy val circeGeneric =
     Def.setting("io.circe" %%% "circe-generic" % props.CirceVersion)
@@ -147,16 +280,19 @@ lazy val libs = new {
     Def.setting("org.http4s" %%% "http4s-ember-server" % props.Http4sVersion)
   lazy val http4sEmberClient =
     Def.setting("org.http4s" %%% "http4s-ember-client" % props.Http4sVersion)
-  lazy val http4sDsl =
+  lazy val http4sDsl         =
     Def.setting("org.http4s" %%% "http4s-dsl" % props.Http4sVersion)
-  lazy val http4sCirce =
+  lazy val http4sCirce       =
     Def.setting("org.http4s" %%% "http4s-circe" % props.Http4sVersion)
 
   lazy val fs2Core = Def.setting("co.fs2" %%% "fs2-core" % props.Fs2Version)
-  lazy val fs2Io = Def.setting("co.fs2" %%% "fs2-io" % props.Fs2Version)
+  lazy val fs2Io   = Def.setting("co.fs2" %%% "fs2-io" % props.Fs2Version)
 
   lazy val scalaJsDom =
     Def.setting("org.scala-js" %%% "scalajs-dom" % props.ScalaJsDomVersion)
+
+  lazy val scalatags =
+    Def.setting("com.lihaoyi" %%% "scalatags" % props.ScalatagsVersion)
 
   lazy val tests = new {
     // hedgehog supports only Scala Native 0.5, so use it for only JVM and JS
@@ -170,9 +306,9 @@ lazy val libs = new {
 
     lazy val hedgehog = Def.setting(
       List(
-        "qa.hedgehog" %%% "hedgehog-core" % props.HedgehogVersion % Test,
+        "qa.hedgehog" %%% "hedgehog-core"   % props.HedgehogVersion % Test,
         "qa.hedgehog" %%% "hedgehog-runner" % props.HedgehogVersion % Test,
-        "qa.hedgehog" %%% "hedgehog-sbt" % props.HedgehogVersion % Test,
+        "qa.hedgehog" %%% "hedgehog-sbt"    % props.HedgehogVersion % Test,
       )
     )
   }
@@ -184,10 +320,9 @@ lazy val libs = new {
 def prefixedProjectName(name: String) = s"${props.ProjectName}${if (name.isEmpty) "" else s"-$name"}"
 // format: on
 
-def module(projectName: String,
-           crossProject: CrossProject.Builder): CrossProject = {
+def module(projectName: String, crossProject: CrossProject.Builder): CrossProject = {
   val prefixedName = prefixedProjectName(projectName)
-  val modulePath = file(s"modules/$prefixedName")
+  val modulePath   = file(s"modules/$prefixedName")
   List(
     modulePath / "shared" / "src" / "main" / "scala",
     modulePath / "shared" / "src" / "test" / "scala",
@@ -204,8 +339,11 @@ def module(projectName: String,
 }
 
 lazy val jsSettingsForFuture: SettingsDefinition =
-  List(Test / fork := false, scalaJSLinkerConfig ~= {
-    _.withModuleKind(ModuleKind.CommonJSModule)
-  })
+  List(
+    Test / fork := false,
+    scalaJSLinkerConfig ~= {
+      _.withModuleKind(ModuleKind.CommonJSModule)
+    }
+  )
 
 lazy val nativeSettings: SettingsDefinition = List(Test / fork := false)

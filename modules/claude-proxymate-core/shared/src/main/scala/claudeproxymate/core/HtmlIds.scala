@@ -1,0 +1,39 @@
+package claudeproxymate.core
+
+/** DOM element IDs shared between the HTML generator (JVM) and renderer (JS). */
+object HtmlIds {
+  // ── Onboarding ──
+  val OnboardModal: String = "onboardModal"
+
+  // ── Header ──
+  val BuildVer: String      = "buildVer"
+  val UpdateBadge: String   = "updateBadge"
+  val LangToggleBtn: String = "langToggleBtn"
+
+  // ── Proxy Bar ──
+  val ProxyBar: String     = "proxyBar"
+  val ProxyInfoBtn: String = "proxyInfoBtn"
+
+  // ── Proxy Panel ──
+  val ProxyPanel: String = "proxyPanel"
+
+  // ── Proxy Control ──
+  val ProxyPort: String       = "proxyPort"
+  val ProxyStatus: String     = "proxyStatus"
+  val ProxyStatusText: String = "proxyStatusText"
+  val ProxyCmdBox: String     = "proxyCmdBox"
+  val ProxyCmdText: String    = "proxyCmdText"
+  val ProxyStartBtn: String   = "proxyStartBtn"
+
+  // ── Proxy Stream ──
+  val ProxyList: String       = "proxyList"
+  val ProxyCount: String      = "proxyCount"
+  val ProxyDetailView: String = "proxyDetailView"
+
+  // ── Dynamically created (not in index.html, but used across renderer modules) ──
+  val ProxyDetailCode: String        = "proxyDetailCode"
+  val ProxyDetailSearchInput: String = "proxyDetailSearchInput"
+  val SearchCounter: String          = "searchCounter"
+  val MsgSearchInput: String         = "msgSearchInput"
+  val MsgCountEl: String             = "msgCountEl"
+}
