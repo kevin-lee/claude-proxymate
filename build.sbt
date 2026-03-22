@@ -8,8 +8,8 @@ ThisBuild / organizationName := props.OrgName
 ThisBuild / developers := List(
   Developer(
     props.GitHubUsername,
-    "Kevin Lee",
-    "kevin.code@kevinlee.io",
+    props.AuthorName,
+    props.AuthorEmail,
     url(s"https://github.com/${props.GitHubUsername}"),
   )
 )
@@ -34,6 +34,8 @@ lazy val root = (project in file("."))
         electronApp / "assets",
         electronApp / "main.js",
         electronApp / "preload.js",
+        electronApp / "package.json",
+        electronApp / "package-lock.json",
       )
     },
   )
@@ -166,6 +168,38 @@ generateI18n := Def.taskDyn {
   }
 }.value
 
+// ===== Generate package.json task =====
+
+lazy val generatePackageJson =
+  taskKey[Unit]("Generate electron-app/package.json from project/package.json.template using values from build.sbt")
+generatePackageJson := {
+  val log          = streams.value.log
+  val base         = baseDirectory.value
+  val templateFile = base / "project" / "package.json.template"
+  val outputFile   = base / "electron-app" / "package.json"
+
+  val licenseId = props.licenses.headOption.map { case (name, _) => name }.getOrElse("MIT")
+
+  val substitutions = List(
+    "@NAME@"         -> props.ProjectName,
+    "@VERSION@"      -> props.ProjectVersion,
+    "@DESCRIPTION@"  -> props.ProductDescription,
+    "@LICENSE@"      -> licenseId,
+    "@PRODUCT_NAME@" -> props.ProductName,
+    "@AUTHOR_NAME@"  -> props.AuthorName,
+    "@AUTHOR_EMAIL@" -> props.AuthorEmail,
+  )
+
+  val templateContent = IO.read(templateFile)
+  val rendered        = substitutions.foldLeft(templateContent) {
+    case (acc, (k, v)) =>
+      acc.replace(k, v)
+  }
+
+  IO.write(outputFile, rendered)
+  log.info(s"Generated ${outputFile}")
+}
+
 // ===== Dev UI task =====
 
 lazy val devUi = taskKey[Unit]("Clean, build all modules, and assemble electron-app/ for development")
@@ -183,7 +217,7 @@ devUi := Def.taskDyn {
     val preloadDir   = (preload / Compile / fastLinkJS / scalaJSLinkerOutputDirectory).value
     (electron / Compile / fastLinkJS).value
     (preload / Compile / fastLinkJS).value
-    val rendererDir = (renderer / Compile / fastLinkJS / scalaJSLinkerOutputDirectory).value
+    val rendererDir  = (renderer / Compile / fastLinkJS / scalaJSLinkerOutputDirectory).value
     (renderer / Compile / fastLinkJS).value
 
     // 3-4. Copy native binary
@@ -199,6 +233,10 @@ devUi := Def.taskDyn {
     // 6. Copy preload.js
     IO.copyFile(preloadDir / "main.js", electronApp / "preload.js")
     log.info(s"Copied preload.js")
+
+    // 6b. Generate package.json
+    generatePackageJson.value
+    log.info(s"Generated package.json")
 
     // 7. Generate index.html via ScalaTags
     IO.createDirectory(electronApp / "public")
@@ -241,6 +279,14 @@ lazy val props = new {
   val OrgName = "Kevin's Code"
 
   val ProjectVersion = "0.1.0"
+
+  val ProductName = "Claude Proxymate"
+
+  val ProductDescription = "Claude Code Proxymate - A local proxy inspector for Claude API traffic"
+
+  val AuthorName = "Kevin Lee"
+
+  val AuthorEmail = "kevin.code@kevinlee.io"
 
   /* Note: Scala Native 0.4.17 required because http4s 0.23.33 does not yet publish for Scala Native 0.5 */
   val CirceVersion = "0.14.8"

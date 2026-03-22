@@ -1,0 +1,9 @@
+node_modules/
+package-lock.json
+
+/assets/
+/public/
+/main.js
+/preload.js
+/package.json
+claude-proxymate

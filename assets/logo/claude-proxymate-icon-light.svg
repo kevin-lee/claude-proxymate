@@ -1,0 +1,119 @@
+<svg width="1080" height="1080" viewBox="0 0 1080 1080" xmlns="http://www.w3.org/2000/svg">
+  <title>Claude Proxymate Icon</title>
+  <defs>
+    <radialGradient id="badgeBg" cx="42%" cy="40%" r="60%">
+      <stop offset="0%" stop-color="#FFFBF0"/>
+      <stop offset="100%" stop-color="#F5EDD5"/>
+    </radialGradient>
+    <radialGradient id="lensFill" cx="36%" cy="36%" r="64%">
+      <stop offset="0%" stop-color="#F0E6C5"/>
+      <stop offset="100%" stop-color="#E6DAB4"/>
+    </radialGradient>
+    <linearGradient id="flowGrad" gradientUnits="userSpaceOnUse" x1="300" y1="0" x2="780" y2="0">
+      <stop offset="0%"   stop-color="#E8784D"/>
+      <stop offset="46%"  stop-color="#C47AE0"/>
+      <stop offset="100%" stop-color="#7B6BF0"/>
+    </linearGradient>
+    <linearGradient id="handleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#E8834D"/>
+      <stop offset="100%" stop-color="#B04A1E"/>
+    </linearGradient>
+    <clipPath id="lensClip">
+      <circle cx="468" cy="450" r="218"/>
+    </clipPath>
+  </defs>
+
+  <!-- ── BADGE ── -->
+  <circle cx="540" cy="540" r="492" fill="url(#badgeBg)"/>
+
+  <!-- Subtle decorative rings -->
+  <circle cx="540" cy="540" r="430" fill="none" stroke="#7B6BF0" stroke-width="1.5" opacity="0.07"/>
+  <circle cx="540" cy="540" r="352" fill="none" stroke="#E8784D" stroke-width="1.5" opacity="0.07"/>
+
+  <!-- ── MAGNIFYING GLASS ── -->
+
+  <!-- Outer glow rings -->
+  <circle cx="468" cy="450" r="284" fill="none" stroke="#E8784D" stroke-width="5" opacity="0.09"/>
+  <circle cx="468" cy="450" r="300" fill="none" stroke="#E8784D" stroke-width="3" opacity="0.05"/>
+
+  <!-- Lens dark fill — radius sized to sit inside the thick ring -->
+  <circle cx="468" cy="450" r="218" fill="url(#lensFill)"/>
+
+  <!-- ── Lens interior (clipped) ── -->
+  <g clip-path="url(#lensClip)">
+
+    <!-- Subtle grid background -->
+    <g stroke="#8880CC" stroke-width="2" opacity="0.09">
+      <line x1="250" y1="310" x2="686" y2="310"/>
+      <line x1="250" y1="358" x2="686" y2="358"/>
+      <line x1="250" y1="406" x2="686" y2="406"/>
+      <line x1="250" y1="450" x2="686" y2="450"/>
+      <line x1="250" y1="498" x2="686" y2="498"/>
+      <line x1="250" y1="546" x2="686" y2="546"/>
+      <line x1="250" y1="590" x2="686" y2="590"/>
+      <line x1="282" y1="232" x2="282" y2="668"/>
+      <line x1="330" y1="232" x2="330" y2="668"/>
+      <line x1="378" y1="232" x2="378" y2="668"/>
+      <line x1="426" y1="232" x2="426" y2="668"/>
+      <line x1="468" y1="232" x2="468" y2="668"/>
+      <line x1="516" y1="232" x2="516" y2="668"/>
+      <line x1="564" y1="232" x2="564" y2="668"/>
+      <line x1="612" y1="232" x2="612" y2="668"/>
+      <line x1="656" y1="232" x2="656" y2="668"/>
+    </g>
+
+    <!-- Traffic sine waves -->
+    <path d="M 250 450 Q 300 398 350 450 Q 400 502 450 450 Q 500 398 550 450 Q 600 502 650 450 Q 675 422 686 450"
+          fill="none" stroke="url(#flowGrad)" stroke-width="8" stroke-linecap="round" opacity="0.62"/>
+    <path d="M 250 422 Q 300 370 350 422 Q 400 474 450 422 Q 500 370 550 422 Q 600 474 650 422 Q 675 398 686 422"
+          fill="none" stroke="url(#flowGrad)" stroke-width="5" stroke-linecap="round" opacity="0.30"/>
+    <path d="M 250 478 Q 300 426 350 478 Q 400 530 450 478 Q 500 426 550 478 Q 600 530 650 478 Q 675 450 686 478"
+          fill="none" stroke="url(#flowGrad)" stroke-width="5" stroke-linecap="round" opacity="0.30"/>
+
+    <!-- Data packets -->
+    <rect x="265" y="440" width="28" height="20" rx="5" fill="#E8784D" opacity="0.50"/>
+    <rect x="372" y="440" width="28" height="20" rx="5" fill="#C47AE0" opacity="0.44"/>
+    <rect x="484" y="440" width="28" height="20" rx="5" fill="#7B6BF0" opacity="0.40"/>
+    <rect x="590" y="440" width="28" height="20" rx="5" fill="#7B6BF0" opacity="0.30"/>
+
+    <!-- Lens top-left light reflection -->
+    <path d="M 378 375 Q 406 353 436 368" fill="none" stroke="white" stroke-width="6" stroke-linecap="round" opacity="0.16"/>
+  </g>
+
+  <!-- Lens outer ring — very thick -->
+  <circle cx="468" cy="450" r="255" fill="none" stroke="#E8784D" stroke-width="48"/>
+  <!-- Lens inner edge highlight -->
+  <circle cx="468" cy="450" r="231" fill="none" stroke="#FFAF84" stroke-width="3" opacity="0.22"/>
+  <!-- Lens outer edge highlight -->
+  <circle cx="468" cy="450" r="279" fill="none" stroke="#FF9966" stroke-width="2" opacity="0.14"/>
+
+  <!-- ── Crosshair / reticle ── -->
+  <circle cx="468" cy="450" r="76"  fill="none" stroke="#C078E0" stroke-width="5" opacity="0.72"/>
+  <circle cx="468" cy="450" r="30"  fill="none" stroke="#E8784D" stroke-width="5" opacity="0.80"/>
+  <line x1="378" y1="450" x2="398" y2="450" stroke="#C078E0" stroke-width="5" stroke-linecap="round" opacity="0.72"/>
+  <line x1="538" y1="450" x2="558" y2="450" stroke="#C078E0" stroke-width="5" stroke-linecap="round" opacity="0.72"/>
+  <line x1="468" y1="360" x2="468" y2="380" stroke="#C078E0" stroke-width="5" stroke-linecap="round" opacity="0.72"/>
+  <line x1="468" y1="520" x2="468" y2="540" stroke="#C078E0" stroke-width="5" stroke-linecap="round" opacity="0.72"/>
+  <circle cx="468" cy="450" r="10" fill="#E8784D" opacity="0.92"/>
+
+  <!-- ── HANDLE — very thick ── -->
+  <!-- Start from ring edge at ~45° SE -->
+  <line x1="654" y1="636" x2="810" y2="792"
+        stroke="url(#handleGrad)" stroke-width="82" stroke-linecap="round"/>
+  <!-- Handle highlight stripe -->
+  <line x1="654" y1="636" x2="810" y2="792"
+        stroke="#FFB07A" stroke-width="26" stroke-linecap="round" opacity="0.26"/>
+  <!-- Grip notches -->
+  <line x1="678" y1="658" x2="700" y2="636" stroke="white" stroke-width="5.5" stroke-linecap="round" opacity="0.18"/>
+  <line x1="710" y1="690" x2="732" y2="668" stroke="white" stroke-width="5.5" stroke-linecap="round" opacity="0.18"/>
+  <line x1="742" y1="722" x2="764" y2="700" stroke="white" stroke-width="5.5" stroke-linecap="round" opacity="0.18"/>
+
+  <!-- Junction knob -->
+  <circle cx="648" cy="630" r="44" fill="#D06030"/>
+  <circle cx="648" cy="630" r="28" fill="none" stroke="#FFAF84" stroke-width="4" opacity="0.38"/>
+
+  <!-- ── BADGE RING ── -->
+  <circle cx="540" cy="540" r="492" fill="none" stroke="#E8784D" stroke-width="5" opacity="0.28"/>
+  <circle cx="540" cy="540" r="484" fill="none" stroke="#7B6BF0" stroke-width="2" opacity="0.14"/>
+
+</svg>

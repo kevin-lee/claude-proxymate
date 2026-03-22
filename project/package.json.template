@@ -1,0 +1,57 @@
+{
+  "name": "@NAME@",
+  "version": "@VERSION@",
+  "description": "@DESCRIPTION@",
+  "license": "@LICENSE@",
+  "author": {
+    "name": "@AUTHOR_NAME@",
+    "email": "@AUTHOR_EMAIL@"
+  },
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --enable-logging",
+    "dist": "electron-builder",
+    "dist:mac": "electron-builder --mac"
+  },
+  "build": {
+    "appId": "io.kevinlee.claudeproxymate.app",
+    "productName": "@PRODUCT_NAME@",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "public/**",
+      "assets/**"
+    ],
+    "extraResources": [
+      {
+        "from": "claude-proxymate",
+        "to": "claude-proxymate"
+      }
+    ],
+    "mac": {
+      "icon": "assets/icon.icns",
+      "category": "public.app-category.developer-tools",
+      "artifactName": "Claude-Proxy-${version}-${arch}.${ext}",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ]
+    },
+    "linux": {
+      "icon": "assets/icon.png"
+    }
+  },
+  "devDependencies": {
+    "electron": "^41.0.3",
+    "electron-builder": "^26.8.1"
+  }
+}

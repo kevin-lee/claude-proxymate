@@ -27,6 +27,7 @@ object IndexHtmlGenerator {
         meta(charset := "UTF-8"),
         meta(name := "viewport", content := "width=device-width, initial-scale=1.0"),
         titleTag("Claude Proxymate"),
+        link(rel := "icon", attr("type") := "image/png", href := "../assets/logo/dark/icon-32.png"),
         link(rel := "stylesheet", href := "styles.css"),
       ),
       body(
@@ -63,7 +64,7 @@ object IndexHtmlGenerator {
   private def headerSection(m: Map[String, String]): Frag =
     tag("header")(cls := "header")(
       div(cls := "logo")(
-        div(cls := "logo-icon")("CP"),
+        img(cls := "logo-icon", src := "../assets/logo/claude-proxymate-icon-light.svg", alt := "Claude Proxymate"),
         span(cls := "logo-text")("Claude Proxymate"),
         span(cls := "logo-sub", i18n := "header.logoSub")(tx(m, "header.logoSub")),
         span(cls := "logo-ver", id := HtmlIds.BuildVer),
