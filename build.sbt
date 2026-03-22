@@ -75,7 +75,7 @@ lazy val proxyServer = (project in file("modules/claude-proxymate-server"))
         .withGC(GC.commix)
     },
     // CurlMain uses libcurl (no s2n needed); Main uses EmberClient (needs `brew install s2n`)
-    Compile / mainClass := Some("claudeproxy.proxy.CurlMain"),
+    Compile / mainClass := Some("claudeproxymate.proxy.CurlMain"),
   )
   .settings(noPublish)
   .settings(nativeSettings)
