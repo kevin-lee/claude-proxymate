@@ -1,0 +1,211 @@
+import scala.scalanative.build.*
+import sbtcrossproject.CrossProject
+
+ThisBuild / scalaVersion := props.ScalaVersion
+ThisBuild / version := props.ProjectVersion
+ThisBuild / organization := props.Org
+ThisBuild / organizationName := props.OrgName
+ThisBuild / developers := List(
+  Developer(
+    props.GitHubUsername,
+    "Kevin Lee",
+    "kevin.code@kevinlee.io",
+    url(s"https://github.com/${props.GitHubUsername}"),
+  )
+)
+ThisBuild / homepage := url(
+  s"https://github.com/${props.GitHubUsername}/${props.RepoName}"
+).some
+ThisBuild / scmInfo :=
+  ScmInfo(
+    url(s"https://github.com/${props.GitHubUsername}/${props.RepoName}"),
+    s"https://github.com/${props.GitHubUsername}/${props.RepoName}.git",
+  ).some
+
+lazy val root = (project in file("."))
+  .settings(name := props.ProjectName)
+  .settings(noPublish)
+  .aggregate(coreJvm, coreJs, coreNative, proxyServer, electron)
+
+// Core cross-project: JVM + JS + Native
+// Note: hedgehog tests only run on JVM and JS (hedgehog does not publish for SN 0.4)
+lazy val core =
+  module("core", crossProject(JVMPlatform, JSPlatform, NativePlatform).crossType(CrossType.Full))
+    .enablePlugins(BuildInfoPlugin)
+    .settings(
+      /* Build Info { */
+      buildInfoKeys := List[BuildInfoKey](name, version, scalaVersion, sbtVersion),
+      buildInfoObject := "ClaudeProxymateInfo",
+      buildInfoPackage := "claudeproxymate.info",
+      buildInfoOptions += BuildInfoOption.ToJson,
+      /* } Build Info */
+    )
+    .settings(
+      libraryDependencies ++= List(
+        libs.circeCore.value,
+        libs.circeParser.value,
+        libs.circeGeneric.value,
+      ),
+    )
+    .jvmSettings(libraryDependencies ++= libs.tests.hedgehog.value)
+    .jsSettings(libraryDependencies ++= libs.tests.hedgehog.value)
+
+lazy val coreJvm = core.jvm
+lazy val coreJs = core.js.settings(jsSettingsForFuture)
+lazy val coreNative = core.native.settings(nativeSettings)
+
+lazy val proxyServer = (project in file("modules/claude-proxymate-server"))
+  .enablePlugins(ScalaNativePlugin)
+  .settings(
+    name := prefixedProjectName("server"),
+    scalaVersion := props.ScalaVersion,
+    scalacOptions ++= List("-no-indent", "-explain"),
+    libraryDependencies ++= List(
+      libs.catsEffect.value,
+      libs.http4sEmberServer.value,
+      libs.http4sEmberClient.value,
+      libs.http4sDsl.value,
+      libs.http4sCirce.value,
+      libs.fs2Core.value,
+      libs.fs2Io.value,
+    ),
+    nativeConfig ~= { c =>
+      c.withLTO(LTO.none)
+        .withMode(Mode.releaseFast)
+        .withGC(GC.commix)
+    },
+    // CurlMain uses libcurl (no s2n needed); Main uses EmberClient (needs `brew install s2n`)
+    Compile / mainClass := Some("claudeproxy.proxy.CurlMain"),
+  )
+  .settings(noPublish)
+  .settings(nativeSettings)
+  .dependsOn(coreNative)
+
+lazy val electron = (project in file("modules/claude-proxymate-electron"))
+  .enablePlugins(ScalaJSPlugin)
+  .settings(
+    name := prefixedProjectName("electron"),
+    scalaVersion := props.ScalaVersion,
+    scalacOptions ++= List("-no-indent", "-explain"),
+    libraryDependencies ++= List(libs.scalaJsDom.value),
+    scalaJSUseMainModuleInitializer := true,
+  )
+  .settings(jsSettingsForFuture)
+  .settings(noPublish)
+  .dependsOn(coreJs)
+
+// ===== Props =====
+
+lazy val props = new {
+
+  private val gitHubRepo = findRepoOrgAndName
+
+  val GitHubUsername = gitHubRepo.fold("kevin-lee")(_.orgToString)
+  val RepoName = gitHubRepo.fold("claude-proxymate")(_.nameToString)
+  val ProjectName = RepoName
+
+  val ScalaVersion = "3.3.7"
+
+  val Org = "io.kevinlee"
+  val OrgName = "Kevin's Code"
+
+  val ProjectVersion = "0.1.0"
+
+  /* Note: Scala Native 0.4.17 required because http4s 0.23.33 does not yet publish for Scala Native 0.5 */
+  val CirceVersion = "0.14.8"
+
+  val CatsVersion = "2.12.0"
+
+  val CatsEffectVersion = "3.5.7"
+
+  val Http4sVersion = "0.23.33"
+
+  val Fs2Version = "3.11.0"
+
+  val ScalaJsDomVersion = "2.8.0"
+
+  val HedgehogVersion = "0.13.0"
+
+  lazy val licenses = List(License.MIT)
+}
+
+// ===== Libs =====
+
+lazy val libs = new {
+
+  lazy val circeCore =
+    Def.setting("io.circe" %%% "circe-core" % props.CirceVersion)
+  lazy val circeParser =
+    Def.setting("io.circe" %%% "circe-parser" % props.CirceVersion)
+  lazy val circeGeneric =
+    Def.setting("io.circe" %%% "circe-generic" % props.CirceVersion)
+
+  lazy val catsEffect =
+    Def.setting("org.typelevel" %%% "cats-effect" % props.CatsEffectVersion)
+
+  lazy val http4sEmberServer =
+    Def.setting("org.http4s" %%% "http4s-ember-server" % props.Http4sVersion)
+  lazy val http4sEmberClient =
+    Def.setting("org.http4s" %%% "http4s-ember-client" % props.Http4sVersion)
+  lazy val http4sDsl =
+    Def.setting("org.http4s" %%% "http4s-dsl" % props.Http4sVersion)
+  lazy val http4sCirce =
+    Def.setting("org.http4s" %%% "http4s-circe" % props.Http4sVersion)
+
+  lazy val fs2Core = Def.setting("co.fs2" %%% "fs2-core" % props.Fs2Version)
+  lazy val fs2Io = Def.setting("co.fs2" %%% "fs2-io" % props.Fs2Version)
+
+  lazy val scalaJsDom =
+    Def.setting("org.scala-js" %%% "scalajs-dom" % props.ScalaJsDomVersion)
+
+  lazy val tests = new {
+    // hedgehog supports only Scala Native 0.5, so use it for only JVM and JS
+//    lazy val hedgehogJvm = Def.setting(
+//      List(
+//        "qa.hedgehog" %% "hedgehog-core"   % props.HedgehogVersion % Test,
+//        "qa.hedgehog" %% "hedgehog-runner" % props.HedgehogVersion % Test,
+//        "qa.hedgehog" %% "hedgehog-sbt"    % props.HedgehogVersion % Test,
+//      )
+//    )
+
+    lazy val hedgehog = Def.setting(
+      List(
+        "qa.hedgehog" %%% "hedgehog-core" % props.HedgehogVersion % Test,
+        "qa.hedgehog" %%% "hedgehog-runner" % props.HedgehogVersion % Test,
+        "qa.hedgehog" %%% "hedgehog-sbt" % props.HedgehogVersion % Test,
+      )
+    )
+  }
+}
+
+// ===== Helpers =====
+
+// format: off
+def prefixedProjectName(name: String) = s"${props.ProjectName}${if (name.isEmpty) "" else s"-$name"}"
+// format: on
+
+def module(projectName: String,
+           crossProject: CrossProject.Builder): CrossProject = {
+  val prefixedName = prefixedProjectName(projectName)
+  val modulePath = file(s"modules/$prefixedName")
+  List(
+    modulePath / "shared" / "src" / "main" / "scala",
+    modulePath / "shared" / "src" / "test" / "scala",
+  ).foreach(IO.createDirectory)
+  crossProject
+    .in(modulePath)
+    .settings(
+      name := prefixedName,
+      fork := true,
+      scalacOptions ++= List("-no-indent", "-explain"),
+      // Note: hedgehog test deps added per-platform (not available on SN 0.4)
+      licenses := props.licenses,
+    )
+}
+
+lazy val jsSettingsForFuture: SettingsDefinition =
+  List(Test / fork := false, scalaJSLinkerConfig ~= {
+    _.withModuleKind(ModuleKind.CommonJSModule)
+  })
+
+lazy val nativeSettings: SettingsDefinition = List(Test / fork := false)
