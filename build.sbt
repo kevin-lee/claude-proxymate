@@ -263,6 +263,70 @@ devUi := Def.taskDyn {
   }
 }.value
 
+// ===== Prod UI task =====
+
+lazy val prodUi =
+  taskKey[Unit]("Clean, build all modules with full optimization, and assemble electron-app/ for production")
+prodUi := Def.taskDyn {
+  // 1. clean — runs first; the inner Def.task starts only after clean completes
+  clean.value
+  Def.task {
+    val log         = streams.value.log
+    val base        = baseDirectory.value
+    val electronApp = base / "electron-app"
+
+    // 2. proxyServer/nativeLink, electron/fullLinkJS, preload/fullLinkJS, renderer/fullLinkJS
+    val nativeBinary = (proxyServer / Compile / nativeLink).value
+    val electronDir  = (electron / Compile / fullLinkJS / scalaJSLinkerOutputDirectory).value
+    val preloadDir   = (preload / Compile / fullLinkJS / scalaJSLinkerOutputDirectory).value
+    (electron / Compile / fullLinkJS).value
+    (preload / Compile / fullLinkJS).value
+    val rendererDir  = (renderer / Compile / fullLinkJS / scalaJSLinkerOutputDirectory).value
+    (renderer / Compile / fullLinkJS).value
+
+    // 3-4. Copy native binary
+    val binaryDest = electronApp / "claude-proxymate"
+    IO.copyFile(nativeBinary, binaryDest)
+    binaryDest.setExecutable(true)
+    log.info(s"Copied native binary to $binaryDest")
+
+    // 5. Copy electron main.js
+    IO.copyFile(electronDir / "main.js", electronApp / "main.js")
+    log.info(s"Copied electron main.js")
+
+    // 6. Copy preload.js
+    IO.copyFile(preloadDir / "main.js", electronApp / "preload.js")
+    log.info(s"Copied preload.js")
+
+    // 6b. Generate package.json
+    generatePackageJson.value
+    log.info(s"Generated package.json")
+
+    // 7. Generate index.html via ScalaTags
+    IO.createDirectory(electronApp / "public")
+    generateHtml.value
+    log.info(s"Generated index.html")
+
+    // 8. Generate i18n JSON files
+    generateI18n.value
+    log.info(s"Generated i18n JSON files")
+
+    // 9. Copy styles.css
+    IO.copyFile(base / "public" / "styles.css", electronApp / "public" / "styles.css")
+    log.info(s"Copied styles.css")
+
+    // 10. Copy assets/
+    IO.copyDirectory(base / "assets", electronApp / "assets")
+    log.info(s"Copied assets/")
+
+    // 11. Copy renderer.js into public/
+    IO.copyFile(rendererDir / "main.js", electronApp / "public" / "renderer.js")
+    log.info(s"Copied renderer.js")
+
+    log.info(s"electron-app/ assembled (production). Run: cd electron-app && npm install && npm start")
+  }
+}.value
+
 // ===== Props =====
 
 lazy val props = new {
