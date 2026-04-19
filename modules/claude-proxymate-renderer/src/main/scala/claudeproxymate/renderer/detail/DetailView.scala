@@ -19,7 +19,7 @@ import scala.scalajs.js.annotation.JSExportTopLevel
   */
 object DetailView {
 
-  private val PricingDate = "2026-03-13"
+  private val PricingDate = "2026-04-20"
 
   @JSExportTopLevel("renderProxyDetail")
   def renderProxyDetail(): Unit = {
@@ -232,15 +232,11 @@ object DetailView {
       else ""
     }
 
-    val isOpus4 = model.contains("opus-4-") && !model.contains("opus-4-1")
-    val isOldOpus = model.contains("opus-4-1") || model.contains("opus-4-0") || model.contains("opus-3")
-    val isHaiku = model.contains("haiku")
-
-    val (inP, outP, crP, cwP) =
-      if (isOpus4) (5.0, 25.0, 0.5, 6.25)
-      else if (isOldOpus) (15.0, 75.0, 1.5, 18.75)
-      else if (isHaiku) (1.0, 5.0, 0.1, 1.25)
-      else (3.0, 15.0, 0.3, 3.75) // sonnet default
+    val rates = ModelTier.forModel(model).rates
+    val inP = rates.input
+    val outP = rates.output
+    val crP = rates.cacheRead
+    val cwP = rates.cacheWrite5m
 
     val cost = (inputTokens * inP + cacheRead * crP + cacheWrite * cwP + outTok * outP) / 1000000.0
     val costStr = fmtCost(cost)
