@@ -46,6 +46,21 @@
       display: none;
     }
     .update-badge:hover { background: color-mix(in srgb, var(--green) 22%, transparent); }
+
+    /* ── Theme Toggle ── */
+    .theme-toggle-btn {
+      padding: 4px; border-radius: 5px;
+      background: none; border: 1px solid var(--border);
+      color: var(--dim); cursor: pointer; transition: all .15s;
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 26px; height: 24px;
+    }
+    .theme-toggle-btn:hover { color: var(--text); border-color: var(--blue); }
+    .theme-icon { display: none; width: 16px; height: 16px; }
+    .theme-toggle-btn[data-theme-state="system"] .theme-icon-system { display: block; }
+    .theme-toggle-btn[data-theme-state="light"]  .theme-icon-light  { display: block; }
+    .theme-toggle-btn[data-theme-state="dark"]   .theme-icon-dark   { display: block; }
+
     .header-right { display: flex; align-items: center; gap: 8px; }
 
     /* ── Layout ── */
@@ -529,3 +544,12 @@
       font-size: 1rem; font-weight: 600; cursor: pointer;
     }
     .onboard-btn:hover { opacity: .9; }
+
+    /* ── Dark Theme (Atom One Dark) ─────────────────────────────────────── */
+    [data-theme="dark"] {
+      --bg: #282c34; --surface: #21252b; --surface2: #2c313a;
+      --border: #3e4451; --text: #abb2bf; --dim: #5c6370;
+      --blue: #61afef; --green: #98c379; --yellow: #e5c07b;
+      --red: #e06c75; --purple: #c678dd; --orange: #d19a66;
+      --cyan: #56b6c2; --cyan-light: #73c7c0;
+    }

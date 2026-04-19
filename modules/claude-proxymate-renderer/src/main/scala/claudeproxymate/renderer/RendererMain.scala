@@ -10,6 +10,7 @@ import claudeproxymate.renderer.proxy.ProxyControl
 import claudeproxymate.renderer.proxy.ProxyInfoPopover
 import claudeproxymate.renderer.search.SearchNavigation
 import claudeproxymate.renderer.state.AppState
+import claudeproxymate.renderer.theme.Theme
 import claudeproxymate.renderer.update.UpdateChecker
 import org.scalajs.dom
 
@@ -28,6 +29,7 @@ object RendererMain {
     // bare `_imeComposing = ...` which throws ReferenceError in strict mode.
     dom.window.asInstanceOf[js.Dynamic]._imeComposing = false
 
+    Theme.init()
     installKeydownHandler()
     detectPlatform()
     fetchBuildInfo()

@@ -6,9 +6,11 @@ object HtmlIds {
   val OnboardModal: String = "onboardModal"
 
   // ── Header ──
-  val BuildVer: String      = "buildVer"
-  val UpdateBadge: String   = "updateBadge"
-  val LangToggleBtn: String = "langToggleBtn"
+  val BuildVer: String       = "buildVer"
+  val UpdateBadge: String    = "updateBadge"
+  val LogoIcon: String       = "logoIcon"
+  val LangToggleBtn: String  = "langToggleBtn"
+  val ThemeToggleBtn: String = "themeToggleBtn"
 
   // ── Proxy Bar ──
   val ProxyBar: String     = "proxyBar"

@@ -97,5 +97,6 @@ object I18n {
     // The status element has data-i18n="proxy.stopped" as a default, but when the proxy is running
     // it needs to show "Running on port {port}" (or the Korean equivalent) instead.
     claudeproxymate.renderer.proxy.ProxyControl.renderProxyStatus()
+    claudeproxymate.renderer.theme.Theme.apply()
   }
 }
