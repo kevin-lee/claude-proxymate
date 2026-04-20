@@ -4,7 +4,7 @@ import cats.effect.IO
 import io.circe.parser.{parse => parseJson}
 import org.http4s.*
 import org.http4s.client.Client
-import claudeproxymate.core.{ProxyEvent, ProxyRequest, ProxyResponse, SseParser}
+import claudeproxymate.core.{ProxyError, ProxyEvent, ProxyRequest, ProxyResponse, SseParser}
 
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
@@ -29,14 +29,11 @@ object ProxyServer {
 
       // 3. Forward to Anthropic
       resp <- AnthropicForwarder.forward(client, req, bodyBytes).handleErrorWith { err =>
-        // On upstream error, return 502 and emit error event
-        val errMsg = err.getMessage
+        val pe     = ProxyError.upstream(err)
+        val errMsg = pe.message
         EventEmitter.emit(
-          ProxyEvent.ResponseCaptured(ProxyResponse(reqId, 502, Left(errMsg), Some(errMsg)))
-        ).as(
-          Response[IO](Status.BadGateway)
-            .withEntity(s"""{"error":"$errMsg"}""")
-        )
+          ProxyEvent.ResponseCaptured(ProxyResponse(reqId, ProxyErrorHttp4s.status(pe).code, Left(errMsg), Some(errMsg)))
+        ).as(ProxyErrorHttp4s.asResponse(pe))
       }
 
       // 4. Tee response: stream to client AND buffer for parsing

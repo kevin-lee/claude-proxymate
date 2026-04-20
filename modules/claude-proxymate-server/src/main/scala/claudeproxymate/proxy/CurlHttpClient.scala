@@ -1,6 +1,7 @@
 package claudeproxymate.proxy
 
 import cats.effect.IO
+import claudeproxymate.core.ProxyError
 import org.http4s.{Headers, Method, Request, Response, Status, Uri}
 import org.http4s.client.Client
 import org.typelevel.ci.CIString
@@ -40,8 +41,7 @@ object CurlHttpClient {
     Zone { implicit z =>
       val curl = LibCurl.curl_easy_init()
       if (curl == null) {
-        Response[IO](Status.BadGateway)
-          .withEntity("""{"error":"curl_easy_init() returned null"}""")
+        ProxyErrorHttp4s.asResponse(ProxyError.CurlInitFailed)
       } else {
         val emptyList: LibCurl.SList = null.asInstanceOf[LibCurl.SList]
         val forwardedHeaders         = headers.headers.filterNot { h =>
@@ -74,8 +74,7 @@ object CurlHttpClient {
           performWithTmpFile(curl)
         } catch {
           case e: Throwable =>
-            Response[IO](Status.BadGateway)
-              .withEntity(s"""{"error":"${e.getMessage}"}""")
+            ProxyErrorHttp4s.asResponse(ProxyError.curlException(e))
         } finally {
           if (finalList != null) LibCurl.curl_slist_free_all(finalList) else ()
           LibCurl.curl_easy_cleanup(curl)
@@ -87,8 +86,7 @@ object CurlHttpClient {
   private def performWithTmpFile(curl: LibCurl.CURL)(implicit z: Zone): Response[IO] = {
     val tmpFile = stdio.tmpfile()
     if (tmpFile == null) {
-      Response[IO](Status.BadGateway)
-        .withEntity("""{"error":"tmpfile() returned null"}""")
+      ProxyErrorHttp4s.asResponse(ProxyError.TmpFileFailed)
     } else {
       try {
         LibCurl.curl_easy_setopt(curl, CurlOpt.WriteData, tmpFile): Unit
@@ -96,8 +94,7 @@ object CurlHttpClient {
         // Perform the request (blocks)
         val code = LibCurl.curl_easy_perform(curl)
         if (code != 0) {
-          Response[IO](Status.BadGateway)
-            .withEntity(s"""{"error":"curl_easy_perform failed with code $code"}""")
+          ProxyErrorHttp4s.asResponse(ProxyError.CurlPerformFailed(code))
         } else {
           // Read response from temp file
           val fileSize = stdio.ftell(tmpFile).toInt
@@ -124,8 +121,7 @@ object CurlHttpClient {
     val str    = new String(data, "ISO-8859-1")
     val sepIdx = str.indexOf("\r\n\r\n")
     if (sepIdx < 0) {
-      Response[IO](Status.BadGateway)
-        .withEntity("""{"error":"malformed response from upstream"}""")
+      ProxyErrorHttp4s.asResponse(ProxyError.MalformedUpstreamResponse)
     } else {
       val headerPart = str.substring(0, sepIdx)
       val bodyStart  = sepIdx + 4

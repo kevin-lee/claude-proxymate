@@ -87,7 +87,8 @@ lazy val proxyServer = (project in file("modules/claude-proxymate-server"))
       libs.http4sCirce.value,
       libs.fs2Core.value,
       libs.fs2Io.value,
-    ),
+    ) ++ libs.tests.munitNative.value,
+//    testFrameworks += new TestFramework("munit.Framework"),
     nativeConfig ~= { c =>
       c.withLTO(LTO.none)
         .withMode(Mode.releaseFast)
@@ -367,6 +368,8 @@ lazy val props = new {
 
   val HedgehogVersion = "0.13.0"
 
+  val MunitVersion = "1.0.0"
+
   val ScalatagsVersion = "0.13.1"
 
   lazy val licenses = List(License.MIT)
@@ -419,6 +422,13 @@ lazy val libs = new {
         "qa.hedgehog" %%% "hedgehog-core"   % props.HedgehogVersion % Test,
         "qa.hedgehog" %%% "hedgehog-runner" % props.HedgehogVersion % Test,
         "qa.hedgehog" %%% "hedgehog-sbt"    % props.HedgehogVersion % Test,
+      )
+    )
+
+    // munit is used by the Scala Native server module where hedgehog isn't published.
+    lazy val munitNative = Def.setting(
+      List(
+        "org.scalameta" %%% "munit" % props.MunitVersion % Test,
       )
     )
   }
