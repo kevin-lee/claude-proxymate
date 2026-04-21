@@ -35,6 +35,9 @@ object Preload {
         IpcRenderer.removeAllListeners(IpcChannels.ProxyRequest)
         IpcRenderer.removeAllListeners(IpcChannels.ProxyResponse)
       }: js.Function0[Unit],
+      openExternal = { (url: String) =>
+        IpcRenderer.invoke(IpcChannels.ShellOpenExternal, url)
+      }: js.Function1[String, js.Promise[js.Any]],
     )
 
     ContextBridge.exposeInMainWorld(IpcChannels.BridgeName, api.asInstanceOf[js.Object])

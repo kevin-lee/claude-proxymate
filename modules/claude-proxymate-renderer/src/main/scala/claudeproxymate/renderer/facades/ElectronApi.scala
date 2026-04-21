@@ -13,6 +13,7 @@ trait ElectronApi extends js.Object {
   def onProxyRequest(cb: js.Function1[js.Dynamic, Unit]): Unit = js.native
   def onProxyResponse(cb: js.Function1[js.Dynamic, Unit]): Unit = js.native
   def offProxy(): Unit = js.native
+  def openExternal(url: String): js.Promise[js.Dynamic] = js.native
 }
 
 object ElectronApi {

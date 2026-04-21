@@ -1,6 +1,6 @@
 package claudeproxymate.electron
 
-import claudeproxymate.core.IpcChannels
+import claudeproxymate.core.{IpcChannels, UrlScheme}
 import claudeproxymate.electron.facades._
 
 import java.util.concurrent.atomic.AtomicReference
@@ -43,6 +43,40 @@ object IpcHandlers {
         getStatus()
       }: js.Function2[js.Dynamic, js.Dynamic, js.Any]
     )
+
+    IpcMain.handle(
+      IpcChannels.ShellOpenExternal,
+      { (_: js.Dynamic, urlArg: js.Dynamic) =>
+        openExternal(urlArg)
+      }: js.Function2[js.Dynamic, js.Dynamic, js.Any]
+    )
+  }
+
+  /** Validate a URL against the allowlist and forward to `shell.openExternal`.
+    * Returns a Promise resolving to `{ok: true}` on success or
+    * `{ok: false, reason: "..."}` on any rejection.
+    */
+  private def openExternal(urlArg: js.Dynamic): js.Promise[js.Dynamic] = {
+    val url =
+      if (js.isUndefined(urlArg) || urlArg == null) ""
+      else urlArg.asInstanceOf[String]
+
+    UrlScheme.validate(url) match {
+      case Left(err) =>
+        js.Promise.resolve[js.Dynamic](
+          js.Dynamic.literal(ok = false, reason = err.message)
+        )
+      case Right(validUrl) =>
+        Shell.openExternal(validUrl)
+          .`then`[js.Dynamic]({ (_: Unit) =>
+            js.Dynamic.literal(ok = true): js.Dynamic
+          }: js.Function1[Unit, js.Dynamic])
+          .asInstanceOf[js.Dynamic]
+          .`catch`({ (e: js.Any) =>
+            js.Dynamic.literal(ok = false, reason = s"openExternal failed: ${e.toString}"): js.Dynamic
+          }: js.Function1[js.Any, js.Dynamic])
+          .asInstanceOf[js.Promise[js.Dynamic]]
+    }
   }
 
   /** Kill the proxy child process if running. Called on app quit. */

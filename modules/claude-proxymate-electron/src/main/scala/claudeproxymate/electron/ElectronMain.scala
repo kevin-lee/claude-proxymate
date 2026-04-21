@@ -1,5 +1,6 @@
 package claudeproxymate.electron
 
+import claudeproxymate.core.UrlScheme
 import claudeproxymate.electron.facades._
 
 import java.util.concurrent.atomic.AtomicReference
@@ -140,11 +141,22 @@ object ElectronMain {
         3000,
       )
 
-    // Open external links in default browser, not Electron
+    // Open external links in default browser, not Electron.
+    // Scheme allowlist guard: only https:// URLs are opened; others are logged and dropped.
     win
       .webContents
       .setWindowOpenHandler({ (details: js.Dynamic) =>
-        Shell.openExternal(details.url.asInstanceOf[String]): Unit
+        val url = details.url.asInstanceOf[String]
+        UrlScheme.validate(url) match {
+          case Left(err) =>
+            val _ = js.Dynamic.global.console.warn("Blocked window.open:", err.message)
+          case Right(validUrl) =>
+            val _ = Shell.openExternal(validUrl)
+              .asInstanceOf[js.Dynamic]
+              .`catch`({ (e: js.Any) =>
+                val _ = js.Dynamic.global.console.warn("openExternal failed:", e.toString)
+              }: js.Function1[js.Any, Unit])
+        }
         js.Dynamic.literal(action = "deny").asInstanceOf[js.Object]
       }: js.Function1[js.Dynamic, js.Object])
 

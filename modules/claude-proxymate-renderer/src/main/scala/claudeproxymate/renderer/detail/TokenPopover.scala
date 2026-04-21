@@ -1,5 +1,6 @@
 package claudeproxymate.renderer.detail
 
+import claudeproxymate.renderer.facades.ElectronApi
 import claudeproxymate.renderer.i18n.I18n
 import claudeproxymate.renderer.util.HtmlUtil.esc
 import org.scalajs.dom
@@ -20,6 +21,41 @@ object TokenPopover {
 
   private def handleClick(e: dom.MouseEvent): Unit = {
     val target = e.target.asInstanceOf[dom.html.Element]
+
+    // External link inside popover — route through electronAPI.openExternal
+    val classNames = {
+      val buf = scala.collection.mutable.ListBuffer.empty[String]
+      for (i <- 0 until target.classList.length) buf += target.classList.item(i)
+      buf.toList
+    }
+    val href = {
+      val raw = target.getAttribute("href")
+      if (raw == null) "" else raw
+    }
+    TokenPopoverLinks.extractExternalLinkHref(classNames, href) match {
+      case Some(h) =>
+        e.preventDefault()
+        e.stopPropagation()
+        ElectronApi.get.foreach { api =>
+          val _ = api
+            .openExternal(h)
+            .`then`[Unit]({ (result: js.Dynamic) =>
+              if (!js.isUndefined(result) && result != null) {
+                val ok = result.selectDynamic("ok")
+                if (!js.isUndefined(ok) && ok.asInstanceOf[Boolean]) ()
+                else {
+                  val reason = result.selectDynamic("reason")
+                  dom.console.warn(
+                    "openExternal refused:",
+                    if (js.isUndefined(reason) || reason == null) "(no reason)" else reason.toString,
+                  )
+                }
+              }
+            }: js.Function1[js.Dynamic, Unit])
+        }
+        return
+      case None => ()
+    }
 
     // Copy button in popover
     if (target.classList.contains("token-popover-copy")) {
@@ -81,7 +117,7 @@ object TokenPopover {
     val noteSb = new StringBuilder
     noteSb.append("""<div class="token-popover-note">""")
     noteSb.append(I18n.t("token.notePricingDate", Map("date" -> pricingDateStr)))
-    noteSb.append(s"""<br>${I18n.t("token.noteModelPrice")} (<a href="https://docs.anthropic.com/en/docs/about-claude/models#model-comparison" target="_blank" style="color:var(--blue);text-decoration:underline;cursor:pointer" onclick="event.stopPropagation();require('electron').shell.openExternal(this.href);return false;">${I18n.t("token.noteOfficialDoc")}</a>)""")
+    noteSb.append(s"""<br>${I18n.t("token.noteModelPrice")} (<a href="https://docs.anthropic.com/en/docs/about-claude/models#model-comparison" class="${TokenPopoverLinks.ExternalLinkClass}" target="_blank" rel="noopener" style="color:var(--blue);text-decoration:underline;cursor:pointer">${I18n.t("token.noteOfficialDoc")}</a>)""")
     noteSb.append(s"<br>${I18n.t("token.noteMTok")}")
     if (cachePctVal >= 50) noteSb.append(s"<br>${I18n.t("token.noteCacheSaving", Map("pct" -> cachePctVal.toString))}")
     noteSb.append("</div>")
