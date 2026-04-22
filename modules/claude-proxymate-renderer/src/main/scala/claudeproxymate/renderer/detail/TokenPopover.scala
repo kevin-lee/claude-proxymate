@@ -2,7 +2,7 @@ package claudeproxymate.renderer.detail
 
 import claudeproxymate.renderer.facades.ElectronApi
 import claudeproxymate.renderer.i18n.I18n
-import claudeproxymate.renderer.util.HtmlUtil.esc
+import claudeproxymate.renderer.view.ViewHelpers
 import org.scalajs.dom
 
 import scala.scalajs.js
@@ -79,60 +79,52 @@ object TokenPopover {
     if (pill == null) return
 
     val costData = pill.asInstanceOf[dom.html.Element].dataset.get("cost").getOrElse("{}")
-    val d = js.JSON.parse(costData)
+    val d        = js.JSON.parse(costData)
 
-    val descs = Map(
-      I18n.t("token.cacheRead") -> I18n.t("token.descCacheRead"),
-      I18n.t("token.cacheWrite") -> I18n.t("token.descCacheWrite"),
-      I18n.t("token.uncachedInput") -> I18n.t("token.descUncached"),
-      I18n.t("token.output") -> I18n.t("token.descOutput"),
+    val rows = d.selectDynamic("rows").asInstanceOf[js.Array[js.Dynamic]].toList.map { r =>
+      TokenPopoverRow(
+        label  = r.label.asInstanceOf[String],
+        tokens = r.tokens.asInstanceOf[String],
+        price  = r.price.toString,
+        cost   = r.cost.asInstanceOf[String],
+      )
+    }
+
+    val data = TokenPopoverData(
+      model       = d.model.asInstanceOf[String],
+      kb          = d.kb.asInstanceOf[String],
+      total       = d.total.asInstanceOf[String],
+      cachePct    = d.cachePct.asInstanceOf[Int],
+      pricingDate = d.pricingDate.asInstanceOf[String],
+      rows        = rows,
     )
 
-    val rows = d.selectDynamic("rows").asInstanceOf[js.Array[js.Dynamic]]
-    val modelStr = d.model.asInstanceOf[String]
-    val kbStr = d.kb.asInstanceOf[String]
-    val totalStr = d.total.asInstanceOf[String]
-    val cachePctVal = d.cachePct.asInstanceOf[Int]
-    val pricingDateStr = d.pricingDate.asInstanceOf[String]
+    val descriptions = Map(
+      I18n.t("token.cacheRead")     -> I18n.t("token.descCacheRead"),
+      I18n.t("token.cacheWrite")    -> I18n.t("token.descCacheWrite"),
+      I18n.t("token.uncachedInput") -> I18n.t("token.descUncached"),
+      I18n.t("token.output")        -> I18n.t("token.descOutput"),
+    )
 
-    val textLines = scala.collection.mutable.ListBuffer.empty[String]
-    textLines += s"${I18n.t("token.model")}: $modelStr"
-    textLines += s"${I18n.t("token.reqSize")}: $kbStr KB"
-    textLines += ""
+    val labels = TokenPopoverLabels(
+      costTitle         = I18n.t("token.costTitle"),
+      modelLabel        = I18n.t("token.model"),
+      reqSizeLabel      = I18n.t("token.reqSize"),
+      copyBtn           = I18n.t("token.copyBtn"),
+      totalLabel        = I18n.t("token.total"),
+      cacheHitRateLabel = I18n.t("token.cacheHitRate"),
+      notePricingDate   = I18n.t("token.notePricingDate", Map("date" -> data.pricingDate)),
+      noteModelPrice    = I18n.t("token.noteModelPrice"),
+      noteOfficialDoc   = I18n.t("token.noteOfficialDoc"),
+      noteMTok          = I18n.t("token.noteMTok"),
+      noteCacheSaving   =
+        if (data.cachePct >= 50) Some(I18n.t("token.noteCacheSaving", Map("pct" -> data.cachePct.toString)))
+        else None,
+    )
 
-    val rowsSb = new StringBuilder
-    for (r <- rows) {
-      val label = r.label.asInstanceOf[String]
-      val tokens = r.tokens.asInstanceOf[String]
-      val price = r.price.toString
-      val costVal = r.cost.asInstanceOf[String]
-      rowsSb.append(s"""<div class="token-popover-row"><span class="tp-label">${esc(label)}</span><span class="tp-formula">${esc(tokens)} tok × $$${esc(price)}/MTok</span><span class="tp-result">${esc(costVal)}</span></div>""")
-      descs.get(label).foreach(desc => rowsSb.append(s"""<div class="tp-desc">$desc</div>"""))
-      textLines += s"$label: $tokens tok × $$$price/MTok = $costVal"
-    }
-    textLines += ""
-    textLines += s"${I18n.t("token.total")}: $totalStr"
-    textLines += s"${I18n.t("token.cacheHitRate")}: $cachePctVal%"
-
-    val noteSb = new StringBuilder
-    noteSb.append("""<div class="token-popover-note">""")
-    noteSb.append(I18n.t("token.notePricingDate", Map("date" -> pricingDateStr)))
-    noteSb.append(s"""<br>${I18n.t("token.noteModelPrice")} (<a href="https://docs.anthropic.com/en/docs/about-claude/models#model-comparison" class="${TokenPopoverLinks.ExternalLinkClass}" target="_blank" rel="noopener" style="color:var(--blue);text-decoration:underline;cursor:pointer">${I18n.t("token.noteOfficialDoc")}</a>)""")
-    noteSb.append(s"<br>${I18n.t("token.noteMTok")}")
-    if (cachePctVal >= 50) noteSb.append(s"<br>${I18n.t("token.noteCacheSaving", Map("pct" -> cachePctVal.toString))}")
-    noteSb.append("</div>")
-
-    val textForCopy = textLines.mkString("\n").replace("\"", "&quot;")
     val pop = dom.document.createElement("div").asInstanceOf[dom.html.Div]
     pop.className = "token-popover"
-    pop.innerHTML =
-      s"""<div class="token-popover-title"><span>${I18n.t("token.costTitle")}</span><span class="token-popover-copy" data-text="$textForCopy">${I18n.t("token.copyBtn")}</span></div>""" +
-        s"""<div class="token-popover-info">${I18n.t("token.model")}: ${esc(modelStr)} · ${I18n.t("token.reqSize")}: ${esc(kbStr)} KB</div>""" +
-        rowsSb.toString() +
-        s"""<div class="token-popover-row tp-total"><span class="tp-label">${I18n.t("token.total")}</span><span class="tp-result">${esc(totalStr)}</span></div>""" +
-        s"""<div class="token-popover-row tp-total"><span class="tp-label">${I18n.t("token.cacheHitRate")}</span><span class="tp-result">${esc(cachePctVal.toString)}%</span></div>""" +
-        noteSb.toString()
-
+    ViewHelpers.setInnerHtml(pop, TokenPopoverView.buildPopoverFrag(data, labels, descriptions))
     locally { val _ = pill.appendChild(pop) }
   }
 }
