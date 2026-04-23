@@ -8,6 +8,7 @@ import claudeproxymate.renderer.messages.MessageRenderer
 import claudeproxymate.renderer.onboarding.Onboarding
 import claudeproxymate.renderer.proxy.ProxyControl
 import claudeproxymate.renderer.proxy.ProxyInfoPopover
+import claudeproxymate.renderer.proxy.ProxyList
 import claudeproxymate.renderer.search.SearchNavigation
 import claudeproxymate.renderer.state.AppState
 import claudeproxymate.renderer.theme.Theme
@@ -41,6 +42,7 @@ object RendererMain {
     showProxyUi()
     syncProxyStatus()
     TokenPopover.install()
+    ProxyList.install()
     ProxyInfoPopover.install()
     Onboarding.showIfNeeded()
   }
