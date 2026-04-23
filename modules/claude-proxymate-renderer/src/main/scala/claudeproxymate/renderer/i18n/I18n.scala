@@ -85,13 +85,7 @@ object I18n {
     if (btn != null) btn.textContent = if (_locale == "ko") "\ud55c" else "EN"
 
     // re-render proxy content that depends on locale
-    import claudeproxymate.renderer.state.AppState
-    if (AppState.proxyCaptures.nonEmpty) {
-      claudeproxymate.renderer.proxy.ProxyList.renderProxyList()
-    } else {
-      val list = dom.document.getElementById(HtmlIds.ProxyList)
-      if (list != null) list.innerHTML = s"""<div class="hist-empty">${t("proxy.noCaptures")}</div>"""
-    }
+    claudeproxymate.renderer.proxy.ProxyList.renderProxyList()
     claudeproxymate.renderer.detail.DetailView.renderProxyDetail()
     // Re-render proxy status to correct the text overwritten by the generic data-i18n loop above.
     // The status element has data-i18n="proxy.stopped" as a default, but when the proxy is running

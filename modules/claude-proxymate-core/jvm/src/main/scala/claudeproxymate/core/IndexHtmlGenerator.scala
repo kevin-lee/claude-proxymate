@@ -178,7 +178,6 @@ object IndexHtmlGenerator {
         button(
           id := HtmlIds.ProxyInfoBtn,
           cls := "proxy-bar-info",
-          onclick := "toggleProxyInfo()",
           attr("aria-label") := "Info",
           attr("title") := tx(m, "proxy.interceptTitle"),
         )("\u2139"),
@@ -195,8 +194,9 @@ object IndexHtmlGenerator {
           span(style := "font-size:10px;color:var(--dim)", id := HtmlIds.ProxyCount)("0"),
         ),
         div(cls := "hist-list", id := HtmlIds.ProxyList)(
-          div(cls := "hist-empty", i18nHtml := "proxy.noCaptures")(
-            raw(tx(m, "proxy.noCaptures")),
+          // Placeholder; replaced at renderer startup by ProxyList.renderProxyList().
+          div(cls := "hist-empty", i18n := "proxy.noCapturesTitle")(
+            tx(m, "proxy.noCapturesTitle"),
           ),
         ),
       ),

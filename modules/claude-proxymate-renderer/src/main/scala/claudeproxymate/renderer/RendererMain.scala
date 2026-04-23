@@ -43,6 +43,7 @@ object RendererMain {
     syncProxyStatus()
     TokenPopover.install()
     ProxyList.install()
+    ProxyList.renderProxyList()
     ProxyInfoPopover.install()
     Onboarding.showIfNeeded()
   }

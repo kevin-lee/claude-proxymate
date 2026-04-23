@@ -1,5 +1,6 @@
 package claudeproxymate.renderer.proxy
 
+import claudeproxymate.renderer.view.I18nTemplate
 import scalatags.Text.all.*
 
 /** Typed shape of one proxy capture row, resolved by the caller from the
@@ -17,7 +18,8 @@ final case class ProxyListEntry(
 
 /** Static i18n-sourced chrome labels for the proxy list. */
 final case class ProxyListLabels(
-  noCaptures: String,
+  noCapturesTitle: String,
+  noCapturesHint: String,
 )
 
 /** Pure view functions for the proxy capture list. */
@@ -32,7 +34,10 @@ object ProxyListView {
 
   def buildListFrag(entries: List[ProxyListEntry], labels: ProxyListLabels): Frag =
     if (entries.isEmpty)
-      div(cls := "hist-empty")(labels.noCaptures)
+      div(cls := "hist-empty")(
+        labels.noCapturesTitle,
+        small(I18nTemplate.render(labels.noCapturesHint)),
+      )
     else
       frag(entries.map(buildEntryFrag))
 

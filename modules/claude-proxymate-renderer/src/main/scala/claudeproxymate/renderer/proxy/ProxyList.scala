@@ -58,7 +58,10 @@ object ProxyList {
       )
     }
 
-    val labels = ProxyListLabels(noCaptures = I18n.t("proxy.noCaptures"))
+    val labels = ProxyListLabels(
+      noCapturesTitle = I18n.t("proxy.noCapturesTitle"),
+      noCapturesHint  = I18n.t("proxy.noCapturesHint"),
+    )
 
     ViewHelpers.setInnerHtml(list, ProxyListView.buildListFrag(entries, labels))
   }

@@ -7,7 +7,10 @@ object ProxyListViewSpec extends Properties {
 
   override def tests: List[Test] = List(
     example("buildListFrag empty list contains hist-empty class", testEmptyHasHistEmpty),
-    example("buildListFrag empty list contains noCaptures label", testEmptyHasLabel),
+    example("buildListFrag empty list contains noCapturesTitle label", testEmptyHasTitle),
+    example("buildListFrag empty list wraps hint in <small>", testEmptyWrapsHintInSmall),
+    example("buildListFrag empty list renders {{br}} hint as <br />", testEmptyHintBrTokenRendered),
+    example("buildListFrag empty list does not contain literal {{br}}", testEmptyNoLiteralBrToken),
     example("buildListFrag empty list does not contain prx-entry", testEmptyHasNoEntry),
     example("buildListFrag one entry contains prx-entry class", testOneEntryClass),
     example("buildListFrag selected entry has selected suffix", testSelectedClass),
@@ -22,7 +25,10 @@ object ProxyListViewSpec extends Properties {
     property("buildListFrag round-trips id as data-id parsable Double", testIdRoundTrip),
   )
 
-  private val sampleLabels = ProxyListLabels(noCaptures = "no captures yet")
+  private val sampleLabels = ProxyListLabels(
+    noCapturesTitle = "no captures yet",
+    noCapturesHint  = "Start the proxy and{{br}}run Claude Code",
+  )
 
   private def sampleEntry(
     id: Double = 1.0,
@@ -41,8 +47,30 @@ object ProxyListViewSpec extends Properties {
   def testEmptyHasHistEmpty: Result =
     Result.assert(render(Nil).contains("hist-empty")).log(render(Nil))
 
-  def testEmptyHasLabel: Result =
+  def testEmptyHasTitle: Result =
     Result.assert(render(Nil).contains("no captures yet")).log(render(Nil))
+
+  def testEmptyWrapsHintInSmall: Result = {
+    val html = render(Nil)
+    Result.all(
+      List(
+        Result.assert(html.contains("<small>")).log(s"<small> open missing: $html"),
+        Result.assert(html.contains("</small>")).log(s"</small> close missing: $html"),
+        Result.assert(html.contains("Start the proxy and")).log(s"hint line1 missing: $html"),
+        Result.assert(html.contains("run Claude Code")).log(s"hint line2 missing: $html"),
+      )
+    )
+  }
+
+  def testEmptyHintBrTokenRendered: Result = {
+    val html = render(Nil)
+    Result.assert(html.contains("<br />")).log(s"<br /> missing: $html")
+  }
+
+  def testEmptyNoLiteralBrToken: Result = {
+    val html = render(Nil)
+    Result.assert(!html.contains("{{br}}")).log(s"literal {{br}} leaked: $html")
+  }
 
   def testEmptyHasNoEntry: Result = {
     val html = render(Nil)
