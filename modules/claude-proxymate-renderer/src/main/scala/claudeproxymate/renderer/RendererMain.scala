@@ -3,6 +3,7 @@ package claudeproxymate.renderer
 import claudeproxymate.core.HtmlIds
 import claudeproxymate.renderer.detail.TokenPopover
 import claudeproxymate.renderer.facades.ElectronApi
+import claudeproxymate.renderer.json.JsonTreeViewer
 import claudeproxymate.renderer.i18n.I18n
 import claudeproxymate.renderer.messages.MessageRenderer
 import claudeproxymate.renderer.onboarding.Onboarding
@@ -45,6 +46,7 @@ object RendererMain {
     ProxyList.install()
     ProxyList.renderProxyList()
     ProxyInfoPopover.install()
+    JsonTreeViewer.install()
     Onboarding.showIfNeeded()
   }
 
