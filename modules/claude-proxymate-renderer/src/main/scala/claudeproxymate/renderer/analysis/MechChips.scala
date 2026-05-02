@@ -1,69 +1,44 @@
 package claudeproxymate.renderer.analysis
 
-import claudeproxymate.core.{ClaudeMdParser, Mechanisms, MechanismDetector}
+import claudeproxymate.core.{ClaudeMdParser, MechanismDetector, Mechanisms}
 import claudeproxymate.renderer.i18n.I18n
 import claudeproxymate.renderer.state.AppState
-import claudeproxymate.renderer.util.HtmlUtil.{esc, escAttr}
 import claudeproxymate.renderer.util.JsJsonBridge
+import org.scalajs.dom
 
 import scala.scalajs.js
-import scala.scalajs.js.annotation.JSExportTopLevel
 
 /** Mechanism filter chips and metadata.
   *
-  * Ports `buildMechFilterChips`, `getChipMeta`, `setProxyDetailMechFilter`,
-  * and `detectMechanisms` (JS bridge to core) from renderer.js.
+  * Owns the document-level click handler that toggles the active filter
+  * via `setProxyDetailMechFilter`. The HTML building lives in
+  * [[MechChipsView]].
   */
 object MechChips {
 
-  /** Bridge from JS `detectMechanisms(body)` to core `MechanismDetector`.
-    * Takes `js.Dynamic`, converts via JsJsonBridge, returns `Mechanisms`.
+  /** Install the document-level click handler for chip clicks. Called
+    * from RendererMain.
     */
+  def install(): Unit =
+    dom.document.addEventListener("click", handleClick _)
+
+  private def handleClick(e: dom.MouseEvent): Unit = {
+    val target = e.target.asInstanceOf[dom.Element]
+    if (target == null) return
+    val chipEl = target.closest(s".${MechChipsView.ChipClass}[${MechChipsView.ChipDataAttr}]")
+    if (chipEl == null) return
+    val key = chipEl.asInstanceOf[dom.html.Element].getAttribute(MechChipsView.ChipDataAttr)
+    if (key == null || key.isEmpty) return
+    setProxyDetailMechFilter(key)
+  }
+
+  /** Bridge from JS `js.Dynamic` body to core `MechanismDetector`. */
   def detectMechanismsFromDynamic(body: js.Dynamic): Mechanisms = {
     val json = JsJsonBridge.toCirceJsonUnsafe(body)
     MechanismDetector.detectMechanisms(json)
   }
 
-  /** JS-callable `detectMechanisms` returning `js.Dynamic` for remaining JS code. */
-  @JSExportTopLevel("detectMechanisms")
-  def detectMechanismsJs(body: js.Dynamic): js.Dynamic = {
-    val det = detectMechanismsFromDynamic(body)
-    mechanismsToJsDynamic(det)
-  }
-
-  private def mechanismsToJsDynamic(det: Mechanisms): js.Dynamic = {
-    val result = js.Dynamic.literal(
-      "claudeMd" -> det.claudeMd.orNull,
-      "outputStyle" -> det.outputStyle.map(ls => js.Array(ls.map(_.asInstanceOf[js.Any])*)).orNull,
-      "slashCommands" -> js.Array(det.slashCommands.map { sc =>
-        js.Dynamic.literal("name" -> sc.name, "tag" -> sc.tag, "full" -> sc.full)
-      }*),
-      "skills" -> js.Array(det.skills.map { sk =>
-        val obj = js.Dynamic.literal(
-          "id" -> sk.id,
-          "input" -> JsJsonBridge.toJsDynamic(sk.input),
-        )
-        sk.result.foreach(r => obj.result = r)
-        obj
-      }*),
-      "subAgents" -> js.Array(det.subAgents.map { sa =>
-        js.Dynamic.literal("id" -> sa.id, "name" -> sa.name, "input" -> JsJsonBridge.toJsDynamic(sa.input))
-      }*),
-      "mcpTools" -> js.Array(det.mcpTools.map { mc =>
-        val obj = js.Dynamic.literal(
-          "id" -> mc.id,
-          "name" -> mc.name,
-          "input" -> JsJsonBridge.toJsDynamic(mc.input),
-        )
-        mc.result.foreach(r => obj.result = r)
-        obj
-      }*),
-    )
-    result
-  }
-
-  final case class ChipMeta(color: String, who: String, what: String)
-
+  /** Static i18n-sourced chip metadata (colour, who, what). */
   def getChipMeta(): Map[String, ChipMeta] = Map(
     "cm" -> ChipMeta("var(--green)", I18n.t("mechDesc.cm.who"), I18n.t("mechDesc.cm.what")),
     "sc" -> ChipMeta("var(--yellow)", I18n.t("mechDesc.sc.who"), I18n.t("mechDesc.sc.what")),
@@ -72,94 +47,69 @@ object MechChips {
     "mc" -> ChipMeta("var(--cyan)", I18n.t("mechDesc.mc.who"), I18n.t("mechDesc.mc.what")),
   )
 
-  @JSExportTopLevel("getChipMeta")
-  def getChipMetaJs(): js.Dynamic = {
-    val meta = getChipMeta()
-    val result = js.Dynamic.literal()
-    meta.foreach { case (k, v) =>
-      result.updateDynamic(k)(js.Dynamic.literal("color" -> v.color, "who" -> v.who, "what" -> v.what))
-    }
-    result
-  }
-
-  @JSExportTopLevel("setProxyDetailMechFilter")
+  /** Toggle the mechanism filter. Called by the click handler. */
   def setProxyDetailMechFilter(key: String): Unit = {
     AppState.proxyDetailMechFilter = AppState.proxyDetailMechFilter match {
       case Some(k) if k == key => None
-      case _                    => Some(key)
+      case _                   => Some(key)
     }
     claudeproxymate.renderer.detail.DetailView.renderProxyDetail()
   }
 
-  final case class Chip(key: String, found: Boolean, label: String, pattern: Option[String], cls: String, metaKey: String)
-
+  /** Build the mechanism filter chips HTML. Returns empty string when no
+    * chips. Caller (AnalysisRenderer / DetailView) concatenates the
+    * result into a String template — keep the return type stable until
+    * those panels migrate (A3g/A3h).
+    */
   def buildMechFilterChips(body: js.Dynamic): String = {
-    val det = detectMechanismsFromDynamic(body)
+    val det   = detectMechanismsFromDynamic(body)
+    val chips = collectChips(det)
+    if (chips.isEmpty) return ""
+    val activeKey = AppState.proxyDetailMechFilter
+    val descMeta  = activeKey
+      .flatMap(k => chips.find(_.key == k))
+      .flatMap(c => getChipMeta().get(c.metaKey))
+    MechChipsView.buildChipsFrag(chips, activeKey, descMeta).render
+  }
 
-    val chips = scala.collection.mutable.ListBuffer.empty[Chip]
+  private def collectChips(det: Mechanisms): List[Chip] = {
+    val buf = scala.collection.mutable.ListBuffer.empty[Chip]
 
-    // CLAUDE.md sections
     det.claudeMd.foreach { claudeMd =>
       val sections = ClaudeMdParser.parseClaudeMdSections(claudeMd)
       if (sections.nonEmpty) {
         for ((s, i) <- sections.zipWithIndex) {
-          val firstLine = s.content.split('\n').find(_.trim.length > 8).getOrElse(s.content.take(40))
           val cls = if (s.cls == "cyan") "st" else "cm"
-          chips += Chip(s"cm_$i", found = true, s.label, Some(firstLine.trim), cls, "cm")
+          buf += Chip(s"cm_$i", s.label, cls, "cm")
         }
       } else {
-        chips += Chip("cm", found = true, "\uD83D\uDCCB CLAUDE.md", Some("system-reminder"), "cm", "cm")
+        buf += Chip("cm", "📋 CLAUDE.md", "cm", "cm")
       }
     }
 
     for ((cmd, i) <- det.slashCommands.zipWithIndex) {
-      chips += Chip(s"sc_$i", found = true, s"\u2328 /${cmd.name}", None, "sc", "sc")
+      buf += Chip(s"sc_$i", s"⌨ /${cmd.name}", "sc", "sc")
     }
+
     for ((sk, i) <- det.skills.zipWithIndex) {
-      val skName = {
-        val input = sk.input
-        input.hcursor.downField("skill").as[String]
-          .orElse(input.hcursor.downField("command").as[String])
-          .getOrElse(s"Skill ${i + 1}")
-      }
-      chips += Chip(s"sk_$i", found = true, s"\uD83D\uDD27 $skName", None, "sk", "sk")
+      val skName = sk.input.hcursor
+        .downField("skill")
+        .as[String]
+        .orElse(sk.input.hcursor.downField("command").as[String])
+        .getOrElse(s"Skill ${i + 1}")
+      buf += Chip(s"sk_$i", s"🔧 $skName", "sk", "sk")
     }
+
     if (det.subAgents.nonEmpty) {
-      val name = det.subAgents.headOption.map(_.name).getOrElse("Agent")
-      chips += Chip("sa", found = true, s"\uD83E\uDD16 Sub-Agent", Some(name), "sa", "sa")
+      buf += Chip("sa", "🤖 Sub-Agent", "sa", "sa")
     }
+
     for ((mc, i) <- det.mcpTools.zipWithIndex) {
-      val parts = mc.name.split("__")
+      val parts    = mc.name.split("__")
       val toolName = if (parts.length > 2) parts.drop(2).mkString("__") else mc.name
-      chips += Chip(s"mc_$i", found = true, s"\uD83D\uDD0C $toolName", None, "mc", "mc")
+      buf += Chip(s"mc_$i", s"🔌 $toolName", "mc", "mc")
     }
 
-    if (chips.isEmpty) return ""
-
-    val activeChip = chips.find(c => AppState.proxyDetailMechFilter.contains(c.key))
-    val meta = activeChip.flatMap(c => getChipMeta().get(c.metaKey))
-    val descBanner = meta match {
-      case Some(m) =>
-        s"""<div class="mech-filter-desc">""" +
-          s"""<span class="mech-filter-desc-dot" style="background:${m.color}"></span>""" +
-          s"""<div class="mech-filter-desc-body">""" +
-          s"""<span class="mech-filter-desc-who">${esc(m.who)}</span>""" +
-          s"""<span class="mech-filter-desc-what">${esc(m.what)}</span>""" +
-          "</div></div>"
-      case None => ""
-    }
-
-    """<div style="flex-shrink:0;border-bottom:1px solid var(--border)">""" +
-      """<div style="display:flex;flex-wrap:wrap;gap:5px;padding:5px 10px 7px">""" +
-      chips.map { c =>
-        val active = if (AppState.proxyDetailMechFilter.contains(c.key)) " active" else ""
-        s"""<span class="mech-chip ${c.cls} found btn$active" data-key="${escAttr(c.key)}" onclick="setProxyDetailMechFilter(this.dataset.key)">${esc(c.label)}</span>"""
-      }.mkString +
-      "</div>" +
-      descBanner +
-      "</div>"
+    buf.toList
   }
-
-  @JSExportTopLevel("buildMechFilterChips")
-  def buildMechFilterChipsJs(body: js.Dynamic): String = buildMechFilterChips(body)
 }

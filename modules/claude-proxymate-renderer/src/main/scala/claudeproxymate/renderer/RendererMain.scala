@@ -1,6 +1,7 @@
 package claudeproxymate.renderer
 
 import claudeproxymate.core.HtmlIds
+import claudeproxymate.renderer.analysis.MechChips
 import claudeproxymate.renderer.detail.TokenPopover
 import claudeproxymate.renderer.facades.ElectronApi
 import claudeproxymate.renderer.json.JsonTreeViewer
@@ -47,6 +48,7 @@ object RendererMain {
     ProxyList.renderProxyList()
     ProxyInfoPopover.install()
     JsonTreeViewer.install()
+    MechChips.install()
     Onboarding.showIfNeeded()
   }
 

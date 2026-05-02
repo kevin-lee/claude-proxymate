@@ -4,9 +4,10 @@ import claudeproxymate.core.ClaudeMdParser
 import claudeproxymate.renderer.json.JsonTreeViewer
 import claudeproxymate.renderer.util.HtmlUtil.esc
 import org.scalajs.dom
+import scalatags.Text.all.*
+import scalatags.Text.tags2 as st2
 
 import scala.scalajs.js
-import scala.scalajs.js.annotation.JSExportTopLevel
 
 /** Highlight mechanisms in the JSON tree and apply detail search highlights.
   *
@@ -16,7 +17,6 @@ import scala.scalajs.js.annotation.JSExportTopLevel
 object MechHighlight {
 
   /** Expand collapsed ancestor nodes so `el` becomes visible. */
-  @JSExportTopLevel("expandAncestors")
   def expandAncestors(el: dom.Element): Unit = {
     var cur = el.asInstanceOf[dom.html.Element].parentElement
     while (cur != null) {
@@ -78,7 +78,6 @@ object MechHighlight {
   }
 
   /** Highlight a tool_use block by its id in the JSON tree. */
-  @JSExportTopLevel("highlightToolUseById")
   def highlightToolUseById(container: dom.Element, toolUseId: String): Unit = {
     val strEls = container.querySelectorAll(".jt-str, .jt-str-expanded")
     var i = 0
@@ -108,7 +107,6 @@ object MechHighlight {
   }
 
   /** Highlight a mechanism in the JSON tree view. */
-  @JSExportTopLevel("highlightMechInJsonTree")
   def highlightMechInJsonTree(container: dom.Element, body: js.Dynamic, mechKey: String): Unit = {
     if (mechKey == null || mechKey.isEmpty) return
 
@@ -223,9 +221,9 @@ object MechHighlight {
   }
 
   /** Apply search highlight to text nodes in a container.
-    * Uses DOM TreeWalker to find text nodes and wraps matches in `<mark class="search-hl">`.
+    * Uses DOM TreeWalker to find text nodes and wraps matches in
+    * `<mark class="search-hl">` via Scalatags (auto-escaping).
     */
-  @JSExportTopLevel("applyDetailHighlight")
   def applyDetailHighlight(container: dom.Element, query: String): Unit = {
     if (query == null || query.isEmpty) return
 
@@ -246,20 +244,20 @@ object MechHighlight {
       re.lastIndex = 0
       if (re.test(text).asInstanceOf[Boolean]) {
         re.lastIndex = 0
-        val sb = new StringBuilder
+        val parts = scala.collection.mutable.ListBuffer.empty[Frag]
         var last = 0
         var m = re.exec(text)
         while (m != null && !js.isUndefined(m)) {
           val matchIndex = m.index.asInstanceOf[Int]
-          val matched = m.selectDynamic("0").asInstanceOf[String]
-          sb.append(esc(text.substring(last, matchIndex)))
-          sb.append(s"""<mark class="search-hl">${esc(matched)}</mark>""")
+          val matched    = m.selectDynamic("0").asInstanceOf[String]
+          parts += stringFrag(text.substring(last, matchIndex))
+          parts += st2.mark(cls := "search-hl")(matched)
           last = matchIndex + matched.length
           m = re.exec(text)
         }
-        sb.append(esc(text.substring(last)))
+        parts += stringFrag(text.substring(last))
         val span = dom.document.createElement("span")
-        span.innerHTML = sb.toString()
+        span.innerHTML = frag(parts.toList).render
         locally { val _ = node.parentNode.replaceChild(span, node) }
       }
     }
