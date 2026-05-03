@@ -4,47 +4,81 @@ import claudeproxymate.core.HtmlIds
 import claudeproxymate.renderer.i18n.I18n
 import claudeproxymate.renderer.state.AppState
 import claudeproxymate.renderer.util.Debounce
-import claudeproxymate.renderer.util.HtmlUtil.{esc, escAttr, highlightSearch}
+import claudeproxymate.renderer.view.ViewHelpers
 import org.scalajs.dom
+import scalatags.Text.all.*
 
 import scala.scalajs.js
-import scala.scalajs.js.annotation.JSExportTopLevel
 
 /** Render proxy messages tab: filter, search, message cards.
   *
-  * Ports `renderUserMsgContent`, `renderProxyMessages`,
-  * `setMsgFilter`, `setMsgSearch` from renderer.js.
+  * Owns the document-level click / input / composition listeners that drive
+  * filter button toggles, search input changes, IME composition tracking,
+  * and badge toggles. The HTML building lives in [[MessageView]].
   */
 object MessageRenderer {
 
   private val msgSearchDebounce = new Debounce(150)
 
-  /** Render a single user message's text content (typed portions + injected blocks).
-    * Returns `None` if `typedOnly` and there are no typed portions.
-    */
-  def renderUserMsgContent(text: String, typedOnly: Boolean, query: String): Option[String] = {
-    val parts = MessageParser.parseUserText(text)
+  /** Install the document-level listeners. Called from RendererMain. */
+  def install(): Unit = {
+    dom.document.addEventListener("click", handleClick _)
+    dom.document.addEventListener("input", handleInput _)
+    dom.document.addEventListener("compositionstart", handleCompositionStart _)
+    dom.document.addEventListener("compositionend", handleCompositionEnd _)
+  }
 
-    if (typedOnly) {
-      val typed = parts.collect { case p: MessageParser.TextPart => p }
-      if (typed.isEmpty) None
-      else Some(typed.map(p => s"""<div class="msg-typed">${highlightSearch(esc(p.content), query)}</div>""").mkString)
-    } else {
-      val html = parts.map {
-        case MessageParser.TextPart(content) =>
-          s"""<div class="msg-typed">${highlightSearch(esc(content), query)}</div>"""
-        case MessageParser.InjectedPart(label, content, cls) =>
-          val uid = dom.window.asInstanceOf[js.Dynamic].Math.random().applyDynamic("toString")(36).asInstanceOf[String].substring(2, 8)
-          s"""<div class="msg-injected-row">""" +
-            s"""<span id="bb_$uid" class="msg-badge $cls expandable" onclick="toggleBadge('$uid')">${esc(label)}</span>""" +
-            s"""<div id="bc_$uid" class="badge-expand-content" style="display:none">${highlightSearch(esc(content), query)}</div>""" +
-            "</div>"
-      }.mkString
-      Some(html)
+  private def handleClick(e: dom.MouseEvent): Unit = {
+    val target = e.target.asInstanceOf[dom.Element]
+    if (target == null) return
+
+    val filterEl = target.closest(s".${MessageView.FilterButtonClass}[${MessageView.FilterDataAttr}]")
+    if (filterEl != null) {
+      val key = filterEl.asInstanceOf[dom.html.Element].getAttribute(MessageView.FilterDataAttr)
+      if (key != null && key.nonEmpty) { setMsgFilter(key); return }
+    }
+
+    if (target.closest(s".${MessageView.SearchClearClass}") != null) {
+      setMsgSearch("")
+      val inp = dom.document.getElementById(HtmlIds.MsgSearchInput)
+      if (inp != null) inp.asInstanceOf[dom.html.Input].focus()
+      return
+    }
+
+    val badgeEl = target.closest(s".${MessageView.BadgeClass}[${MessageView.BadgeDataAttr}]")
+    if (badgeEl != null) {
+      val uid = badgeEl.asInstanceOf[dom.html.Element].getAttribute(MessageView.BadgeDataAttr)
+      if (uid != null && uid.nonEmpty) BadgeToggle.toggleBadge(uid)
     }
   }
 
-  @JSExportTopLevel("renderProxyMessages")
+  private def handleInput(e: dom.Event): Unit = {
+    val target = e.target.asInstanceOf[dom.Element]
+    if (target == null || target.id != HtmlIds.MsgSearchInput) return
+    setMsgSearch(target.asInstanceOf[dom.html.Input].value)
+  }
+
+  private def handleCompositionStart(e: dom.Event): Unit = {
+    val target = e.target.asInstanceOf[dom.Element]
+    if (target == null || target.id != HtmlIds.MsgSearchInput) return
+    // The IME flag stays on the window global until A3g/A3h migrate the
+    // other two search inputs; sharing one source of truth is required by
+    // SearchNavigation.
+    dom.window.asInstanceOf[js.Dynamic]._imeComposing = true
+  }
+
+  private def handleCompositionEnd(e: dom.Event): Unit = {
+    val target = e.target.asInstanceOf[dom.Element]
+    if (target == null || target.id != HtmlIds.MsgSearchInput) return
+    dom.window.asInstanceOf[js.Dynamic]._imeComposing = false
+    setMsgSearch(target.asInstanceOf[dom.html.Input].value)
+  }
+
+  private def nextBadgeUid(): String = {
+    AppState.badgeUidCounter += 1
+    s"b${AppState.badgeUidCounter}"
+  }
+
   def renderProxyMessages(entry: js.Dynamic, container: dom.html.Element): Unit = {
     val body = entry.selectDynamic("body")
     val msgs: js.Array[js.Dynamic] =
@@ -55,7 +89,7 @@ object MessageRenderer {
       } else js.Array[js.Dynamic]()
 
     if (msgs.length == 0) {
-      container.innerHTML = s"""<div class="proxy-empty"><span>${I18n.t("proxy.noMessages")}</span></div>"""
+      ViewHelpers.setInnerHtml(container, MessageView.buildEmptyFrag(I18n.t("proxy.noMessages")))
       return
     }
 
@@ -68,10 +102,7 @@ object MessageRenderer {
       else if (AppState.msgFilter == "assistant") msgs.filter(m => m.role.asInstanceOf[String] == "assistant")
       else msgs
 
-    val filterHtml = buildFilterHtml()
-    val searchHtml = buildSearchHtml(q)
-
-    val cards = scala.collection.mutable.ListBuffer.empty[String]
+    val cards = scala.collection.mutable.ListBuffer.empty[MsgCard]
     for (msg <- baseFiltered) {
       val role = msg.role.asInstanceOf[String]
       val rawContent = msg.selectDynamic("content")
@@ -92,34 +123,51 @@ object MessageRenderer {
       }
 
       if (!shouldSkip) {
-        val bodyParts = buildBodyParts(contents, role, isUserFilter, q)
-        if (bodyParts.nonEmpty) {
-          val joined = bodyParts.mkString
-          if (q.isEmpty || joined.contains("""class="search-hl"""")) {
-            cards += s"""<div class="msg-card msg-${esc(role)}">""" +
-              s"""<div class="msg-role">${esc(role)}</div>""" +
-              s"""<div class="msg-body">$joined</div>""" +
-              "</div>"
-          }
-        }
+        val card = buildCard(role, contents, typedOnly)
+        if (cardIsNonEmpty(card) && cardMatchesQuery(card, q)) cards += card
       }
     }
 
-    // Override container styles for scrollable layout
     container.style.cssText = "flex:1;overflow-y:auto;display:block"
-    container.innerHTML =
-      s"""<div style="position:sticky;top:0;z-index:1;background:var(--bg)">$filterHtml$searchHtml</div>""" +
-        s"""<div style="display:flex;flex-direction:column;gap:8px;padding:12px">""" +
-        (if (cards.isEmpty) s"""<div class="proxy-empty"><span>${I18n.t("proxy.noResults")}</span></div>"""
-         else cards.mkString) +
-        "</div>"
+
+    val filterLabels = FilterLabels(
+      user      = I18n.t("messages.filterUser"),
+      typed     = I18n.t("messages.filterTyped"),
+      assistant = I18n.t("messages.filterAssistant"),
+      all       = I18n.t("messages.filterAll"),
+    )
+    val searchLabels = SearchLabels(
+      placeholder = I18n.t("messages.searchPlaceholder"),
+      clear       = I18n.t("messages.searchClear"),
+    )
+
+    val header = MessageView.buildHeaderFrag(
+      activeFilter  = AppState.msgFilter,
+      filterLabels  = filterLabels,
+      msgCountId    = HtmlIds.MsgCountEl,
+      searchInputId = HtmlIds.MsgSearchInput,
+      searchLabels  = searchLabels,
+      query         = q,
+    )
+
+    val body2: Frag =
+      if (cards.isEmpty) MessageView.buildNoResultsFrag(I18n.t("proxy.noResults"))
+      else MessageView.buildCardsFrag(cards.toList, isUserFilter, q)
+
+    val full = frag(
+      div(style := "position:sticky;top:0;z-index:1;background:var(--bg)")(header),
+      div(style := "display:flex;flex-direction:column;gap:8px;padding:12px")(body2),
+    )
+    ViewHelpers.setInnerHtml(container, full)
 
     val countEl = dom.document.getElementById(HtmlIds.MsgCountEl)
     if (countEl != null) {
-      countEl.textContent = I18n.t("proxy.msgCount", Map("count" -> cards.length.toString, "total" -> msgs.length.toString))
+      countEl.textContent = I18n.t(
+        "proxy.msgCount",
+        Map("count" -> cards.length.toString, "total" -> msgs.length.toString),
+      )
     }
 
-    // Restore focus on search input after re-render
     val inp = dom.document.getElementById(HtmlIds.MsgSearchInput)
     if (inp != null && (q.nonEmpty || AppState.msgSearchWasFocused)) {
       val inputEl = inp.asInstanceOf[dom.html.Input]
@@ -129,81 +177,92 @@ object MessageRenderer {
     }
   }
 
-  private def buildFilterHtml(): String = {
-    def active(f: String): String = if (AppState.msgFilter == f) " active" else ""
-    s"""<div class="msg-filter">""" +
-      s"""<button class="mf-btn${active("user")}" onclick="setMsgFilter('user')">${I18n.t("messages.filterUser")}</button>""" +
-      s"""<button class="mf-btn${active("typed")}" onclick="setMsgFilter('typed')">${I18n.t("messages.filterTyped")}</button>""" +
-      s"""<button class="mf-btn${active("assistant")}" onclick="setMsgFilter('assistant')">${I18n.t("messages.filterAssistant")}</button>""" +
-      s"""<button class="mf-btn${active("all")}" onclick="setMsgFilter('all')">${I18n.t("messages.filterAll")}</button>""" +
-      s"""<span class="msg-count" id="${HtmlIds.MsgCountEl}"></span>""" +
-      "</div>"
-  }
-
-  private def buildSearchHtml(q: String): String = {
-    val clearBtn =
-      if (q.nonEmpty)
-        s"""<button class="msg-search-clear" onclick="setMsgSearch('');document.getElementById('${HtmlIds.MsgSearchInput}')?.focus()" title="${escAttr(I18n.t("messages.searchClear"))}">✕</button>"""
-      else ""
-    s"""<div class="msg-search-bar">""" +
-      s"""<input type="text" id="${HtmlIds.MsgSearchInput}" class="msg-search-input" """ +
-      s"""placeholder="${escAttr(I18n.t("messages.searchPlaceholder"))}" value="${escAttr(q)}" """ +
-      s"""oninput="setMsgSearch(this.value)" """ +
-      s"""oncompositionstart="_imeComposing=true" """ +
-      s"""oncompositionend="_imeComposing=false;setMsgSearch(this.value)">""" +
-      clearBtn +
-      "</div>"
-  }
-
-  private def buildBodyParts(
-    contents: js.Array[js.Dynamic],
+  private def buildCard(
     role: String,
-    isUserFilter: Boolean,
-    q: String,
-  ): List[String] = {
-    val parts = scala.collection.mutable.ListBuffer.empty[String]
-    for (c <- contents) {
-      val cType = c.selectDynamic("type").asInstanceOf[String]
-      cType match {
-        case "text" =>
+    contents: js.Array[js.Dynamic],
+    typedOnly: Boolean,
+  ): MsgCard = {
+    if (role == "user") {
+      val parts = scala.collection.mutable.ListBuffer.empty[MsgPart]
+      for (c <- contents) {
+        val cType = c.selectDynamic("type").asInstanceOf[String]
+        if (cType == "text") {
           val cText = c.selectDynamic("text")
           val text  = if (!js.isUndefined(cText) && cText != null) cText.toString else ""
-          if (role == "user") {
-            renderUserMsgContent(text, isUserFilter, q).foreach(parts += _)
+          val parsed = MessageParser.parseUserText(text)
+          if (typedOnly) {
+            parsed.foreach {
+              case MessageParser.TextPart(content) => parts += TextMsgPart(content)
+              case _: MessageParser.InjectedPart   => ()
+            }
           } else {
-            parts += s"""<div class="msg-text">${highlightSearch(esc(text), q)}</div>"""
+            parsed.foreach {
+              case MessageParser.TextPart(content) => parts += TextMsgPart(content)
+              case MessageParser.InjectedPart(label, content, cls) =>
+                parts += InjectedMsgPart(nextBadgeUid(), label, content, cls)
+            }
           }
-        case "tool_use" =>
-          if (!isUserFilter) {
+        }
+      }
+      MsgCard(role, contents = Nil, userParts = parts.toList)
+    } else {
+      val msgContents = contents.toList.map { c =>
+        val cType = c.selectDynamic("type").asInstanceOf[String]
+        cType match {
+          case "text" =>
+            val cText = c.selectDynamic("text")
+            val text  = if (!js.isUndefined(cText) && cText != null) cText.toString else ""
+            TextContent(text)
+          case "tool_use" =>
             val name = c.selectDynamic("name")
             val nameStr = if (!js.isUndefined(name) && name != null) name.toString else ""
-            parts += s"""<div class="msg-tool">\uD83D\uDD27 ${esc(nameStr)}()</div>"""
-          }
-        case "tool_result" =>
-          if (!isUserFilter) {
+            ToolUseContent(nameStr)
+          case "tool_result" =>
             val rc = c.selectDynamic("content")
-            val preview =
-              if (js.typeOf(rc) == "string") rc.asInstanceOf[String].take(120)
-              else if (js.Array.isArray(rc)) {
+            val raw =
+              if (js.typeOf(rc) == "string") rc.asInstanceOf[String]
+              else if (js.Array.isArray(rc))
                 rc.asInstanceOf[js.Array[js.Dynamic]]
                   .map { x =>
                     val t = x.selectDynamic("text")
                     if (!js.isUndefined(t) && t != null) t.toString else ""
                   }
                   .mkString
-                  .take(120)
-              } else "[object]"
-            val ellipsis = if (preview.length == 120) "\u2026" else ""
-            parts += s"""<div class="msg-tool-result">\uD83D\uDCE4 ${esc(preview)}$ellipsis</div>"""
-          }
-        case other =>
-          parts += s"""<div class="msg-other">[${esc(other)}]</div>"""
+              else "[object]"
+            val preview   = raw.take(120)
+            val truncated = raw.length > 120
+            ToolResultContent(preview, truncated)
+          case other =>
+            OtherContent(other)
+        }
       }
+      MsgCard(role, contents = msgContents, userParts = Nil)
     }
-    parts.toList
   }
 
-  @JSExportTopLevel("setMsgFilter")
+  private def cardIsNonEmpty(card: MsgCard): Boolean =
+    card.userParts.nonEmpty || card.contents.nonEmpty
+
+  /** Approximate the original "rendered HTML contains a match" filter by
+    * checking whether any text content of the card matches the query.
+    */
+  private def cardMatchesQuery(card: MsgCard, query: String): Boolean = {
+    if (query.isEmpty) return true
+    val q = query.toLowerCase
+    def textOf(content: MsgContent): String = content match {
+      case TextContent(t)              => t
+      case ToolUseContent(n)           => n
+      case ToolResultContent(p, _)     => p
+      case OtherContent(t)             => t
+    }
+    def textOfPart(p: MsgPart): String = p match {
+      case TextMsgPart(c)                => c
+      case InjectedMsgPart(_, l, c, _)   => l + " " + c
+    }
+    card.userParts.exists(p => textOfPart(p).toLowerCase.contains(q)) ||
+    card.contents.exists(c => textOf(c).toLowerCase.contains(q))
+  }
+
   def setMsgFilter(f: String): Unit = {
     AppState.msgFilter = f
     val entry = AppState.proxyCaptures.find(e => e.id == AppState.selectedProxyId.map(_.asInstanceOf[js.Any]).orNull)
@@ -213,10 +272,10 @@ object MessageRenderer {
     }
   }
 
-  @JSExportTopLevel("setMsgSearch")
   def setMsgSearch(q: String): Unit = {
     AppState.msgSearchQuery = q
-    // _imeComposing is set by inline oncompositionstart/end handlers in the HTML
+    // _imeComposing global is shared with AnalysisRenderer/DetailView until
+    // A3g/A3h migrate; reading the global keeps the three panels in sync.
     val imeComposing = dom.window.asInstanceOf[js.Dynamic].selectDynamic("_imeComposing")
     if (!js.isUndefined(imeComposing) && imeComposing.asInstanceOf[Boolean]) return
     msgSearchDebounce { () =>

@@ -2,8 +2,6 @@ package claudeproxymate.renderer.messages
 
 import claudeproxymate.core.ClaudeMdParser
 
-import scala.scalajs.js
-import scala.scalajs.js.annotation.JSExportTopLevel
 import scala.util.matching.Regex
 
 /** Parse user message text into typed portions and injected blocks.
@@ -23,44 +21,9 @@ object MessageParser {
   private val blockRe: Regex =
     """(?s)(<system-reminder>.*?</system-reminder>|<command-message>.*?</command-message>)""".r
 
-  private val skillsPattern: Regex   = "(?i)skills are available".r
+  private val skillsPattern: Regex     = "(?i)skills are available".r
   private val dateMemoryPattern: Regex = "(?i)currentDate|auto-memory".r
-  private val claudeMdPattern: Regex = "(?i)claudeMd|CLAUDE\\.md".r
-
-  @JSExportTopLevel("parseUserText")
-  def parseUserTextJs(text: String): js.Array[js.Dynamic] = {
-    val parts = parseUserText(text)
-    js.Array(parts.map { p =>
-      val obj = js.Dynamic.literal("type" -> p.tpe)
-      p match {
-        case TextPart(content) =>
-          obj.content = content
-        case InjectedPart(label, content, cls) =>
-          obj.label = label
-          obj.content = content
-          obj.cls = cls
-      }
-      obj
-    }*)
-  }
-
-  /** JS-callable bridge for `ClaudeMdParser.parseClaudeMdSections`.
-    * Returns `js.Array[js.Dynamic]` with `{label, path, content, cls, scope}` fields.
-    * Used by remaining JS functions (buildMechFilterChips, etc.) until they are ported.
-    */
-  @JSExportTopLevel("parseClaudeMdSections")
-  def parseClaudeMdSectionsJs(inner: String): js.Array[js.Dynamic] = {
-    val sections = ClaudeMdParser.parseClaudeMdSections(inner)
-    js.Array(sections.map { s =>
-      js.Dynamic.literal(
-        "label" -> s.label,
-        "path" -> s.path,
-        "content" -> s.content,
-        "cls" -> s.cls,
-        "scope" -> s.scope,
-      )
-    }*)
-  }
+  private val claudeMdPattern: Regex   = "(?i)claudeMd|CLAUDE\\.md".r
 
   def parseUserText(text: String): List[Part] = {
     val parts = scala.collection.mutable.ListBuffer.empty[Part]

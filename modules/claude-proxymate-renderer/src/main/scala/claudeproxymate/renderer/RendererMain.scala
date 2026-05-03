@@ -49,6 +49,7 @@ object RendererMain {
     ProxyInfoPopover.install()
     JsonTreeViewer.install()
     MechChips.install()
+    MessageRenderer.install()
     Onboarding.showIfNeeded()
   }
 

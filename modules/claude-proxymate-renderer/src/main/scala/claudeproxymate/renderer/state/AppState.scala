@@ -35,4 +35,7 @@ object AppState {
   // JSON tree viewer counters
   var jtId: Int   = 0
   var jtLine: Int = 0
+
+  // Monotonic counter for badge UIDs (replaces Math.random() in MessageRenderer)
+  var badgeUidCounter: Int = 0
 }

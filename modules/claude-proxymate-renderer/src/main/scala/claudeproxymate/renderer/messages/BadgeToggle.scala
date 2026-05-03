@@ -3,15 +3,12 @@ package claudeproxymate.renderer.messages
 import claudeproxymate.renderer.state.AppState
 import org.scalajs.dom
 
-import scala.scalajs.js.annotation.JSExportTopLevel
-
 /** Toggle expandable badge sections in user messages.
   *
-  * Ports `toggleBadge` from renderer.js.
+  * Called by [[MessageRenderer]]'s document-level click handler.
   */
 object BadgeToggle {
 
-  @JSExportTopLevel("toggleBadge")
   def toggleBadge(uid: String): Unit = {
     val content = dom.document.getElementById(s"bc_$uid")
     val btn     = dom.document.getElementById(s"bb_$uid")

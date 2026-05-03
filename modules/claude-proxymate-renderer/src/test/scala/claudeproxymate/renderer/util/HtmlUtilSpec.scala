@@ -102,19 +102,19 @@ object HtmlUtilSpec extends Properties {
   }
 
   def testHighlightEmpty: Result = {
-    val html = "<b>test</b>"
-    HtmlUtil.highlightSearch(html, "") ==== html
+    val text = "plain text"
+    HtmlUtil.highlightSearchFrag(text, "").render ==== text
   }
 
   def testHighlightMatch: Result = {
-    val html     = "hello world hello"
+    val text     = "hello world hello"
     val expected = """<mark class="search-hl">hello</mark> world <mark class="search-hl">hello</mark>"""
-    HtmlUtil.highlightSearch(html, "hello") ==== expected
+    HtmlUtil.highlightSearchFrag(text, "hello").render ==== expected
   }
 
   def testHighlightCaseInsensitive: Result = {
-    val html   = "Hello HELLO hello"
-    val result = HtmlUtil.highlightSearch(html, "hello")
+    val text   = "Hello HELLO hello"
+    val result = HtmlUtil.highlightSearchFrag(text, "hello").render
     Result.all(
       List(
         Result.assert(result.contains("""<mark class="search-hl">Hello</mark>"""))
@@ -128,8 +128,8 @@ object HtmlUtilSpec extends Properties {
   }
 
   def testHighlightRegexMeta: Result = {
-    val html   = "price is $100.00 (USD)"
-    val result = HtmlUtil.highlightSearch(html, "$100.00")
+    val text   = "price is $100.00 (USD)"
+    val result = HtmlUtil.highlightSearchFrag(text, "$100.00").render
     Result.assert(result.contains("""<mark class="search-hl">$100.00</mark>"""))
       .log(s"should match literal $$100.00, got: $result")
   }

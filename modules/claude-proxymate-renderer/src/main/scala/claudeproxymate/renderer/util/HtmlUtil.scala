@@ -1,5 +1,8 @@
 package claudeproxymate.renderer.util
 
+import scalatags.Text.all.*
+import scalatags.Text.tags2 as st2
+
 import scala.scalajs.js.annotation.JSExportTopLevel
 
 /** HTML escaping and search-highlight utilities.
@@ -43,15 +46,30 @@ object HtmlUtil {
     sb.toString()
   }
 
-  def highlightSearch(escapedHtml: String, query: String): String = {
-    if (query.isEmpty) escapedHtml
+  /** Tokenise `text` into matched / unmatched runs for `query` and emit a
+    * Scalatags `Frag` with each match wrapped in `<mark class="search-hl">`.
+    * Operates on raw text (not escaped HTML) — Scalatags handles escaping
+    * for both the surrounding text and the wrapped match.
+    */
+  def highlightSearchFrag(text: String, query: String): Frag = {
+    if (query.isEmpty) stringFrag(text)
     else {
-      val escaped = escapeRegex(query)
-      val re      = s"(?i)($escaped)".r
-      re.replaceAllIn(
-        escapedHtml,
-        m => java.util.regex.Matcher.quoteReplacement(s"""<mark class="search-hl">${m.matched}</mark>"""),
+      val pattern = java.util.regex.Pattern.compile(
+        escapeRegex(query),
+        java.util.regex.Pattern.CASE_INSENSITIVE,
       )
+      val matcher = pattern.matcher(text)
+      val parts   = scala.collection.mutable.ListBuffer.empty[Frag]
+      var last    = 0
+      while (matcher.find()) {
+        val s = matcher.start
+        val e = matcher.end
+        if (s > last) parts += stringFrag(text.substring(last, s))
+        parts += st2.mark(cls := "search-hl")(text.substring(s, e))
+        last = e
+      }
+      if (last < text.length) parts += stringFrag(text.substring(last))
+      frag(parts.toList)
     }
   }
 }
