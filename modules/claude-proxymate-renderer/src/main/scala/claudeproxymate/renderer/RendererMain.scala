@@ -11,7 +11,7 @@ import claudeproxymate.renderer.onboarding.Onboarding
 import claudeproxymate.renderer.proxy.ProxyControl
 import claudeproxymate.renderer.proxy.ProxyInfoPopover
 import claudeproxymate.renderer.proxy.ProxyList
-import claudeproxymate.renderer.search.SearchNavigation
+import claudeproxymate.renderer.search.{ProxyDetailSearchListeners, SearchNavigation}
 import claudeproxymate.renderer.state.AppState
 import claudeproxymate.renderer.theme.Theme
 import claudeproxymate.renderer.update.UpdateChecker
@@ -50,6 +50,7 @@ object RendererMain {
     JsonTreeViewer.install()
     MechChips.install()
     MessageRenderer.install()
+    ProxyDetailSearchListeners.install()
     Onboarding.showIfNeeded()
   }
 
