@@ -5,20 +5,24 @@ import org.scalajs.dom
 
 import scala.scalajs.js
 
-/** Document-level listeners for the search input and clear button shared
-  * by the Analysis tab and the (still inline-handler) Detail tabs. The
-  * input id `HtmlIds.ProxyDetailSearchInput` is unique per active tab —
-  * only one search input exists at a time — so `target.id` filtering
-  * disambiguates correctly.
+/** Document-level listeners for the search input, clear button, and prev /
+  * next nav buttons shared by every proxy detail tab (Request, Response,
+  * Analysis). The search input id `HtmlIds.ProxyDetailSearchInput` is
+  * unique per active tab — only one search input exists at a time — so
+  * `target.id` filtering disambiguates correctly.
   *
-  * Replaces inline `onclick="setProxyDetailSearch('')..."`,
-  * `oninput="setProxyDetailSearch(this.value)"`,
-  * `oncompositionstart="_imeComposing=true"`,
-  * `oncompositionend="_imeComposing=false;setProxyDetailSearch(this.value)"`.
+  * Replaces the previously-inline `oninput`, `oncompositionstart`,
+  * `oncompositionend`, `onclick` (clear), and `onclick`
+  * (`navigateSearchMatch`) handlers. Inline handlers were observed not to
+  * fire reliably from the Scala.js NoModule output in this Electron
+  * version: typing into the search input produced no result updates and
+  * apparent focus loss.
   *
   * Composition listeners continue to write to `window._imeComposing`
-  * because that flag is shared with `SearchNavigation` and (until A3h)
-  * with `DetailView`'s remaining inline handlers.
+  * because that flag is shared with `SearchNavigation` (Enter-key shortcut).
+  * Migrating to `AppState.imeComposing` is a follow-up; doing it here
+  * would require flipping `MessageRenderer` and the SearchNavigation
+  * reader together.
   */
 object ProxyDetailSearchListeners {
 
@@ -32,14 +36,26 @@ object ProxyDetailSearchListeners {
   private def handleClick(e: dom.MouseEvent): Unit = {
     val target = e.target.asInstanceOf[dom.Element]
     if (target == null) return
-    val clear = target.closest(".msg-search-clear")
-    if (clear == null) return
-    // Only trigger when the clear button is *next to* the proxy detail
-    // search input — i.e., the input with this id is currently in the DOM.
-    val inp = dom.document.getElementById(HtmlIds.ProxyDetailSearchInput)
-    if (inp == null) return
-    SearchNavigation.setProxyDetailSearch("")
-    inp.asInstanceOf[dom.html.Input].focus()
+
+    // Search-nav prev / next (only present when query is non-empty).
+    if (target.closest(".search-nav-prev") != null) {
+      SearchNavigation.navigateSearchMatch(-1)
+      return
+    }
+    if (target.closest(".search-nav-next") != null) {
+      SearchNavigation.navigateSearchMatch(1)
+      return
+    }
+
+    // Clear button. Only act if the proxy detail search input exists in the
+    // current DOM (Messages tab also uses .msg-search-clear, but its input
+    // id is different and is handled by MessageRenderer).
+    if (target.closest(".msg-search-clear") != null) {
+      val inp = dom.document.getElementById(HtmlIds.ProxyDetailSearchInput)
+      if (inp == null) return
+      SearchNavigation.setProxyDetailSearch("")
+      inp.asInstanceOf[dom.html.Input].focus()
+    }
   }
 
   private def handleInput(e: dom.Event): Unit = {

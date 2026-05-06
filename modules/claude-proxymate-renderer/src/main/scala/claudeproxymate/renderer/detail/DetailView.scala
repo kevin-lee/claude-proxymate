@@ -156,24 +156,26 @@ object DetailView {
   }
 
   private def buildSearchBar(q: String): String = {
+    // Inline handlers are intentionally NOT emitted here; the input + buttons
+    // are wired by ProxyDetailSearchListeners (a single document-level listener
+    // installed by RendererMain). Inline handlers turned out not to fire from
+    // Scala.js NoModule output in this Electron version — symptoms: typing
+    // produces no result update and apparent focus loss.
     val searchNav = if (q.nonEmpty) {
       s"""<div class="search-nav">""" +
         s"""<span id="${HtmlIds.SearchCounter}"></span>""" +
-        s"""<button class="search-nav-btn" onclick="navigateSearchMatch(-1)" title="${escAttr(I18n.t("search.prev"))}">▲</button>""" +
-        s"""<button class="search-nav-btn" onclick="navigateSearchMatch(1)" title="${escAttr(I18n.t("search.next"))}">▼</button>""" +
+        s"""<button class="search-nav-btn search-nav-prev" title="${escAttr(I18n.t("search.prev"))}">▲</button>""" +
+        s"""<button class="search-nav-btn search-nav-next" title="${escAttr(I18n.t("search.next"))}">▼</button>""" +
         "</div>"
     } else ""
 
     val clearBtn = if (q.nonEmpty)
-      s"""<button class="msg-search-clear" onclick="setProxyDetailSearch('');document.getElementById('${HtmlIds.ProxyDetailSearchInput}')?.focus()" title="${escAttr(I18n.t("messages.searchClear"))}">✕</button>"""
+      s"""<button class="msg-search-clear" title="${escAttr(I18n.t("messages.searchClear"))}">✕</button>"""
     else ""
 
     s"""<div class="msg-search-bar" style="flex-shrink:0">""" +
       s"""<input type="text" class="msg-search-input" id="${HtmlIds.ProxyDetailSearchInput}" """ +
-      s"""placeholder="${escAttr(I18n.t("analysis.searchPlaceholder"))}" value="${escAttr(q)}" """ +
-      s"""oninput="setProxyDetailSearch(this.value)" """ +
-      s"""oncompositionstart="_imeComposing=true" """ +
-      s"""oncompositionend="_imeComposing=false;setProxyDetailSearch(this.value)">""" +
+      s"""placeholder="${escAttr(I18n.t("analysis.searchPlaceholder"))}" value="${escAttr(q)}">""" +
       searchNav + clearBtn +
       "</div>"
   }

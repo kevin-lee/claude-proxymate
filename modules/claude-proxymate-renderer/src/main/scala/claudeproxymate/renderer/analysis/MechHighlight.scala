@@ -234,27 +234,31 @@ object MechHighlight {
       container,
       4, // NodeFilter.SHOW_TEXT
     )
+    // TreeWalker.nextNode() returns Node | null — iterate until null, not via
+    // Boolean cast (Scala.js's strict cast throws when the value isn't a JS
+    // primitive boolean).
     val nodes = scala.collection.mutable.ListBuffer.empty[dom.Node]
-    while (walker.nextNode().asInstanceOf[Boolean]) {
-      nodes += walker.currentNode.asInstanceOf[dom.Node]
+    var nextNode = walker.nextNode()
+    while (nextNode != null && !js.isUndefined(nextNode)) {
+      nodes += nextNode.asInstanceOf[dom.Node]
+      nextNode = walker.nextNode()
     }
 
     for (node <- nodes) {
       val text = node.textContent
       re.lastIndex = 0
-      if (re.test(text).asInstanceOf[Boolean]) {
-        re.lastIndex = 0
-        val parts = scala.collection.mutable.ListBuffer.empty[Frag]
-        var last = 0
-        var m = re.exec(text)
-        while (m != null && !js.isUndefined(m)) {
-          val matchIndex = m.index.asInstanceOf[Int]
-          val matched    = m.selectDynamic("0").asInstanceOf[String]
-          parts += stringFrag(text.substring(last, matchIndex))
-          parts += st2.mark(cls := "search-hl")(matched)
-          last = matchIndex + matched.length
-          m = re.exec(text)
-        }
+      val parts = scala.collection.mutable.ListBuffer.empty[Frag]
+      var last  = 0
+      var m     = re.exec(text)
+      while (m != null && !js.isUndefined(m)) {
+        val matchIndex = m.index.asInstanceOf[Int]
+        val matched    = m.selectDynamic("0").asInstanceOf[String]
+        parts += stringFrag(text.substring(last, matchIndex))
+        parts += st2.mark(cls := "search-hl")(matched)
+        last = matchIndex + matched.length
+        m = re.exec(text)
+      }
+      if (parts.nonEmpty) {
         parts += stringFrag(text.substring(last))
         val span = dom.document.createElement("span")
         span.innerHTML = frag(parts.toList).render

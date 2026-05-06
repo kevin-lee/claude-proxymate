@@ -33,7 +33,8 @@ object AnalysisViewSpec extends Properties {
     property("<script> in modelName never leaks raw", testNoScriptLeakInModel),
     property("<script> in slash command / skill never leaks raw", testNoScriptLeakInSlashSkill),
     property("<script> in MCP fields never leaks raw", testNoScriptLeakInMcp),
-    // Inline-handler regression
+    // Inline-handler regression (search bar deliberately keeps inline handlers
+    // until A3h; body of analysis sections must stay handler-free)
     example("buildFrag never contains inline event handlers", testNoInlineHandlers),
     // data-mech-key preservation
     example("data-mech-key present on every mechanism section type", testAllDataMechKeys),
@@ -325,10 +326,10 @@ object AnalysisViewSpec extends Properties {
     val out = render(Some(data), query = "q")
     Result.all(
       List(
-        Result.assert(!out.contains("onclick=")).log("unexpected onclick"),
-        Result.assert(!out.contains("oninput=")).log("unexpected oninput"),
-        Result.assert(!out.contains("oncompositionstart=")).log("unexpected oncompositionstart"),
-        Result.assert(!out.contains("oncompositionend=")).log("unexpected oncompositionend"),
+        Result.assert(!out.contains("onclick=")).log(s"unexpected onclick: $out"),
+        Result.assert(!out.contains("oninput=")).log(s"unexpected oninput: $out"),
+        Result.assert(!out.contains("oncompositionstart=")).log(s"unexpected oncompositionstart: $out"),
+        Result.assert(!out.contains("oncompositionend=")).log(s"unexpected oncompositionend: $out"),
       )
     )
   }

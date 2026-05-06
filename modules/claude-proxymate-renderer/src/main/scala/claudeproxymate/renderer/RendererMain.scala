@@ -77,10 +77,16 @@ object RendererMain {
           MessageRenderer.setMsgSearch("")
         }
       }
-      // Enter / Shift+Enter: navigate search matches
+      // Enter / Shift+Enter: navigate search matches.
+      // Triggers from either the proxy detail search input (Request /
+      // Response / Analysis) or the messages-tab search input.
       if (e.key == "Enter") {
         val proxyInp = dom.document.getElementById(HtmlIds.ProxyDetailSearchInput)
-        if (proxyInp != null && dom.document.activeElement == proxyInp) {
+        val msgInp   = dom.document.getElementById(HtmlIds.MsgSearchInput)
+        val active   = dom.document.activeElement
+        val onProxy  = proxyInp != null && active == proxyInp
+        val onMsg    = msgInp != null && active == msgInp
+        if (onProxy || onMsg) {
           e.preventDefault()
           SearchNavigation.navigateSearchMatch(if (e.shiftKey) -1 else 1)
         }

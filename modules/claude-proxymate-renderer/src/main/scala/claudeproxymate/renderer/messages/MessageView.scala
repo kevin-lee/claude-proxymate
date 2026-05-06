@@ -106,16 +106,30 @@ object MessageView {
       div(cls := "msg-typed")(HtmlUtil.highlightSearchFrag(content, query))
 
     case InjectedMsgPart(uid, label, content, badgeCls) =>
+      // Auto-expand the badge when the search query matches inside the
+      // collapsed content. Without this, search hits inside system-reminders /
+      // skills / etc. are wrapped in <mark> but invisible to the user because
+      // the parent is display:none.
+      val matched      = query.nonEmpty && content.toLowerCase.contains(query.toLowerCase)
+      val badgeClasses =
+        if (matched) s"$BadgeClass $badgeCls expandable open hl-active"
+        else s"$BadgeClass $badgeCls expandable"
+      val contentStyle =
+        if (matched) "display:block"
+        else "display:none"
+      val contentClasses =
+        if (matched) "badge-expand-content badge-section-hl"
+        else "badge-expand-content"
       div(cls := "msg-injected-row")(
         span(
           id                  := s"bb_$uid",
-          cls                 := s"$BadgeClass $badgeCls expandable",
+          cls                 := badgeClasses,
           attr(BadgeDataAttr) := uid,
         )(label),
         div(
           id    := s"bc_$uid",
-          cls   := "badge-expand-content",
-          style := "display:none",
+          cls   := contentClasses,
+          style := contentStyle,
         )(HtmlUtil.highlightSearchFrag(content, query)),
       )
   }

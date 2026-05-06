@@ -97,6 +97,8 @@ object AnalysisView {
     )
 
   def buildSearchBarFrag(searchInputId: String, query: String, labels: AnalysisLabels): Frag =
+    // No inline handlers — the input + clear button are wired by
+    // ProxyDetailSearchListeners installed once from RendererMain.
     div(cls := "msg-search-bar", style := "flex-shrink:0")(
       input(
         tpe         := "text",
