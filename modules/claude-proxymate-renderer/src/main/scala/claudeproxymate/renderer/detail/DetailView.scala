@@ -7,21 +7,24 @@ import claudeproxymate.renderer.json.JsonTreeViewer
 import claudeproxymate.renderer.messages.MessageRenderer
 import claudeproxymate.renderer.search.SearchNavigation
 import claudeproxymate.renderer.state.AppState
-import claudeproxymate.renderer.util.HtmlUtil.escAttr
+import claudeproxymate.renderer.view.ViewHelpers
 import org.scalajs.dom
+import scalatags.Text.all.*
 
 import scala.scalajs.js
-import scala.scalajs.js.annotation.JSExportTopLevel
 
 /** Render the proxy detail panel (request/response/messages/analysis tabs).
   *
-  * Ports `renderProxyDetail`, `showDetailTab` from renderer.js.
+  * Thin orchestrator: routes to per-tab renderers, populates typed views
+  * for the placeholder + Request/Response header, and runs post-render
+  * side effects (json-tree hydration, mech highlight, search highlight,
+  * input refocus). HTML building lives in [[DetailEmptyView]] +
+  * [[DetailHeaderView]].
   */
 object DetailView {
 
   private val PricingDate = "2026-04-20"
 
-  @JSExportTopLevel("renderProxyDetail")
   def renderProxyDetail(): Unit = {
     val entry = AppState.proxyCaptures.find(e => e.id == AppState.selectedProxyId.map(_.asInstanceOf[js.Any]).orNull)
     val detail = dom.document.getElementById(HtmlIds.ProxyDetailView)
@@ -32,11 +35,17 @@ object DetailView {
     detailEl.style.cssText = "flex:1;overflow:hidden;display:flex;flex-direction:column"
 
     entry match {
-      case None =>
-        detailEl.innerHTML = s"""<div class="proxy-empty"><span style="font-size:28px">\uD83D\uDD0D</span><span>${I18n.t("proxy.selectRequest")}</span></div>"""
-        return
+      case None    => renderEmpty(detailEl)
       case Some(e) => renderEntry(e, detailEl)
     }
+  }
+
+  private def renderEmpty(detail: dom.html.Element): Unit = {
+    val labels = DetailEmptyLabels(
+      selectRequestTitle = I18n.t("proxy.selectRequestTitle"),
+      selectRequestHint  = I18n.t("proxy.selectRequestHint"),
+    )
+    ViewHelpers.setInnerHtml(detail, DetailEmptyView.buildFrag(labels))
   }
 
   private def renderEntry(entry: js.Dynamic, detail: dom.html.Element): Unit = {
@@ -59,25 +68,44 @@ object DetailView {
       else null
     }
 
-    val q = AppState.proxyDetailSearch
-    val searchBar = buildSearchBar(q)
-    val mechChips = if (AppState.proxyDetailTab == "request") MechChips.buildMechFilterChips(entry.selectDynamic("body")) else ""
-    val header = s"""<div style="flex-shrink:0">$searchBar$mechChips</div>"""
+    val q             = AppState.proxyDetailSearch
+    val searchBarFrag = buildSearchBarFrag(q)
+    val mechChipsHtml = if (AppState.proxyDetailTab == "request") MechChips.buildMechFilterChips(entry.selectDynamic("body")) else ""
 
     if (js.isUndefined(data) || data == null) {
       val msg = if (AppState.proxyDetailTab == "response") I18n.t("proxy.waitingResponse") else I18n.t("proxy.noBody")
-      detail.innerHTML = header + s"""<div style="color:var(--dim);padding:16px;font-size:12px">$msg</div>"""
+      val emptyBodyFrag = frag(
+        div(style := "flex-shrink:0")(searchBarFrag, raw(mechChipsHtml)),
+        div(style := "color:var(--dim);padding:16px;font-size:12px")(msg),
+      )
+      ViewHelpers.setInnerHtml(detail, emptyBodyFrag)
       return
     }
 
-    val tokenInfo = if (AppState.proxyDetailTab == "request") buildTokenInfo(entry, data) else ""
+    val tokenPill: Option[TokenPill] =
+      if (AppState.proxyDetailTab == "request") buildTokenPill(entry, data) else None
 
     val prevScrollTop = {
       val el = dom.document.getElementById(HtmlIds.ProxyDetailCode)
       if (el != null) el.asInstanceOf[dom.html.Element].scrollTop else 0.0
     }
 
-    detail.innerHTML = header + tokenInfo + s"""<div class="json-tree-view" id="${HtmlIds.ProxyDetailCode}" style="flex:1;overflow:auto"></div>"""
+    val tokenPillFrag: Frag = tokenPill match {
+      case Some(p) => DetailHeaderView.buildTokenPillFrag(p)
+      case None    => frag()
+    }
+
+    val full = frag(
+      div(style := "flex-shrink:0")(searchBarFrag, raw(mechChipsHtml)),
+      tokenPillFrag,
+      div(
+        cls   := "json-tree-view",
+        id    := HtmlIds.ProxyDetailCode,
+        style := "flex:1;overflow:auto",
+      ),
+    )
+    ViewHelpers.setInnerHtml(detail, full)
+
     val code = dom.document.getElementById(HtmlIds.ProxyDetailCode).asInstanceOf[dom.html.Element]
     JsonTreeViewer.renderJsonTree(code, data)
 
@@ -93,9 +121,11 @@ object DetailView {
         if (AppState.searchCurrentIdx < 0) AppState.searchCurrentIdx = 0
         if (AppState.searchCurrentIdx >= marks.length) AppState.searchCurrentIdx = 0
         locally { val _ = marks(AppState.searchCurrentIdx).classList.add("current") }
-        locally { val _ = marks(AppState.searchCurrentIdx).asInstanceOf[js.Dynamic].scrollIntoView(
-          js.Dynamic.literal("behavior" -> "smooth", "block" -> "center")
-        ) }
+        locally {
+          val _ = marks(AppState.searchCurrentIdx).asInstanceOf[js.Dynamic].scrollIntoView(
+            js.Dynamic.literal("behavior" -> "smooth", "block" -> "center"),
+          )
+        }
         SearchNavigation.updateSearchCounter(marks.length)
       }
     }
@@ -155,29 +185,19 @@ object DetailView {
     }
   }
 
-  private def buildSearchBar(q: String): String = {
-    // Inline handlers are intentionally NOT emitted here; the input + buttons
-    // are wired by ProxyDetailSearchListeners (a single document-level listener
-    // installed by RendererMain). Inline handlers turned out not to fire from
-    // Scala.js NoModule output in this Electron version — symptoms: typing
-    // produces no result update and apparent focus loss.
-    val searchNav = if (q.nonEmpty) {
-      s"""<div class="search-nav">""" +
-        s"""<span id="${HtmlIds.SearchCounter}"></span>""" +
-        s"""<button class="search-nav-btn search-nav-prev" title="${escAttr(I18n.t("search.prev"))}">▲</button>""" +
-        s"""<button class="search-nav-btn search-nav-next" title="${escAttr(I18n.t("search.next"))}">▼</button>""" +
-        "</div>"
-    } else ""
-
-    val clearBtn = if (q.nonEmpty)
-      s"""<button class="msg-search-clear" title="${escAttr(I18n.t("messages.searchClear"))}">✕</button>"""
-    else ""
-
-    s"""<div class="msg-search-bar" style="flex-shrink:0">""" +
-      s"""<input type="text" class="msg-search-input" id="${HtmlIds.ProxyDetailSearchInput}" """ +
-      s"""placeholder="${escAttr(I18n.t("analysis.searchPlaceholder"))}" value="${escAttr(q)}">""" +
-      searchNav + clearBtn +
-      "</div>"
+  private def buildSearchBarFrag(q: String): Frag = {
+    val labels = SearchBarLabels(
+      placeholder = I18n.t("analysis.searchPlaceholder"),
+      clear       = I18n.t("messages.searchClear"),
+      searchPrev  = I18n.t("search.prev"),
+      searchNext  = I18n.t("search.next"),
+    )
+    DetailHeaderView.buildSearchBarFrag(
+      searchInputId   = HtmlIds.ProxyDetailSearchInput,
+      searchCounterId = HtmlIds.SearchCounter,
+      query           = q,
+      labels          = labels,
+    )
   }
 
   private def fmtTok(n: Int): String =
@@ -187,7 +207,13 @@ object DetailView {
 
   private def fmtCost(n: Double): String = f"$$$n%.4f"
 
-  private def buildTokenInfo(entry: js.Dynamic, data: js.Dynamic): String = {
+  /** Build the typed token pill model for the Request tab.
+    *
+    * Returns `None` when there's no usable response/usage data and we'd
+    * otherwise fall back to a tiny estimate-only pill (still emitted via
+    * the Some branch — we always have at least the size badge).
+    */
+  private def buildTokenPill(entry: js.Dynamic, data: js.Dynamic): Option[TokenPill] = {
     val jsonStr = js.JSON.stringify(data)
     val bytes = {
       val encoder = js.Dynamic.newInstance(dom.window.asInstanceOf[js.Dynamic].TextEncoder)()
@@ -195,79 +221,82 @@ object DetailView {
     }
     val kb = f"${bytes / 1024.0}%.1f"
 
-    // Try to get usage from response
     val resp = entry.selectDynamic("response")
     val respBody = if (!js.isUndefined(resp) && resp != null) resp.selectDynamic("body") else null
     val usage = if (respBody != null && !js.isUndefined(respBody)) respBody.selectDynamic("usage") else null
 
     if (!js.isUndefined(usage) && usage != null) {
-      buildUsageTokenInfo(entry, kb, usage)
+      Some(buildUsageTokenPill(entry, kb, usage))
     } else {
       val tokens = Math.ceil(bytes.toDouble / 3.5).toInt
       val tokStr = fmtTok(tokens)
-      s"""<div class="proxy-token-pill"><span class="tt-badge">$kb KB</span><span class="tt-badge">~$tokStr tok (${I18n.t("token.estimated")})</span></div>"""
+      val badges = List(
+        TokenBadge(s"$kb KB", None),
+        TokenBadge(s"~$tokStr tok (${I18n.t("token.estimated")})", None),
+      )
+      // No usage → no popover data needed, but we still need a data-cost
+      // attribute so the click handler doesn't miss; emit empty JSON.
+      Some(TokenPill(badges = badges, dataCost = "{}"))
     }
   }
 
-  private def buildUsageTokenInfo(entry: js.Dynamic, kb: String, usage: js.Dynamic): String = {
+  private def buildUsageTokenPill(entry: js.Dynamic, kb: String, usage: js.Dynamic): TokenPill = {
     def intField(name: String): Int = {
       val v = usage.selectDynamic(name)
       if (!js.isUndefined(v) && v != null) try v.asInstanceOf[Int] catch { case _: Throwable => 0 } else 0
     }
 
     val inputTokens = intField("input_tokens")
-    val cacheRead = intField("cache_read_input_tokens")
-    val cacheWrite = intField("cache_creation_input_tokens")
-    val outTok = intField("output_tokens")
-    val totalIn = inputTokens + cacheRead + cacheWrite
-    val cachePct = if (totalIn > 0) Math.round(cacheRead.toDouble / totalIn * 100).toInt else 0
+    val cacheRead   = intField("cache_read_input_tokens")
+    val cacheWrite  = intField("cache_creation_input_tokens")
+    val outTok      = intField("output_tokens")
+    val totalIn     = inputTokens + cacheRead + cacheWrite
+    val cachePct    = if (totalIn > 0) Math.round(cacheRead.toDouble / totalIn * 100).toInt else 0
 
-    // Model-based pricing ($/MTok)
     val model = {
-      val reqBody = entry.selectDynamic("body")
-      val reqModel = if (!js.isUndefined(reqBody) && reqBody != null) reqBody.selectDynamic("model") else null
-      val respBody = entry.selectDynamic("response")
+      val reqBody       = entry.selectDynamic("body")
+      val reqModel      = if (!js.isUndefined(reqBody) && reqBody != null) reqBody.selectDynamic("model") else null
+      val respBody      = entry.selectDynamic("response")
       val respBodyInner = if (!js.isUndefined(respBody) && respBody != null) respBody.selectDynamic("body") else null
-      val respModel = if (respBodyInner != null && !js.isUndefined(respBodyInner)) respBodyInner.selectDynamic("model") else null
+      val respModel     = if (respBodyInner != null && !js.isUndefined(respBodyInner)) respBodyInner.selectDynamic("model") else null
       if (!js.isUndefined(reqModel) && reqModel != null) reqModel.toString
       else if (!js.isUndefined(respModel) && respModel != null) respModel.toString
       else ""
     }
 
     val rates = ModelTier.forModel(model).rates
-    val inP = rates.input
-    val outP = rates.output
-    val crP = rates.cacheRead
-    val cwP = rates.cacheWrite5m
+    val inP   = rates.input
+    val outP  = rates.output
+    val crP   = rates.cacheRead
+    val cwP   = rates.cacheWrite5m
 
-    val cost = (inputTokens * inP + cacheRead * crP + cacheWrite * cwP + outTok * outP) / 1000000.0
+    val cost    = (inputTokens * inP + cacheRead * crP + cacheWrite * cwP + outTok * outP) / 1000000.0
     val costStr = fmtCost(cost)
 
     val popData = js.JSON.stringify(js.Dynamic.literal(
-      "model" -> (if (model.nonEmpty) model else I18n.t("token.unknown")),
-      "kb" -> kb,
+      "model"       -> (if (model.nonEmpty) model else I18n.t("token.unknown")),
+      "kb"          -> kb,
       "pricingDate" -> PricingDate,
       "rows" -> js.Array(
-        js.Dynamic.literal("label" -> I18n.t("token.cacheRead"), "tokens" -> fmtTok(cacheRead), "price" -> crP, "cost" -> fmtCost(cacheRead * crP / 1000000.0)),
-        js.Dynamic.literal("label" -> I18n.t("token.cacheWrite"), "tokens" -> fmtTok(cacheWrite), "price" -> cwP, "cost" -> fmtCost(cacheWrite * cwP / 1000000.0)),
+        js.Dynamic.literal("label" -> I18n.t("token.cacheRead"),     "tokens" -> fmtTok(cacheRead),   "price" -> crP, "cost" -> fmtCost(cacheRead * crP / 1000000.0)),
+        js.Dynamic.literal("label" -> I18n.t("token.cacheWrite"),    "tokens" -> fmtTok(cacheWrite),  "price" -> cwP, "cost" -> fmtCost(cacheWrite * cwP / 1000000.0)),
         js.Dynamic.literal("label" -> I18n.t("token.uncachedInput"), "tokens" -> fmtTok(inputTokens), "price" -> inP, "cost" -> fmtCost(inputTokens * inP / 1000000.0)),
-        js.Dynamic.literal("label" -> I18n.t("token.output"), "tokens" -> fmtTok(outTok), "price" -> outP, "cost" -> fmtCost(outTok * outP / 1000000.0)),
+        js.Dynamic.literal("label" -> I18n.t("token.output"),        "tokens" -> fmtTok(outTok),      "price" -> outP, "cost" -> fmtCost(outTok * outP / 1000000.0)),
       ),
-      "total" -> costStr,
+      "total"    -> costStr,
       "cachePct" -> cachePct,
     ))
 
-    val sb = new StringBuilder
-    sb.append(s"""<span class="tt-badge">$kb KB</span>""")
-    sb.append(s"""<span class="tt-badge">${I18n.t("token.input")} ${fmtTok(totalIn)}</span>""")
-    sb.append(s"""<span class="tt-badge">${I18n.t("token.output")} ${fmtTok(outTok)}</span>""")
-    if (cachePct > 0) sb.append(s"""<span class="tt-badge" style="color:var(--green)">${I18n.t("token.cache")} $cachePct%</span>""")
-    sb.append(s"""<span class="tt-badge" style="color:var(--yellow)">$costStr</span>""")
+    val badges = scala.collection.mutable.ListBuffer.empty[TokenBadge]
+    badges += TokenBadge(s"$kb KB", None)
+    badges += TokenBadge(s"${I18n.t("token.input")} ${fmtTok(totalIn)}", None)
+    badges += TokenBadge(s"${I18n.t("token.output")} ${fmtTok(outTok)}", None)
+    if (cachePct > 0) badges += TokenBadge(s"${I18n.t("token.cache")} $cachePct%", Some("var(--green)"))
+    badges += TokenBadge(costStr, Some("var(--yellow)"))
 
-    s"""<div class="proxy-token-pill" data-cost='${popData.replace("'", "&#39;")}'>${sb.toString()}</div>"""
+    TokenPill(badges = badges.toList, dataCost = popData.asInstanceOf[String])
   }
 
-  @JSExportTopLevel("showDetailTab")
   def showDetailTab(tab: String): Unit = {
     AppState.proxyDetailTab = tab
     AppState.proxyDetailSearch = ""
@@ -276,7 +305,7 @@ object DetailView {
     val tabs = dom.document.querySelectorAll(".dtab")
     var i = 0
     while (i < tabs.length) {
-      val btn = tabs(i).asInstanceOf[dom.html.Element]
+      val btn  = tabs(i).asInstanceOf[dom.html.Element]
       val dtab = btn.dataset.get("dtab").getOrElse("")
       locally { val _ = btn.classList.toggle("active", dtab == tab) }
       i += 1

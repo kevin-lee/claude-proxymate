@@ -61,16 +61,13 @@ object MessageRenderer {
   private def handleCompositionStart(e: dom.Event): Unit = {
     val target = e.target.asInstanceOf[dom.Element]
     if (target == null || target.id != HtmlIds.MsgSearchInput) return
-    // The IME flag stays on the window global until A3g/A3h migrate the
-    // other two search inputs; sharing one source of truth is required by
-    // SearchNavigation.
-    dom.window.asInstanceOf[js.Dynamic]._imeComposing = true
+    AppState.imeComposing = true
   }
 
   private def handleCompositionEnd(e: dom.Event): Unit = {
     val target = e.target.asInstanceOf[dom.Element]
     if (target == null || target.id != HtmlIds.MsgSearchInput) return
-    dom.window.asInstanceOf[js.Dynamic]._imeComposing = false
+    AppState.imeComposing = false
     setMsgSearch(target.asInstanceOf[dom.html.Input].value)
   }
 
@@ -274,10 +271,7 @@ object MessageRenderer {
 
   def setMsgSearch(q: String): Unit = {
     AppState.msgSearchQuery = q
-    // _imeComposing global is shared with AnalysisRenderer/DetailView until
-    // A3g/A3h migrate; reading the global keeps the three panels in sync.
-    val imeComposing = dom.window.asInstanceOf[js.Dynamic].selectDynamic("_imeComposing")
-    if (!js.isUndefined(imeComposing) && imeComposing.asInstanceOf[Boolean]) return
+    if (AppState.imeComposing) return
     msgSearchDebounce { () =>
       AppState.msgSearchWasFocused = dom.document.activeElement match {
         case el: dom.html.Element => el.id == HtmlIds.MsgSearchInput

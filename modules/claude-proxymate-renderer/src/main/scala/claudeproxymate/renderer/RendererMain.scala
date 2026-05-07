@@ -2,7 +2,7 @@ package claudeproxymate.renderer
 
 import claudeproxymate.core.HtmlIds
 import claudeproxymate.renderer.analysis.MechChips
-import claudeproxymate.renderer.detail.TokenPopover
+import claudeproxymate.renderer.detail.{DtabListeners, TokenPopover}
 import claudeproxymate.renderer.facades.ElectronApi
 import claudeproxymate.renderer.json.JsonTreeViewer
 import claudeproxymate.renderer.i18n.I18n
@@ -27,11 +27,6 @@ import scala.scalajs.js
   */
 object RendererMain {
   def main(args: Array[String]): Unit = {
-    // Initialize _imeComposing global used by inline HTML event handlers.
-    // Must use dom.window explicitly because js.Dynamic.global compiles to
-    // bare `_imeComposing = ...` which throws ReferenceError in strict mode.
-    dom.window.asInstanceOf[js.Dynamic]._imeComposing = false
-
     Theme.init()
     installKeydownHandler()
     detectPlatform()
@@ -51,6 +46,7 @@ object RendererMain {
     MechChips.install()
     MessageRenderer.install()
     ProxyDetailSearchListeners.install()
+    DtabListeners.install()
     Onboarding.showIfNeeded()
   }
 

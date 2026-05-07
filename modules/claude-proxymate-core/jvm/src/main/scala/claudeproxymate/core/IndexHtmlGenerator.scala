@@ -202,24 +202,30 @@ object IndexHtmlGenerator {
       ),
       div(cls := "proxy-detail")(
         div(cls := "dtabs")(
-          button(cls := "dtab active", dataDtab := "messages", onclick := "showDetailTab('messages')")("Messages"),
-          button(cls := "dtab", dataDtab := "request", onclick := "showDetailTab('request')")("Request"),
-          button(cls := "dtab", dataDtab := "response", onclick := "showDetailTab('response')")("Response"),
+          // dtab clicks are dispatched by the renderer's DtabListeners
+          // (doc-level click delegation reading data-dtab). No inline
+          // handlers here — Scala.js NoModule's let-exported globals
+          // don't reliably resolve from inline `onclick=...` attributes.
+          button(cls := "dtab active", dataDtab := "messages")("Messages"),
+          button(cls := "dtab", dataDtab := "request")("Request"),
+          button(cls := "dtab", dataDtab := "response")("Response"),
           button(
-            cls := "dtab",
+            cls      := "dtab",
             dataDtab := "analysis",
-            onclick := "showDetailTab('analysis')",
-            style := "color:var(--purple)",
+            style    := "color:var(--purple)",
           )("Analysis"),
           button(cls := "copy-small", style := "margin-left:auto", onclick := "copyProxyDetail()", i18n := "copy.copy")(
             tx(m, "copy.copy"),
           ),
         ),
         div(id := HtmlIds.ProxyDetailView, style := "flex:1;overflow:hidden;display:flex;flex-direction:column")(
+          // Renderer immediately replaces this with the view-rendered
+          // placeholder once a capture is selected (or stays as a plain-
+          // text title until then). Same trick as proxy.noCapturesTitle.
           div(cls := "proxy-empty")(
             span(style := "font-size:28px")("\uD83D\uDD0D"),
-            span(i18nHtml := "proxy.selectRequest")(
-              raw(tx(m, "proxy.selectRequest")),
+            span(i18n := "proxy.selectRequestTitle")(
+              tx(m, "proxy.selectRequestTitle"),
             ),
           ),
         ),

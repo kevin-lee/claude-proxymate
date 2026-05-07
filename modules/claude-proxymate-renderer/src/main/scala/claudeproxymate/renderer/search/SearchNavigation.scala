@@ -20,11 +20,7 @@ object SearchNavigation {
   @JSExportTopLevel("setProxyDetailSearch")
   def setProxyDetailSearch(q: String): Unit = {
     AppState.proxyDetailSearch = q
-    // _imeComposing is set by Scala-side composition handlers
-    // (ProxyDetailSearchListeners) and the still-inline writers will
-    // migrate together with A3h.
-    val imeComposing = dom.window.asInstanceOf[js.Dynamic].selectDynamic("_imeComposing")
-    if (!js.isUndefined(imeComposing) && imeComposing.asInstanceOf[Boolean]) return
+    if (AppState.imeComposing) return
 
     detailSearchDebounce { () =>
       AppState.detailSearchWasFocused = dom.document.activeElement match {
