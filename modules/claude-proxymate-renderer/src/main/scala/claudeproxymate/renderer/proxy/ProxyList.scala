@@ -29,7 +29,7 @@ object ProxyList {
     if (target == null) return
 
     if (target.closest(s"#${HtmlIds.ProxyClearBtn}") != null) {
-      clearProxyCaptures()
+      val _ = confirmAndClearProxyCaptures()
       return
     }
 
@@ -115,4 +115,22 @@ object ProxyList {
     renderProxyList()
     ProxyControl.callRenderProxyDetail()
   }
+
+  /** Clear captures, prompting the user first if the list is non-empty.
+    *
+    * Used by both the Clear button and the proxy-stop path to reduce
+    * the lifetime of captured wire data in renderer memory. Returns
+    * `true` if captures were cleared (or were already empty), `false`
+    * if the user cancelled the prompt.
+    */
+  def confirmAndClearProxyCaptures(): Boolean =
+    if (AppState.proxyCaptures.isEmpty) {
+      clearProxyCaptures()
+      true
+    } else if (dom.window.confirm(I18n.t("proxy.discardConfirm"))) {
+      clearProxyCaptures()
+      true
+    } else {
+      false
+    }
 }
