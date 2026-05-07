@@ -5,13 +5,30 @@ import claudeproxymate.renderer.state.AppState
 import org.scalajs.dom
 
 import scala.scalajs.js
-import scala.scalajs.js.annotation.JSExportTopLevel
 
 /** Copy utilities for proxy command and detail view.
   *
-  * Ports `copyProxyCmd`, `copyProxyDetail` from renderer.js.
+  * Ports `copyProxyCmd`, `copyProxyDetail` from renderer.js. Click
+  * dispatch goes through [[install]] (doc-level click listener
+  * filtered by `#proxyCmdCopyBtn` / `#copyDetailBtn`). Inline
+  * `onclick` handlers were removed because Scala.js NoModule
+  * `let`-exported globals are unreliable from inline HTML attributes
+  * in this Electron version.
   */
 object CopyUtil {
+
+  def install(): Unit =
+    dom.document.addEventListener("click", handleClick _)
+
+  private def handleClick(e: dom.MouseEvent): Unit = {
+    val target = e.target.asInstanceOf[dom.Element]
+    if (target == null) return
+    if (target.closest(s"#${HtmlIds.ProxyCmdCopyBtn}") != null) {
+      copyProxyCmd()
+      return
+    }
+    if (target.closest(s"#${HtmlIds.CopyDetailBtn}") != null) copyProxyDetail()
+  }
 
   private def flashCopyButton(selector: String): js.Function1[Any, Unit] = { (_: Any) =>
     val btn = dom.document.querySelector(selector)
@@ -26,17 +43,15 @@ object CopyUtil {
     dom.console.error("copy failed", e.asInstanceOf[js.Any])
   }
 
-  @JSExportTopLevel("copyProxyCmd")
   def copyProxyCmd(): Unit = {
     val el = dom.document.getElementById(HtmlIds.ProxyCmdText)
     if (el == null || !AppState.proxyRunning) return
     locally { val _ = dom.window.navigator.clipboard.writeText(el.textContent)
       .asInstanceOf[js.Dynamic]
-      .`then`(flashCopyButton("""[onclick="copyProxyCmd()"]"""))
+      .`then`(flashCopyButton(s"#${HtmlIds.ProxyCmdCopyBtn}"))
       .`catch`(onCopyError) }
   }
 
-  @JSExportTopLevel("copyProxyDetail")
   def copyProxyDetail(): Unit = {
     val entry = AppState.proxyCaptures.find(e => e.id == AppState.selectedProxyId.map(_.asInstanceOf[js.Any]).orNull)
     entry match {
@@ -56,7 +71,7 @@ object CopyUtil {
 
         locally { val _ = dom.window.navigator.clipboard.writeText(text)
           .asInstanceOf[js.Dynamic]
-          .`then`(flashCopyButton("""[onclick="copyProxyDetail()"]"""))
+          .`then`(flashCopyButton(s"#${HtmlIds.CopyDetailBtn}"))
           .`catch`(onCopyError) }
     }
   }

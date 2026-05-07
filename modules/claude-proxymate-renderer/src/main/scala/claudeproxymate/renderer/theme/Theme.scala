@@ -53,7 +53,21 @@ object Theme {
     installSystemListener()
   }
 
-  @JSExportTopLevel("toggleTheme")
+  /** Install the doc-level click listener that dispatches the
+    * `#themeToggleBtn` button. Replaces the inline
+    * `onclick="toggleTheme()"`, which was unreliable in Scala.js
+    * NoModule output (the global `let` export sometimes resolves to
+    * undefined at the inline-handler call site).
+    */
+  def install(): Unit =
+    dom.document.addEventListener("click", handleClick _)
+
+  private def handleClick(e: dom.MouseEvent): Unit = {
+    val target = e.target.asInstanceOf[dom.Element]
+    if (target == null) return
+    if (target.closest(s"#${HtmlIds.ThemeToggleBtn}") != null) toggle()
+  }
+
   def toggle(): Unit = {
     val next = _selection match {
       case "system" => "light"

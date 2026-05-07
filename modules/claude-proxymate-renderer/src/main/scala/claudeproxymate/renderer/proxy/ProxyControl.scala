@@ -20,7 +20,28 @@ object ProxyControl {
   private val debouncedRenderList   = new Debounce(50)
   private val debouncedRenderDetail = new Debounce(100)
 
-  @JSExportTopLevel("updateProxyCmd")
+  /** Install doc-level listeners for the port input (`#proxyPort`) and
+    * the start/stop proxy button (`#proxyStartBtn`). Replaces the
+    * inline `oninput="updateProxyCmd()"` and
+    * `onclick="toggleProxy()"`.
+    */
+  def install(): Unit = {
+    dom.document.addEventListener("click", handleClick _)
+    dom.document.addEventListener("input", handleInput _)
+  }
+
+  private def handleClick(e: dom.MouseEvent): Unit = {
+    val target = e.target.asInstanceOf[dom.Element]
+    if (target == null) return
+    if (target.closest(s"#${HtmlIds.ProxyStartBtn}") != null) toggleProxy()
+  }
+
+  private def handleInput(e: dom.Event): Unit = {
+    val target = e.target.asInstanceOf[dom.Element]
+    if (target == null || target.id != HtmlIds.ProxyPort) return
+    updateProxyCmd()
+  }
+
   def updateProxyCmd(): Unit = {
     val portEl = dom.document.getElementById(HtmlIds.ProxyPort)
     val cmdEl  = dom.document.getElementById(HtmlIds.ProxyCmdText)
@@ -66,7 +87,6 @@ object ProxyControl {
     }
   }
 
-  @JSExportTopLevel("toggleProxy")
   def toggleProxy(): Unit = {
     ElectronApi.get match {
       case None      => ()

@@ -26,6 +26,13 @@ object ProxyList {
 
   private def handleClick(e: dom.MouseEvent): Unit = {
     val target = e.target.asInstanceOf[dom.Element]
+    if (target == null) return
+
+    if (target.closest(s"#${HtmlIds.ProxyClearBtn}") != null) {
+      clearProxyCaptures()
+      return
+    }
+
     val entry  = target.closest(s".${ProxyListView.EntryClass}[${ProxyListView.EntryDataIdAttr}]")
     if (entry == null) return
     val raw = entry.asInstanceOf[dom.html.Element].getAttribute(ProxyListView.EntryDataIdAttr)
@@ -102,7 +109,6 @@ object ProxyList {
     ProxyControl.callRenderProxyDetail()
   }
 
-  @JSExportTopLevel("clearProxyCaptures")
   def clearProxyCaptures(): Unit = {
     AppState.proxyCaptures = Nil
     AppState.selectedProxyId = None

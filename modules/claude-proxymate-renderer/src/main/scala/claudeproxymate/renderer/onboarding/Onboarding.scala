@@ -3,15 +3,26 @@ package claudeproxymate.renderer.onboarding
 import claudeproxymate.core.HtmlIds
 import org.scalajs.dom
 
-import scala.scalajs.js.annotation.JSExportTopLevel
-
 /** Onboarding modal.
   *
-  * Ports `closeOnboard` and the initial onboarding check from renderer.js.
+  * Ports the initial onboarding check from renderer.js. The close
+  * button click is dispatched by [[install]] (doc-level click listener
+  * filtered by `#onboardCloseBtn`). Inline `onclick="closeOnboard()"`
+  * was removed because Scala.js NoModule `let`-exported globals are
+  * unreliable when invoked from inline HTML attributes in this
+  * Electron version.
   */
 object Onboarding {
 
-  @JSExportTopLevel("closeOnboard")
+  def install(): Unit =
+    dom.document.addEventListener("click", handleClick _)
+
+  private def handleClick(e: dom.MouseEvent): Unit = {
+    val target = e.target.asInstanceOf[dom.Element]
+    if (target == null) return
+    if (target.closest(s"#${HtmlIds.OnboardCloseBtn}") != null) closeOnboard()
+  }
+
   def closeOnboard(): Unit = {
     val modal = dom.document.getElementById(HtmlIds.OnboardModal)
     if (modal != null) modal.asInstanceOf[dom.html.Element].style.display = "none"

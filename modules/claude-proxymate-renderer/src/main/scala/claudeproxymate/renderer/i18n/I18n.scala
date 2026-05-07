@@ -46,7 +46,19 @@ object I18n {
     vars.foldLeft(value) { case (s, (k, v)) => s.replace(s"{$k}", v) }
   }
 
-  @JSExportTopLevel("toggleLocale")
+  /** Install the doc-level click listener that dispatches the
+    * `#langToggleBtn` button. Replaces the inline
+    * `onclick="toggleLocale()"` in the generated `index.html`.
+    */
+  def install(): Unit =
+    dom.document.addEventListener("click", handleClick _)
+
+  private def handleClick(e: dom.MouseEvent): Unit = {
+    val target = e.target.asInstanceOf[dom.Element]
+    if (target == null) return
+    if (target.closest(s"#${HtmlIds.LangToggleBtn}") != null) toggleLocale()
+  }
+
   def toggleLocale(): Unit =
     setLocale(if (_locale == "ko") "en" else "ko")
 

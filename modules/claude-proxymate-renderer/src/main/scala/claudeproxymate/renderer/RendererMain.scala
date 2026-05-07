@@ -2,6 +2,7 @@ package claudeproxymate.renderer
 
 import claudeproxymate.core.HtmlIds
 import claudeproxymate.renderer.analysis.MechChips
+import claudeproxymate.renderer.copy.CopyUtil
 import claudeproxymate.renderer.detail.{DtabListeners, TokenPopover}
 import claudeproxymate.renderer.facades.ElectronApi
 import claudeproxymate.renderer.json.JsonTreeViewer
@@ -47,6 +48,11 @@ object RendererMain {
     MessageRenderer.install()
     ProxyDetailSearchListeners.install()
     DtabListeners.install()
+    Onboarding.install()
+    Theme.install()
+    I18n.install()
+    ProxyControl.install()
+    CopyUtil.install()
     Onboarding.showIfNeeded()
   }
 

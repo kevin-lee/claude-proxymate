@@ -55,7 +55,7 @@ object IndexHtmlGenerator {
           li(i18nHtml := "onboard.step3")(raw(tx(m, "onboard.step3"))),
         ),
         div(cls := "onboard-note", i18n := "onboard.note")(tx(m, "onboard.note")),
-        button(cls := "onboard-btn", onclick := "closeOnboard()", i18n := "onboard.btn")(tx(m, "onboard.btn")),
+        button(id := HtmlIds.OnboardCloseBtn, cls := "onboard-btn", i18n := "onboard.btn")(tx(m, "onboard.btn")),
       ),
     )
 
@@ -79,7 +79,6 @@ object IndexHtmlGenerator {
         button(
           id := HtmlIds.ThemeToggleBtn,
           cls := "theme-toggle-btn",
-          onclick := "toggleTheme()",
           attr("aria-label") := "Theme: System",
           attr("title") := "Theme: System",
           attr("data-theme-state") := "system",
@@ -90,7 +89,6 @@ object IndexHtmlGenerator {
         ),
         button(
           id := HtmlIds.LangToggleBtn,
-          onclick := "toggleLocale()",
           style := "padding:4px 10px;border-radius:5px;font-size:11px;background:none;border:1px solid var(--border);color:var(--dim);cursor:pointer;transition:all .15s;white-space:nowrap;font-weight:700;",
         )(""),
       ),
@@ -144,7 +142,6 @@ object IndexHtmlGenerator {
             value := "8888",
             attr("min") := "1024",
             attr("max") := "65535",
-            attr("oninput") := "updateProxyCmd()",
           ),
         ),
         div(id := HtmlIds.ProxyStatus, cls := "proxy-status proxy-bar-status")(
@@ -157,8 +154,8 @@ object IndexHtmlGenerator {
           tx(m, "proxy.startFirst"),
         ),
         button(
+          id := HtmlIds.ProxyCmdCopyBtn,
           cls := "proxy-bar-cmd-copy",
-          onclick := "copyProxyCmd()",
           attr("aria-label") := "Copy command",
           attr("title") := tx(m, "copy.copy"),
         )("\u29C9"),
@@ -167,12 +164,11 @@ object IndexHtmlGenerator {
         button(
           cls := "btn btn-send proxy-bar-btn-primary",
           id := HtmlIds.ProxyStartBtn,
-          onclick := "toggleProxy()",
           i18n := "proxy.startProxy",
         )(tx(m, "proxy.startProxy")),
         button(
+          id := HtmlIds.ProxyClearBtn,
           cls := "btn btn-copy proxy-bar-btn-clear",
-          onclick := "clearProxyCaptures()",
           i18n := "proxy.clear",
         )(tx(m, "proxy.clear")),
         button(
@@ -214,7 +210,7 @@ object IndexHtmlGenerator {
             dataDtab := "analysis",
             style    := "color:var(--purple)",
           )("Analysis"),
-          button(cls := "copy-small", style := "margin-left:auto", onclick := "copyProxyDetail()", i18n := "copy.copy")(
+          button(id := HtmlIds.CopyDetailBtn, cls := "copy-small", style := "margin-left:auto", i18n := "copy.copy")(
             tx(m, "copy.copy"),
           ),
         ),

@@ -312,7 +312,7 @@ object DetailView {
     }
 
     // Hide copy button for analysis/messages tabs
-    val copyBtn = dom.document.querySelector("[onclick=\"copyProxyDetail()\"]")
+    val copyBtn = dom.document.getElementById(HtmlIds.CopyDetailBtn)
     if (copyBtn != null) {
       copyBtn.asInstanceOf[dom.html.Element].style.display =
         if (tab == "analysis" || tab == "messages") "none" else ""
