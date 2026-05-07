@@ -13,6 +13,11 @@ object IndexHtmlGeneratorSpec extends Properties {
     example("copy detail button has the CopyDetailBtn id", testCopyDetailBtnId),
     example("existing button ids are preserved", testExistingButtonIdsPreserved),
     example("dtab buttons carry their data-dtab attributes", testDtabDataAttrs),
+    example("CSP meta tag is emitted in <head>", testCspMetaPresent),
+    example("CSP locks script-src to 'self' (no unsafe-inline / unsafe-eval)", testCspScriptSrcStrict),
+    example("CSP includes object-src 'none'", testCspObjectSrcNone),
+    example("CSP allows api.github.com in connect-src for the update check", testCspGitHubApiAllowed),
+    example("CSP includes base-uri / form-action / frame-ancestors hardening", testCspDefenceInDepth),
   )
 
   private val sampleLocale: Map[String, String] = Map(
@@ -100,4 +105,37 @@ object IndexHtmlGeneratorSpec extends Properties {
       Result.assert(rendered.contains(s"""data-dtab="$tab""""))
         .log(s"`data-dtab=\"$tab\"` missing from generated HTML")
     })
+
+  def testCspMetaPresent: Result =
+    Result.assert(rendered.contains("""http-equiv="Content-Security-Policy""""))
+      .log(s"CSP meta tag missing from generated HTML")
+
+  def testCspScriptSrcStrict: Result =
+    Result.all(
+      List(
+        Result.assert(rendered.contains("script-src 'self'"))
+          .log("`script-src 'self'` missing"),
+        Result.assert(!rendered.contains("script-src 'self' 'unsafe-inline'"))
+          .log("`script-src` must not include `'unsafe-inline'`"),
+        Result.assert(!rendered.contains("'unsafe-eval'"))
+          .log("`'unsafe-eval'` must never appear in the CSP"),
+      )
+    )
+
+  def testCspObjectSrcNone: Result =
+    Result.assert(rendered.contains("object-src 'none'"))
+      .log("`object-src 'none'` missing from CSP")
+
+  def testCspGitHubApiAllowed: Result =
+    Result.assert(rendered.contains("https://api.github.com"))
+      .log("`https://api.github.com` missing from CSP connect-src")
+
+  def testCspDefenceInDepth: Result =
+    Result.all(
+      List(
+        Result.assert(rendered.contains("base-uri 'self'")).log("`base-uri 'self'` missing"),
+        Result.assert(rendered.contains("form-action 'none'")).log("`form-action 'none'` missing"),
+        Result.assert(rendered.contains("frame-ancestors 'none'")).log("`frame-ancestors 'none'` missing"),
+      )
+    )
 }

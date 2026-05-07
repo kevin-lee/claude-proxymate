@@ -17,6 +17,32 @@ object IndexHtmlGenerator {
   private val i18nHtml = attr("data-i18n-html")
   private val dataDtab = attr("data-dtab")
 
+  /** Strict Content-Security-Policy applied via `<meta http-equiv>`.
+    *
+    *   - `script-src 'self'` is the high-value lock: no inline JS,
+    *     no `eval`, no remote scripts. A3i made this possible by
+    *     removing every inline `onclick` / `oninput` handler.
+    *   - `style-src 'self' 'unsafe-inline'` is intentional —
+    *     `IndexHtmlGenerator` and the Scalatags views use many
+    *     inline `style=""` attributes for layout / mechanism colors.
+    *     No captured wire data flows into a `style` attribute, so
+    *     CSS-injection risk is minimal; tightening this to `'self'`
+    *     would require moving ~60+ inline styles into `styles.css`
+    *     (separate refactor).
+    *   - `connect-src` includes `https://api.github.com` for the
+    *     in-app update check (`UpdateChecker.checkForUpdate`).
+    */
+  val ContentSecurityPolicy: String =
+    "default-src 'self'; " +
+      "script-src 'self'; " +
+      "style-src 'self' 'unsafe-inline'; " +
+      "img-src 'self'; " +
+      "connect-src 'self' https://api.github.com; " +
+      "object-src 'none'; " +
+      "base-uri 'self'; " +
+      "form-action 'none'; " +
+      "frame-ancestors 'none'"
+
   /** Look up a translation key, falling back to the key itself. */
   private def tx(m: Map[String, String], key: String): String =
     m.getOrElse(key, key)
@@ -25,6 +51,7 @@ object IndexHtmlGenerator {
     "<!DOCTYPE html>\n" + html(lang := "en")(
       head(
         meta(charset := "UTF-8"),
+        meta(attr("http-equiv") := "Content-Security-Policy", content := ContentSecurityPolicy),
         meta(name := "viewport", content := "width=device-width, initial-scale=1.0"),
         titleTag("Claude Proxymate"),
         link(rel := "icon", attr("type") := "image/png", href := "../assets/logo/dark/icon-32.png"),
