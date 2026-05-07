@@ -82,6 +82,7 @@ object ElectronMain {
             preload = NodePath.join(appPath, "preload.js"),
             contextIsolation = true,
             nodeIntegration = false,
+            sandbox = true,
           ),
         titleBarStyle = (if (isDarwin) "hiddenInset" else "default"),
         title = "Claude Proxymate",
