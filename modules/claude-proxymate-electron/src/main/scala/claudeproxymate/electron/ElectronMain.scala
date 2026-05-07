@@ -161,6 +161,20 @@ object ElectronMain {
         js.Dynamic.literal(action = "deny").asInstanceOf[js.Object]
       }: js.Function1[js.Dynamic, js.Object])
 
+    /* Renderer must never navigate the main frame. External links go
+     * through `setWindowOpenHandler` (target="_blank") or
+     * `electronAPI.openExternal` (popover links). Any will-navigate
+     * / will-redirect / will-frame-navigate event is therefore either
+     * a bug or an attack — preventDefault() and warn.
+     */
+    val blockNavigation: js.Function2[js.Dynamic, String, Unit] = { (event: js.Dynamic, url: String) =>
+      val _ = event.preventDefault()
+      val _ = js.Dynamic.global.console.warn("Blocked navigation:", url)
+    }
+    win.webContents.on("will-navigate", blockNavigation)
+    win.webContents.on("will-redirect", blockNavigation)
+    win.webContents.on("will-frame-navigate", blockNavigation)
+
     mainWindow.set(Some(win))
   }
 }
