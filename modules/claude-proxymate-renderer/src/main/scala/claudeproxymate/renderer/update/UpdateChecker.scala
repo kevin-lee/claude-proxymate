@@ -18,7 +18,7 @@ object UpdateChecker {
     dom.window.sessionStorage.setItem("updateChecked", "1")
 
     locally { val _ = dom.window.fetch(
-      "https://api.github.com/repos/kevin-lee/claude-proxyman/releases/latest",
+      "https://api.github.com/repos/kevin-lee/claude-proxymate/releases/latest",
       new dom.RequestInit {
         headers = js.Dictionary("Accept" -> "application/vnd.github.v3+json")
       },
