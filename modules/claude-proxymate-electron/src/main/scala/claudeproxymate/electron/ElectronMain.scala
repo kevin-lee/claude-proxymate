@@ -68,6 +68,26 @@ object ElectronMain {
     val isDarwin = platform == "darwin"
     val appPath  = ElectronApp.getAppPath()
 
+    /* DevTools are enabled when:
+     *   - the app is NOT packaged (covers all `electron .` dev runs), OR
+     *   - the env var `CLAUDE_PROXYMATE_DEVTOOLS=1` is set (escape
+     *     hatch for debugging a packaged build).
+     *
+     * Setting `webPreferences.devTools = false` disables Cmd/Ctrl+Shift+I,
+     * right-click → Inspect, and programmatic `webContents.openDevTools()`.
+     * End-user `.dmg` / `.AppImage` / `.exe` installs ship without
+     * DevTools so captured wire data in `AppState.proxyCaptures` is
+     * not trivially inspectable from the keyboard.
+     */
+    val devToolsEnabled: Boolean = {
+      val packaged = ElectronApp.isPackaged
+      val envFlag  = {
+        val v = process.selectDynamic("env").selectDynamic("CLAUDE_PROXYMATE_DEVTOOLS")
+        !js.isUndefined(v) && v != null && v.toString == "1"
+      }
+      !packaged || envFlag
+    }
+
     val windowOptions = js
       .Dynamic
       .literal(
@@ -83,6 +103,7 @@ object ElectronMain {
             contextIsolation = true,
             nodeIntegration = false,
             sandbox = true,
+            devTools = devToolsEnabled,
           ),
         titleBarStyle = (if (isDarwin) "hiddenInset" else "default"),
         title = "Claude Proxymate",

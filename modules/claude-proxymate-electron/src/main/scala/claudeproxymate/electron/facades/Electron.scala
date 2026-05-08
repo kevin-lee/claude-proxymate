@@ -11,6 +11,7 @@ object ElectronApp extends js.Object {
   def quit(): Unit                                    = js.native
   def getPath(name: String): String                   = js.native
   def getAppPath(): String                            = js.native
+  val isPackaged: Boolean                             = js.native
 }
 
 @js.native
