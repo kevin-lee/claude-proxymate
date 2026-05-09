@@ -20,7 +20,8 @@ object JsonTreeViewSpec extends Properties {
     example("short string with inner double-quotes JSON-escapes them", testShortStrInnerDoubleQuotes),
     example("long string builds jt-str-long envelope", testLongStrEnvelope),
     example("long string preview is 80 chars + ellipsis", testLongStrPreviewLength),
-    example("long string expanded splits on newlines", testLongStrExpandedLines),
+    example("long string expanded splits on real newlines", testLongStrExpandedLines),
+    example("long string with literal backslash-n does NOT split (legacy dropped)", testLongStrLiteralBackslashNDoesNotSplit),
     example("long string carries data-jt-str-id on all three carriers", testLongStrDataAttr),
     example("long string with <script> escapes properly in expanded", testLongStrExpandedEscape),
     // Container rendering
@@ -59,6 +60,12 @@ object JsonTreeViewSpec extends Properties {
     example("token-mask reveals when maskRevealed contains the path#offset id", testTokenMaskRevealed),
     example("plain string with no tokens renders without token-mask", testTokenMaskNoFalsePositive),
     example("sensitive key wins over inner token (no inner mask rendered)", testTokenMaskSensitiveKeyWins),
+    // Long-string token masking (C3 PR2c)
+    example("long string with token renders token-mask in expanded view", testLongStrTokenInExpanded),
+    example("long string with token does not leak the raw token", testLongStrTokenNoLeak),
+    example("long string token at start renders mask in collapsed preview", testLongStrTokenInPreview),
+    example("long string token across 80-char preview boundary skipped from preview", testLongStrTokenCrossingPreview),
+    example("long string with token uses raw-string offset in token id", testLongStrTokenIdOffset),
     // Path walker (used by JsonTreeViewer.toggleMaskReveal for in-place swap)
     example("resolvePath: $ returns the root value", testResolvePathRoot),
     example("resolvePath: $.key returns nested object value", testResolvePathDotKey),
@@ -199,9 +206,10 @@ object JsonTreeViewSpec extends Properties {
   }
 
   def testLongStrExpandedLines: Result = {
-    // Build a JSON string containing literal \n newline escapes, total length > threshold
+    // Build a long string with REAL newlines; expanded view splits
+    // on real `\n` chars per JSON viewer convention.
     val pad   = "z" * 305
-    val value = "line1\\nline2\\n" + pad
+    val value = "line1\nline2\n" + pad
     val out   = render(parse(js.JSON.stringify(value)))
     val expCount = out.split("class=\"jt-exp-line\"", -1).length - 1
     Result.all(
@@ -211,6 +219,20 @@ object JsonTreeViewSpec extends Properties {
         Result.assert(out.contains("line2")).log("line2 missing"),
       )
     )
+  }
+
+  def testLongStrLiteralBackslashNDoesNotSplit: Result = {
+    // Regression guard for the dropped `\\n` legacy split: a long
+    // string containing the literal two-char sequence `\` + `n`
+    // (NOT a real newline) renders as a SINGLE expanded line.
+    // Embedded `\n` escape sequences appear in the rendered text
+    // per JSON.stringify convention.
+    val pad   = "z" * 305
+    val value = "line1\\nline2\\n" + pad
+    val out   = render(parse(js.JSON.stringify(value)))
+    val expCount = out.split("class=\"jt-exp-line\"", -1).length - 1
+    Result.assert(expCount == 1)
+      .log(s"expected exactly 1 jt-exp-line for literal-backslash-n value, got $expCount: $out")
   }
 
   def testLongStrDataAttr: Result = {
@@ -480,6 +502,71 @@ object JsonTreeViewSpec extends Properties {
     val out = renderWithLabel(parse("""{"api_key":"v"}"""), "REDACTED-LABEL")
     Result.assert(out.contains("REDACTED-LABEL"))
       .log(s"provided maskLabel not in output: $out")
+  }
+
+  // ── Long-string token masking (C3 PR2c) ───────────────────────────────
+
+  private val LongPad = "z" * 305 // pushes value past CollapseLenThreshold
+
+  def testLongStrTokenInExpanded: Result = {
+    val key   = "sk-ant-abcdefghijklmnopqrstuvwxyz12345"
+    val value = LongPad + " " + key + " trailing"
+    val out   = render(parse(js.JSON.stringify(value)))
+    val expanded = out.substring(out.indexOf("class=\"jt-str-expanded\""))
+    Result.all(
+      List(
+        Result.assert(expanded.contains(s"""class="${JsonTreeView.TokenMaskClass}""""))
+          .log(s"jt-token-mask span missing from expanded view: $expanded"),
+        Result.assert(!out.contains(key)).log(s"raw token leaked: $out"),
+      )
+    )
+  }
+
+  def testLongStrTokenNoLeak: Result = {
+    val key   = "sk-ant-abcdefghijklmnopqrstuvwxyz12345"
+    val value = LongPad + " " + key
+    val out   = render(parse(js.JSON.stringify(value)))
+    Result.assert(!out.contains(key))
+      .log(s"raw token leaked from long-string render: $out")
+  }
+
+  def testLongStrTokenInPreview: Result = {
+    // Token at offset 0 — fully inside the first 80 chars of preview.
+    val key   = "sk-ant-abcdefghijklmnopqrstuvwxyz12345"
+    val value = key + " " + LongPad
+    val out   = render(parse(js.JSON.stringify(value)))
+    // The preview span exists; it should contain the mask.
+    val preview = out.substring(out.indexOf("class=\"jt-str-preview\""), out.indexOf("class=\"jt-str-expanded\""))
+    Result.assert(preview.contains(s"""class="${JsonTreeView.TokenMaskClass}""""))
+      .log(s"jt-token-mask span missing from preview: $preview")
+  }
+
+  def testLongStrTokenCrossingPreview: Result = {
+    // Token starts at offset 60, length 38 → ends at 98, crossing
+    // the 80-char preview boundary. Preview should NOT render a
+    // mask span for it; expanded view DOES.
+    val key   = "sk-ant-abcdefghijklmnopqrstuvwxyz12345" // length 38
+    val value = ("a" * 60) + key + LongPad
+    val out   = render(parse(js.JSON.stringify(value)))
+    val preview  = out.substring(out.indexOf("class=\"jt-str-preview\""), out.indexOf("class=\"jt-str-expanded\""))
+    val expanded = out.substring(out.indexOf("class=\"jt-str-expanded\""))
+    Result.all(
+      List(
+        Result.assert(!preview.contains(s"""class="${JsonTreeView.TokenMaskClass}""""))
+          .log(s"unexpected token mask in preview: $preview"),
+        Result.assert(expanded.contains(s"""class="${JsonTreeView.TokenMaskClass}""""))
+          .log(s"token mask missing from expanded view: $expanded"),
+      )
+    )
+  }
+
+  def testLongStrTokenIdOffset: Result = {
+    // Token at known offset 5 within the raw value.
+    val key   = "sk-ant-abcdefghijklmnopqrstuvwxyz12345"
+    val value = "abcd " + key + " " + LongPad
+    val out   = render(parse(js.JSON.stringify(value)))
+    Result.assert(out.contains(s"""${JsonTreeView.TokenMaskDataAttr}="$$#5""""))
+      .log(s"expected `${JsonTreeView.TokenMaskDataAttr}=\"$$#5\"` in: $out")
   }
 
   // ── Token-shape masking (C3 PR2) ───────────────────────────────────────

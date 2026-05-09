@@ -29,7 +29,11 @@ object JsonTreeViewer {
     val tokenEl = target.closest(s".${JsonTreeView.TokenMaskClass},.${JsonTreeView.TokenMaskRevealedClass}")
     if (tokenEl != null) {
       val raw = tokenEl.asInstanceOf[dom.html.Element].getAttribute(JsonTreeView.TokenMaskDataAttr)
-      if (raw != null && raw.nonEmpty) { toggleTokenReveal(raw); return }
+      // Messages-tab token ids are prefixed `m.` and owned by
+      // `MessageRenderer.handleClick` (different scroll-preserve
+      // behavior). Skip them here.
+      if (raw != null && raw.nonEmpty && !raw.startsWith("m.")) { toggleTokenReveal(raw); return }
+      if (raw != null && raw.startsWith("m.")) return
     }
 
     val maskEl = target.closest(s".${JsonTreeView.MaskClass},.${JsonTreeView.MaskRevealedClass}")
@@ -282,7 +286,13 @@ object JsonTreeViewer {
     for (block <- blocks) {
       val lineNodes = block.querySelectorAll(".jt-exp-line")
       val lines     = (0 until lineNodes.length).map(lineNodes(_))
-      if (lines.nonEmpty) {
+      // Skip the wrap pass when any line contains a token-mask span.
+      // The wrap rebuilds the block as plain `<div>`s with
+      // `textContent`, which would flatten the span structure and
+      // break click-to-reveal. Long lines with tokens overflow
+      // horizontally instead — acceptable trade-off for correctness.
+      val hasTokenMask = block.querySelector(s".${JsonTreeView.TokenMaskClass},.${JsonTreeView.TokenMaskRevealedClass}") != null
+      if (lines.nonEmpty && !hasTokenMask) {
         val needsSplit = lines.exists(_.textContent.length > maxChars)
         if (needsSplit) {
           val baseLn = {

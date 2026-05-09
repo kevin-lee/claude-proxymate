@@ -32,6 +32,21 @@ object MessageRenderer {
     val target = e.target.asInstanceOf[dom.Element]
     if (target == null) return
 
+    // Messages-tab token reveal. Token ids in this surface are
+    // prefixed `m.` to distinguish them from JSON-tree token ids
+    // (which encode a JSON dot-path). The JSON tree's click
+    // handler early-returns on `m.`-prefixed ids so this branch
+    // owns the toggle.
+    val tokenEl = target.closest(
+      s".${claudeproxymate.renderer.json.JsonTreeView.TokenMaskClass},.${claudeproxymate.renderer.json.JsonTreeView.TokenMaskRevealedClass}",
+    )
+    if (tokenEl != null) {
+      val tid = tokenEl.asInstanceOf[dom.html.Element].getAttribute(
+        claudeproxymate.renderer.json.JsonTreeView.TokenMaskDataAttr,
+      )
+      if (tid != null && tid.startsWith("m.")) { toggleMessageToken(tid); return }
+    }
+
     val filterEl = target.closest(s".${MessageView.FilterButtonClass}[${MessageView.FilterDataAttr}]")
     if (filterEl != null) {
       val key = filterEl.asInstanceOf[dom.html.Element].getAttribute(MessageView.FilterDataAttr)
@@ -49,6 +64,35 @@ object MessageRenderer {
     if (badgeEl != null) {
       val uid = badgeEl.asInstanceOf[dom.html.Element].getAttribute(MessageView.BadgeDataAttr)
       if (uid != null && uid.nonEmpty) BadgeToggle.toggleBadge(uid)
+    }
+  }
+
+  /** Toggle reveal state for a messages-tab token mask, then
+    * re-render the messages list while preserving the scrollable
+    * container's scrollTop so the user stays where they were.
+    */
+  private def toggleMessageToken(tokenId: String): Unit = {
+    if (AppState.maskRevealed.contains(tokenId)) {
+      val _ = AppState.maskRevealed.remove(tokenId)
+    } else {
+      val _ = AppState.maskRevealed.add(tokenId)
+    }
+
+    val container = dom.document.getElementById(HtmlIds.ProxyDetailView)
+    if (container == null) return
+    val containerEl = container.asInstanceOf[dom.html.Element]
+    val savedScroll = containerEl.scrollTop
+
+    val entry = AppState.proxyCaptures.find(e => e.id == AppState.selectedProxyId.map(_.asInstanceOf[js.Any]).orNull)
+    entry match {
+      case None    => ()
+      case Some(e) =>
+        renderProxyMessages(e, containerEl)
+        // scrollTop reset to 0 by setInnerHtml; restore on the next
+        // animation frame so layout has settled.
+        val _ = dom.window.requestAnimationFrame { _ =>
+          containerEl.scrollTop = savedScroll
+        }
     }
   }
 
@@ -94,13 +138,19 @@ object MessageRenderer {
     val isUserFilter = AppState.msgFilter == "user" || typedOnly
     val q            = AppState.msgSearchQuery
 
-    val baseFiltered: js.Array[js.Dynamic] =
-      if (isUserFilter) msgs.filter(m => m.role.asInstanceOf[String] == "user")
-      else if (AppState.msgFilter == "assistant") msgs.filter(m => m.role.asInstanceOf[String] == "assistant")
-      else msgs
+    // Carry the raw index along with each filtered message so the
+    // token-mask layer can build stable ids that don't shift when
+    // filters change.
+    val indexed: js.Array[(js.Dynamic, Int)] =
+      msgs.zipWithIndex.filter { case (m, _) =>
+        val role = m.role.asInstanceOf[String]
+        if (isUserFilter) role == "user"
+        else if (AppState.msgFilter == "assistant") role == "assistant"
+        else true
+      }
 
     val cards = scala.collection.mutable.ListBuffer.empty[MsgCard]
-    for (msg <- baseFiltered) {
+    for ((msg, rawIdx) <- indexed) {
       val role = msg.role.asInstanceOf[String]
       val rawContent = msg.selectDynamic("content")
       val contents: js.Array[js.Dynamic] =
@@ -120,7 +170,7 @@ object MessageRenderer {
       }
 
       if (!shouldSkip) {
-        val card = buildCard(role, contents, typedOnly)
+        val card = buildCard(role, contents, typedOnly).copy(rawIdx = rawIdx)
         if (cardIsNonEmpty(card) && cardMatchesQuery(card, q)) cards += card
       }
     }

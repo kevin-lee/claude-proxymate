@@ -38,6 +38,12 @@ object MessageViewSpec extends Properties {
     property("<script> in injected badge label / content never leaks raw", testNoScriptLeakInBadge),
     // Inline-handler regression
     example("output never contains inline onclick / oninput / oncomposition", testNoInlineHandlers),
+    // Token-shape masking (C3 PR2b)
+    example("TextContent containing sk-ant-… renders a token-mask span", testTokenMaskInTextContent),
+    example("token mask in TextContent does not leak the raw token", testTokenMaskNoLeakInTextContent),
+    example("InjectedMsgPart with embedded token is masked", testTokenMaskInInjectedMsgPart),
+    example("ToolResultContent.preview with embedded token is masked", testTokenMaskInToolResult),
+    example("token id includes the m. namespace prefix", testTokenIdNamespace),
   )
 
   // ── Helpers ───────────────────────────────────────────────────────────
@@ -306,5 +312,64 @@ object MessageViewSpec extends Properties {
         Result.assert(!out.contains("oncompositionend=")).log("unexpected oncompositionend"),
       )
     )
+  }
+
+  // ── Token-shape masking (C3 PR2b) ─────────────────────────────────────
+
+  private val FakeAnthropic = "sk-ant-abcdefghijklmnopqrstuvwxyz12345"
+
+  def testTokenMaskInTextContent: Result = {
+    val card = MsgCard("assistant", List(TextContent(s"prefix $FakeAnthropic suffix")), Nil)
+    val out  = renderCards(List(card))
+    Result.all(
+      List(
+        Result.assert(out.contains("class=\"jt-token-mask\""))
+          .log(s"jt-token-mask span missing: $out"),
+        Result.assert(out.contains("data-token-id=\"m."))
+          .log(s"messages-namespace token id missing: $out"),
+      )
+    )
+  }
+
+  def testTokenMaskNoLeakInTextContent: Result = {
+    val card = MsgCard("assistant", List(TextContent(s"prefix $FakeAnthropic suffix")), Nil)
+    val out  = renderCards(List(card))
+    Result.assert(!out.contains(FakeAnthropic))
+      .log(s"raw token leaked: $out")
+  }
+
+  def testTokenMaskInInjectedMsgPart: Result = {
+    val card = userCard(List(InjectedMsgPart("u1", "label", FakeAnthropic, "badge-x")))
+    val out  = renderCards(List(card))
+    Result.all(
+      List(
+        Result.assert(out.contains("class=\"jt-token-mask\"")).log(s"jt-token-mask span missing: $out"),
+        Result.assert(!out.contains(FakeAnthropic)).log(s"raw token leaked: $out"),
+      )
+    )
+  }
+
+  def testTokenMaskInToolResult: Result = {
+    val card = MsgCard("assistant", List(ToolResultContent(s"result: $FakeAnthropic", truncated = false)), Nil)
+    val out  = renderCards(List(card))
+    Result.all(
+      List(
+        Result.assert(out.contains("class=\"jt-token-mask\"")).log(s"jt-token-mask span missing: $out"),
+        Result.assert(!out.contains(FakeAnthropic)).log(s"raw token leaked: $out"),
+      )
+    )
+  }
+
+  def testTokenIdNamespace: Result = {
+    // Card at rawIdx = 7, first text content. Token at offset 0.
+    val card = MsgCard(
+      role      = "assistant",
+      contents  = List(TextContent(FakeAnthropic)),
+      userParts = Nil,
+      rawIdx    = 7,
+    )
+    val out = renderCards(List(card))
+    Result.assert(out.contains("data-token-id=\"m.7.text.0#0\""))
+      .log(s"expected `data-token-id=\"m.7.text.0#0\"` in: $out")
   }
 }

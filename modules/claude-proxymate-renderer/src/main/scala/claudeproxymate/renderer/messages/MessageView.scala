@@ -1,6 +1,5 @@
 package claudeproxymate.renderer.messages
 
-import claudeproxymate.renderer.util.HtmlUtil
 import scalatags.Text.all.*
 
 /** A parsed user-text part, ready for rendering. Mirrors
@@ -19,8 +18,18 @@ final case class OtherContent(typeName: String) extends MsgContent
 
 /** One message card: role, the raw content blocks, and (only when role is
   * "user") the parsed user-text parts the orchestrator already produced.
+  *
+  * `rawIdx` is the position of this message in the raw
+  * `body.messages` array (NOT the filtered view) — used as part of
+  * the stable token-mask id prefix so reveal state survives filter
+  * changes and re-renders.
   */
-final case class MsgCard(role: String, contents: List[MsgContent], userParts: List[MsgPart])
+final case class MsgCard(
+  role: String,
+  contents: List[MsgContent],
+  userParts: List[MsgPart],
+  rawIdx: Int = 0,
+)
 
 final case class FilterLabels(user: String, typed: String, assistant: String, all: String)
 final case class SearchLabels(placeholder: String, clear: String)
@@ -95,15 +104,16 @@ object MessageView {
 
   private def buildBodyFrag(card: MsgCard, isUserFilter: Boolean, query: String): Frag = {
     if (card.role == "user" && card.userParts.nonEmpty) {
-      frag(card.userParts.map(p => buildUserPartFrag(p, query)))
+      frag(card.userParts.zipWithIndex.map { case (p, idx) => buildUserPartFrag(p, query, card.rawIdx, idx) })
     } else {
-      frag(card.contents.map(c => buildContentFrag(c, isUserFilter, query)))
+      frag(card.contents.zipWithIndex.map { case (c, idx) => buildContentFrag(c, isUserFilter, query, card.rawIdx, idx) })
     }
   }
 
-  private def buildUserPartFrag(p: MsgPart, query: String): Frag = p match {
+  private def buildUserPartFrag(p: MsgPart, query: String, cardIdx: Int, partIdx: Int): Frag = p match {
     case TextMsgPart(content) =>
-      div(cls := "msg-typed")(HtmlUtil.highlightSearchFrag(content, query))
+      val idPrefix = s"m.$cardIdx.user.$partIdx"
+      div(cls := "msg-typed")(MessageTokenView.buildTextFrag(content, query, idPrefix))
 
     case InjectedMsgPart(uid, label, content, badgeCls) =>
       // Auto-expand the badge when the search query matches inside the
@@ -120,6 +130,7 @@ object MessageView {
       val contentClasses =
         if (matched) "badge-expand-content badge-section-hl"
         else "badge-expand-content"
+      val idPrefix = s"m.$cardIdx.inj.$uid"
       div(cls := "msg-injected-row")(
         span(
           id                  := s"bb_$uid",
@@ -130,26 +141,33 @@ object MessageView {
           id    := s"bc_$uid",
           cls   := contentClasses,
           style := contentStyle,
-        )(HtmlUtil.highlightSearchFrag(content, query)),
+        )(MessageTokenView.buildTextFrag(content, query, idPrefix)),
       )
   }
 
-  private def buildContentFrag(c: MsgContent, isUserFilter: Boolean, query: String): Frag = c match {
-    case TextContent(text) =>
-      div(cls := "msg-text")(HtmlUtil.highlightSearchFrag(text, query))
+  private def buildContentFrag(c: MsgContent, isUserFilter: Boolean, query: String, cardIdx: Int, partIdx: Int): Frag =
+    c match {
+      case TextContent(text) =>
+        val idPrefix = s"m.$cardIdx.text.$partIdx"
+        div(cls := "msg-text")(MessageTokenView.buildTextFrag(text, query, idPrefix))
 
-    case ToolUseContent(name) =>
-      if (isUserFilter) frag()
-      else div(cls := "msg-tool")(s"🔧 $name()")
+      case ToolUseContent(name) =>
+        if (isUserFilter) frag()
+        else div(cls := "msg-tool")(s"🔧 $name()")
 
-    case ToolResultContent(preview, truncated) =>
-      if (isUserFilter) frag()
-      else {
-        val ellipsis = if (truncated) "…" else ""
-        div(cls := "msg-tool-result")(s"📤 $preview$ellipsis")
-      }
+      case ToolResultContent(preview, truncated) =>
+        if (isUserFilter) frag()
+        else {
+          val ellipsis = if (truncated) "…" else ""
+          val idPrefix = s"m.$cardIdx.tr.$partIdx"
+          div(cls := "msg-tool-result")(
+            "📤 ",
+            MessageTokenView.buildTextFrag(preview, query, idPrefix),
+            ellipsis,
+          )
+        }
 
-    case OtherContent(typeName) =>
-      div(cls := "msg-other")(s"[$typeName]")
-  }
+      case OtherContent(typeName) =>
+        div(cls := "msg-other")(s"[$typeName]")
+    }
 }

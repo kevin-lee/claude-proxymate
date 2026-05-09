@@ -85,50 +85,46 @@ object JsonTreeView {
   private def buildStringFrag(s: String, trailing: Frag, path: String): Frag = {
     if (s.length > CollapseLenThreshold) {
       AppState.jtId += 1
-      val sid     = s"jts${AppState.jtId}"
-      // Preview line: flatten newlines (both real and the literal
-      // `\n` two-char sequence that some captured payloads carry),
-      // JSON-escape `"` / `\` / control chars, truncate to 80 chars
-      // + ellipsis.
-      val flat    = s.replace("\\n", " ").replace('\n', ' ').replace('\r', ' ')
-      val preview = jsonEscapeBody(flat.take(80)) + "…"
-      // Expanded view: split on real newlines AND on the literal
-      // `\n` two-char sequence (legacy: some downstream payloads
-      // store newlines as literal backslash-n rather than as a
-      // real newline char). Each line is then JSON-escaped so `"`
-      // / `\` / tab show as their JSON literals (matches clipboard
-      // format).
-      //
-      // Token-mask spans are interleaved per-line, intersecting the
-      // global token list (offsets in raw `s`) against the line's
-      // post-replace slice. The replace step changes offsets, so we
-      // skip token rendering inside expanded lines for now and
-      // surface tokens only in the collapsed preview. (Long-string
-      // token rendering inside the expanded view: deferred — the
-      // current users see this in the preview, and the hole in
-      // coverage is consistent with the existing `\\n` → `\n`
-      // legacy treatment.)
-      val lines  = s.replace("\\n", "\n").split("\n", -1)
+      val sid    = s"jts${AppState.jtId}"
+      val tokens = TokenPatterns.scan(s)
+
+      // Collapsed preview: render the first 80 raw chars with
+      // newlines flattened to spaces and tokens masked inline.
+      // Tokens that cross the 80-char boundary are skipped from
+      // the preview (they show in the expanded view).
+      val previewSliceLen = math.min(80, s.length)
+      val previewSlice    = s.substring(0, previewSliceLen)
+      val previewParts: List[Frag] =
+        buildTokenizedSlice(previewSlice, tokens, sliceOffset = 0, path, flattenNewlines = true)
+          .getOrElse(List(stringFrag(jsonEscapeBody(maybeFlatten(previewSlice, flatten = true)))))
+
+      // Expanded view: split raw `s` on real newlines. Each line
+      // becomes a `<div class="jt-exp-line">` with tokenized
+      // contents. The legacy `\\n` → `\n` substitution is dropped;
+      // raw values containing the two-char `\` + `n` sequence
+      // render as `\n` in the line text per JSON.stringify
+      // convention (matches clipboard format).
+      val lines  = s.split("\n", -1)
       val baseLn = AppState.jtLine
 
+      var sliceAt = 0
       val rowFrags: List[Frag] = lines.indices.toList.map { li =>
-        val ln = if (li == 0) baseLn else { AppState.jtLine += 1; AppState.jtLine }
+        val line       = lines(li)
+        val ln         = if (li == 0) baseLn else { AppState.jtLine += 1; AppState.jtLine }
         val isLast     = li == lines.length - 1
         val openQuote  = if (li == 0) "\"" else ""
         val closeQuote = if (isLast) "\"" else ""
-        val escaped    = jsonEscapeBody(lines(li))
+        val lineParts: List[Frag] =
+          buildTokenizedSlice(line, tokens, sliceOffset = sliceAt, path, flattenNewlines = false)
+            .getOrElse(List(stringFrag(jsonEscapeBody(line))))
+        sliceAt += line.length + 1 // +1 for the consumed `\n`
         div(cls := "jt-exp-line", attr("data-ln") := ln.toString)(
-          s"$openQuote$escaped$closeQuote",
+          openQuote,
+          frag(lineParts*),
+          closeQuote,
         )
       }
 
-      /* Long-string token rendering inside preview / expanded
-       * lines: deferred. The `\\n` → `\n` replace shifts character
-       * offsets, making it non-trivial to project token offsets
-       * (which are relative to the raw value) onto the post-replace
-       * slices. PR 2 only handles short strings inline; long-string
-       * token coverage follows in a later PR.
-       */
       frag(
         span(cls := "jt-str-long")(
           span(
@@ -142,8 +138,8 @@ object JsonTreeView {
             attr(StringDataAttr) := sid,
           )(
             "\"",
-            preview,
-            "\" ",
+            frag(previewParts*),
+            "…\" ",
             span(style := "color:var(--dim);font-size:10px")(s"(${s.length} chars)"),
           ),
           div(
@@ -181,6 +177,11 @@ object JsonTreeView {
     * `sliceOffset` is the offset of `text[0]` within that raw value,
     * which is also the offset used in token ids.
     *
+    * When `flattenNewlines` is true, real `\n` / `\r` chars in the
+    * plain segments are replaced with space before JSON-escape — used
+    * by the long-string collapsed preview to keep everything on one
+    * visual line.
+    *
     * Returns `None` when no token matches fall inside the slice
     * (caller can fall back to a single plain frag), or `Some(parts)`
     * with the interleaved sequence of plain-text and `<span>`
@@ -193,6 +194,7 @@ object JsonTreeView {
     tokens: List[TokenPatterns.TokenMatch],
     sliceOffset: Int,
     path: String,
+    flattenNewlines: Boolean = false,
   ): Option[List[Frag]] = {
     val sliceEnd = sliceOffset + text.length
     val inSlice  = tokens.filter(t => t.start >= sliceOffset && t.end <= sliceEnd)
@@ -202,7 +204,7 @@ object JsonTreeView {
     inSlice.foreach { t =>
       if (t.start > cursor) {
         val plain = text.substring(cursor - sliceOffset, t.start - sliceOffset)
-        parts += stringFrag(jsonEscapeBody(plain))
+        parts += stringFrag(jsonEscapeBody(maybeFlatten(plain, flattenNewlines)))
       }
       val raw = text.substring(t.start - sliceOffset, t.end - sliceOffset)
       parts += buildTokenMaskFrag(path, t.start, raw)
@@ -210,10 +212,13 @@ object JsonTreeView {
     }
     if (cursor < sliceEnd) {
       val plain = text.substring(cursor - sliceOffset, sliceEnd - sliceOffset)
-      parts += stringFrag(jsonEscapeBody(plain))
+      parts += stringFrag(jsonEscapeBody(maybeFlatten(plain, flattenNewlines)))
     }
     Some(parts.toList)
   }
+
+  private def maybeFlatten(s: String, flatten: Boolean): String =
+    if (flatten) s.replace('\n', ' ').replace('\r', ' ') else s
 
   /** Build the masked-or-revealed frag for a single regex-detected
     * token. Token id format: `<json-path>#<offset>`, stable across
