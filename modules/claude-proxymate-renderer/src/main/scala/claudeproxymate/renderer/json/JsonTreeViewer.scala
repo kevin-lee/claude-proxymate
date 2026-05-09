@@ -26,6 +26,12 @@ object JsonTreeViewer {
     val target = e.target.asInstanceOf[dom.Element]
     if (target == null) return
 
+    val tokenEl = target.closest(s".${JsonTreeView.TokenMaskClass},.${JsonTreeView.TokenMaskRevealedClass}")
+    if (tokenEl != null) {
+      val raw = tokenEl.asInstanceOf[dom.html.Element].getAttribute(JsonTreeView.TokenMaskDataAttr)
+      if (raw != null && raw.nonEmpty) { toggleTokenReveal(raw); return }
+    }
+
     val maskEl = target.closest(s".${JsonTreeView.MaskClass},.${JsonTreeView.MaskRevealedClass}")
     if (maskEl != null) {
       val raw = maskEl.asInstanceOf[dom.html.Element].getAttribute(JsonTreeView.MaskDataAttr)
@@ -112,6 +118,74 @@ object JsonTreeViewer {
     if (replacement == null) return false
     val _ = live.asInstanceOf[js.Dynamic].replaceWith(replacement)
     true
+  }
+
+  /** Toggle reveal state for a regex-detected token mask, then swap
+    * the single span in the live DOM. The token id is `path#offset`;
+    * we resolve the parent string by `path`, then locate the match
+    * at `offset` in the scanned token list to recover the original
+    * matched substring.
+    */
+  private def toggleTokenReveal(tokenId: String): Unit = {
+    if (AppState.maskRevealed.contains(tokenId)) {
+      val _ = AppState.maskRevealed.remove(tokenId)
+    } else {
+      val _ = AppState.maskRevealed.add(tokenId)
+    }
+
+    val swapped = trySwapTokenInPlace(tokenId)
+    if (!swapped) DetailView.renderProxyDetail()
+  }
+
+  private def trySwapTokenInPlace(tokenId: String): Boolean = {
+    val container = dom.document.getElementById(claudeproxymate.core.HtmlIds.ProxyDetailCode)
+    if (container == null) return false
+
+    val cssEscape = js.Dynamic.global.CSS.applyDynamic("escape")(tokenId).asInstanceOf[String]
+    val live      = container.querySelector(s"[${JsonTreeView.TokenMaskDataAttr}=\"$cssEscape\"]")
+    if (live == null) return false
+
+    // Split `path#offset`. `#` doesn't appear in JSON paths the
+    // builder emits, so a single `lastIndexOf` is unambiguous.
+    val hashAt = tokenId.lastIndexOf('#')
+    if (hashAt < 0) return false
+    val path   = tokenId.substring(0, hashAt)
+    val offset =
+      try tokenId.substring(hashAt + 1).toInt
+      catch { case _: NumberFormatException => return false }
+
+    val entry = AppState.proxyCaptures.find(e => e.id == AppState.selectedProxyId.map(_.asInstanceOf[js.Any]).orNull)
+    val body: js.Dynamic = entry match {
+      case None    => null.asInstanceOf[js.Dynamic]
+      case Some(e) =>
+        if (AppState.proxyDetailTab == "request") e.selectDynamic("body")
+        else {
+          val resp = e.selectDynamic("response")
+          if (!js.isUndefined(resp) && resp != null) resp.selectDynamic("body")
+          else null.asInstanceOf[js.Dynamic]
+        }
+    }
+    if (body == null || js.isUndefined(body)) return false
+
+    val parent = JsonTreeView.resolvePath(body, path)
+    if (parent == null || js.isUndefined(parent) || js.typeOf(parent) != "string") return false
+    val parentStr = parent.asInstanceOf[String]
+
+    val matches = claudeproxymate.core.TokenPatterns.scan(parentStr)
+    matches.find(_.start == offset) match {
+      case None => false
+      case Some(m) =>
+        val raw     = parentStr.substring(m.start, m.end)
+        val newFrag = JsonTreeView.buildTokenMaskFrag(path, m.start, raw).render
+        val sandbox = dom.document.createElement("div").asInstanceOf[dom.html.Element]
+        sandbox.innerHTML = newFrag
+        val replacement = sandbox.firstChild
+        if (replacement == null) false
+        else {
+          val _ = live.asInstanceOf[js.Dynamic].replaceWith(replacement)
+          true
+        }
+    }
   }
 
   /** Measure byte length of a string using TextEncoder (Web API). */

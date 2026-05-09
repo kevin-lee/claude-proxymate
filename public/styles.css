@@ -474,6 +474,30 @@
     .jt-mask-revealed:hover {
       background: color-mix(in srgb, var(--yellow) 10%, transparent);
     }
+    /* C3 PR2 — regex-detected token mask (in-line redaction) */
+    .jt-token-mask {
+      display: inline;
+      padding: 0 4px;
+      border-radius: 3px;
+      background: color-mix(in srgb, var(--orange) 14%, transparent);
+      color: var(--dim);
+      cursor: pointer;
+      font-style: italic;
+      transition: background .1s;
+    }
+    .jt-token-mask:hover {
+      background: color-mix(in srgb, var(--orange) 22%, transparent);
+      color: var(--text);
+    }
+    .jt-token-mask-revealed {
+      cursor: pointer;
+      border-radius: 3px;
+      background: color-mix(in srgb, var(--orange) 8%, transparent);
+      transition: background .1s;
+    }
+    .jt-token-mask-revealed:hover {
+      background: color-mix(in srgb, var(--orange) 14%, transparent);
+    }
     .proxy-token-pill {
       padding: 6px 12px;
       font-size: 11px;

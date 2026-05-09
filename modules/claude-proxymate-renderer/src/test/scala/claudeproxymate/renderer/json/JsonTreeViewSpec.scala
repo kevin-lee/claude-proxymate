@@ -53,6 +53,12 @@ object JsonTreeViewSpec extends Properties {
     example("input_tokens does NOT render the masked placeholder", testMaskNoFalsePositiveOnTokenCount),
     example("mask data-mask-id is the dot-path of the field (stable across re-renders)", testMaskIdIsDotPath),
     example("masked placeholder uses provided maskLabel", testMaskUsesProvidedLabel),
+    // Token-shape masking (C3 PR2)
+    example("string containing sk-ant-… renders as a token-mask span", testTokenMaskAnthropic),
+    example("masked token renders the fingerprint, not the raw value", testTokenMaskFingerprint),
+    example("token-mask reveals when maskRevealed contains the path#offset id", testTokenMaskRevealed),
+    example("plain string with no tokens renders without token-mask", testTokenMaskNoFalsePositive),
+    example("sensitive key wins over inner token (no inner mask rendered)", testTokenMaskSensitiveKeyWins),
     // Path walker (used by JsonTreeViewer.toggleMaskReveal for in-place swap)
     example("resolvePath: $ returns the root value", testResolvePathRoot),
     example("resolvePath: $.key returns nested object value", testResolvePathDotKey),
@@ -474,6 +480,70 @@ object JsonTreeViewSpec extends Properties {
     val out = renderWithLabel(parse("""{"api_key":"v"}"""), "REDACTED-LABEL")
     Result.assert(out.contains("REDACTED-LABEL"))
       .log(s"provided maskLabel not in output: $out")
+  }
+
+  // ── Token-shape masking (C3 PR2) ───────────────────────────────────────
+
+  def testTokenMaskAnthropic: Result = {
+    val key = "sk-ant-abcdefghijklmnopqrstuvwxyz12345"
+    val out = renderWithLabel(parse(s"""{"text":"prefix $key suffix"}"""), "hidden")
+    Result.all(
+      List(
+        Result.assert(out.contains(s"""class="${JsonTreeView.TokenMaskClass}""""))
+          .log(s"jt-token-mask span missing: $out"),
+        Result.assert(!out.contains(key))
+          .log(s"raw token leaked: $out"),
+        Result.assert(out.contains("prefix ")).log(s"surrounding text lost: $out"),
+        Result.assert(out.contains(" suffix")).log(s"surrounding text lost: $out"),
+      )
+    )
+  }
+
+  def testTokenMaskFingerprint: Result = {
+    val key   = "sk-ant-abcdefghijklmnopqrstuvwxyz12345"
+    val out   = renderWithLabel(parse(s"""{"text":"$key"}"""), "hidden")
+    // first-4 = "sk-a", last-4 = "2345"
+    Result.assert(out.contains("sk-a") && out.contains("2345") && out.contains("…"))
+      .log(s"fingerprint shape missing: $out")
+  }
+
+  def testTokenMaskRevealed: Result = {
+    val key  = "sk-ant-abcdefghijklmnopqrstuvwxyz12345"
+    val data = parse(s"""{"text":"prefix $key suffix"}""")
+    reset()
+    val totalBytes = js.JSON.stringify(data).length
+    // The token offset within the value `prefix sk-ant-... suffix` is 7
+    // (length of "prefix "). Token id = `$.text#7`.
+    val _ = AppState.maskRevealed.add("$.text#7")
+    val out = JsonTreeView.buildJsonFrag(data, totalBytes, "hidden").render
+    Result.all(
+      List(
+        Result.assert(out.contains(s"""class="${JsonTreeView.TokenMaskRevealedClass}""""))
+          .log(s"jt-token-mask-revealed missing: $out"),
+        Result.assert(out.contains(key))
+          .log(s"raw token missing when revealed: $out"),
+      )
+    )
+  }
+
+  def testTokenMaskNoFalsePositive: Result = {
+    val out = renderWithLabel(parse("""{"text":"plain claude-3-5-sonnet model name"}"""), "hidden")
+    Result.assert(!out.contains(s"""class="${JsonTreeView.TokenMaskClass}""""))
+      .log(s"unexpected token-mask span: $out")
+  }
+
+  def testTokenMaskSensitiveKeyWins: Result = {
+    // Sensitive key `api_key` masks the whole value; no inner
+    // token-mask should be emitted (the value isn't visible at all).
+    val key = "sk-ant-abcdefghijklmnopqrstuvwxyz12345"
+    val out = renderWithLabel(parse(s"""{"api_key":"$key"}"""), "hidden")
+    Result.all(
+      List(
+        Result.assert(out.contains(s"""class="${JsonTreeView.MaskClass}"""")).log(s"field-name mask missing: $out"),
+        Result.assert(!out.contains(s"""class="${JsonTreeView.TokenMaskClass}"""")).log(s"unexpected inner token-mask: $out"),
+        Result.assert(!out.contains(key)).log(s"raw token leaked: $out"),
+      )
+    )
   }
 
   // ── Path walker ────────────────────────────────────────────────────────

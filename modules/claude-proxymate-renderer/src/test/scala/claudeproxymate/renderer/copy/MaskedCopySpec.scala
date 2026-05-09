@@ -18,6 +18,11 @@ object MaskedCopySpec extends Properties {
     example("does not mutate the input object", testNoInputMutation),
     example("input_tokens is NOT replaced (false-positive guard)", testInputTokensNotReplaced),
     example("Authorization (mixed case) is replaced", testCaseInsensitive),
+    // Token-shape regex pass (PR2)
+    example("regex token in non-sensitive string field is redacted with sentinel", testRegexTokenRedacted),
+    example("multiple regex tokens in one string are all redacted", testMultipleRegexTokens),
+    example("non-token string preserved verbatim", testNonTokenStringPreserved),
+    example("regex token inside sensitive-key value still field-replaced (no double mask)", testRegexInsideSensitiveKey),
   )
 
   private def parse(s: String): js.Dynamic = js.JSON.parse(s)
@@ -110,5 +115,57 @@ object MaskedCopySpec extends Properties {
     val out = stringify(MaskedCopy.maskBody(parse("""{"Authorization":"Bearer xyz"}""")))
     Result.assert(!out.contains("Bearer xyz"))
       .log(s"mixed-case sensitive key not masked: $out")
+  }
+
+  // ── Token-shape regex pass (PR2) ───────────────────────────────────────
+
+  def testRegexTokenRedacted: Result = {
+    val key = "sk-ant-abcdefghijklmnopqrstuvwxyz12345"
+    val out = stringify(MaskedCopy.maskBody(parse(s"""{"text":"prefix $key suffix"}""")))
+    Result.all(
+      List(
+        Result.assert(!out.contains(key)).log(s"raw token leaked: $out"),
+        Result.assert(out.contains(MaskedCopy.Sentinel)).log(s"sentinel missing: $out"),
+        Result.assert(out.contains("prefix ")).log(s"surrounding text lost: $out"),
+        Result.assert(out.contains(" suffix")).log(s"surrounding text lost: $out"),
+      )
+    )
+  }
+
+  def testMultipleRegexTokens: Result = {
+    val k1  = "sk-ant-abcdefghijklmnopqrstuvwxyz11111"
+    val k2  = "AKIA0123456789ABCDEF"
+    val out = stringify(MaskedCopy.maskBody(parse(s"""{"text":"$k1 and $k2"}""")))
+    Result.all(
+      List(
+        Result.assert(!out.contains(k1)).log(s"first token leaked: $out"),
+        Result.assert(!out.contains(k2)).log(s"second token leaked: $out"),
+      )
+    )
+  }
+
+  def testNonTokenStringPreserved: Result = {
+    val out = stringify(MaskedCopy.maskBody(parse("""{"text":"plain claude-3-5-sonnet model","model":"claude"}""")))
+    Result.all(
+      List(
+        Result.assert(out.contains("plain claude-3-5-sonnet model")).log(s"non-token text lost: $out"),
+        Result.assert(out.contains("\"claude\"")).log(s"non-token model lost: $out"),
+        Result.assert(!out.contains(MaskedCopy.Sentinel)).log(s"unexpected sentinel: $out"),
+      )
+    )
+  }
+
+  def testRegexInsideSensitiveKey: Result = {
+    val key = "sk-ant-abcdefghijklmnopqrstuvwxyz12345"
+    val out = stringify(MaskedCopy.maskBody(parse(s"""{"api_key":"$key"}""")))
+    // `api_key` triggers field-level replacement; no double-redaction
+    // — the value is fully replaced before the string-token pass
+    // ever sees it.
+    Result.all(
+      List(
+        Result.assert(!out.contains(key)).log(s"raw token leaked: $out"),
+        Result.assert(out.contains(MaskedCopy.Sentinel)).log(s"sentinel missing: $out"),
+      )
+    )
   }
 }

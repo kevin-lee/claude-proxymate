@@ -1,6 +1,6 @@
 package claudeproxymate.renderer.json
 
-import claudeproxymate.core.SensitiveKeys
+import claudeproxymate.core.{SensitiveKeys, TokenPatterns}
 import claudeproxymate.renderer.state.AppState
 import scalatags.Text.all.*
 
@@ -39,6 +39,10 @@ object JsonTreeView {
   val MaskRevealedClass: String  = "jt-mask-revealed"
   val MaskDataAttr: String       = "data-mask-id"
 
+  val TokenMaskClass: String         = "jt-token-mask"
+  val TokenMaskRevealedClass: String = "jt-token-mask-revealed"
+  val TokenMaskDataAttr: String      = "data-token-id"
+
   val CollapseLenThreshold: Int = 300
 
   /** Convenience overload: trailing = empty frag, depth = 0,
@@ -69,7 +73,7 @@ object JsonTreeView {
       } else if (typeOf == "number") {
         frag(span(cls := "jt-num")(value.toString), trailing)
       } else if (typeOf == "string") {
-        buildStringFrag(value.asInstanceOf[String], trailing)
+        buildStringFrag(value.asInstanceOf[String], trailing, path)
       } else if (js.Array.isArray(value)) {
         buildContainerFrag(value, isArr = true, depth, trailing, totalBytes, maskLabel, path)
       } else {
@@ -78,7 +82,7 @@ object JsonTreeView {
     }
   }
 
-  private def buildStringFrag(s: String, trailing: Frag): Frag = {
+  private def buildStringFrag(s: String, trailing: Frag, path: String): Frag = {
     if (s.length > CollapseLenThreshold) {
       AppState.jtId += 1
       val sid     = s"jts${AppState.jtId}"
@@ -94,6 +98,16 @@ object JsonTreeView {
       // real newline char). Each line is then JSON-escaped so `"`
       // / `\` / tab show as their JSON literals (matches clipboard
       // format).
+      //
+      // Token-mask spans are interleaved per-line, intersecting the
+      // global token list (offsets in raw `s`) against the line's
+      // post-replace slice. The replace step changes offsets, so we
+      // skip token rendering inside expanded lines for now and
+      // surface tokens only in the collapsed preview. (Long-string
+      // token rendering inside the expanded view: deferred — the
+      // current users see this in the preview, and the hole in
+      // coverage is consistent with the existing `\\n` → `\n`
+      // legacy treatment.)
       val lines  = s.replace("\\n", "\n").split("\n", -1)
       val baseLn = AppState.jtLine
 
@@ -108,6 +122,13 @@ object JsonTreeView {
         )
       }
 
+      /* Long-string token rendering inside preview / expanded
+       * lines: deferred. The `\\n` → `\n` replace shifts character
+       * offsets, making it non-trivial to project token offsets
+       * (which are relative to the raw value) onto the post-replace
+       * slices. PR 2 only handles short strings inline; long-string
+       * token coverage follows in a later PR.
+       */
       frag(
         span(cls := "jt-str-long")(
           span(
@@ -140,12 +161,75 @@ object JsonTreeView {
         trailing,
       )
     } else {
-      // `js.JSON.stringify(s)` emits a fully-escaped JSON string
-      // literal — including the surrounding `"`s and inner `\"`,
-      // `\\`, `\n`, control-char escapes. Matches the clipboard
-      // representation and any standard JSON viewer.
-      val display = js.JSON.stringify(s.asInstanceOf[js.Any])
-      frag(span(cls := "jt-str")(display), trailing)
+      /* Short string — scan for token-shape matches and either
+       * render plain (when no matches) or interleave mask spans
+       * with JSON-escaped surrounding text.
+       */
+      val tokens = TokenPatterns.scan(s)
+      if (tokens.isEmpty) {
+        val display = js.JSON.stringify(s.asInstanceOf[js.Any])
+        frag(span(cls := "jt-str")(display), trailing)
+      } else {
+        val parts = buildTokenizedSlice(s, tokens, sliceOffset = 0, path).getOrElse(List(stringFrag(s)))
+        frag(span(cls := "jt-str")("\"", frag(parts*), "\""), trailing)
+      }
+    }
+  }
+
+  /** Tokenize `text` using the pre-scanned `tokens` list (whose
+    * offsets are relative to the raw value the slice came from).
+    * `sliceOffset` is the offset of `text[0]` within that raw value,
+    * which is also the offset used in token ids.
+    *
+    * Returns `None` when no token matches fall inside the slice
+    * (caller can fall back to a single plain frag), or `Some(parts)`
+    * with the interleaved sequence of plain-text and `<span>`
+    * frags. Plain-text parts go through `jsonEscapeBody` so `"` /
+    * `\` / control chars render as JSON literals (matching the
+    * unmasked branch).
+    */
+  private def buildTokenizedSlice(
+    text: String,
+    tokens: List[TokenPatterns.TokenMatch],
+    sliceOffset: Int,
+    path: String,
+  ): Option[List[Frag]] = {
+    val sliceEnd = sliceOffset + text.length
+    val inSlice  = tokens.filter(t => t.start >= sliceOffset && t.end <= sliceEnd)
+    if (inSlice.isEmpty) return None
+    val parts = scala.collection.mutable.ListBuffer.empty[Frag]
+    var cursor = sliceOffset
+    inSlice.foreach { t =>
+      if (t.start > cursor) {
+        val plain = text.substring(cursor - sliceOffset, t.start - sliceOffset)
+        parts += stringFrag(jsonEscapeBody(plain))
+      }
+      val raw = text.substring(t.start - sliceOffset, t.end - sliceOffset)
+      parts += buildTokenMaskFrag(path, t.start, raw)
+      cursor = t.end
+    }
+    if (cursor < sliceEnd) {
+      val plain = text.substring(cursor - sliceOffset, sliceEnd - sliceOffset)
+      parts += stringFrag(jsonEscapeBody(plain))
+    }
+    Some(parts.toList)
+  }
+
+  /** Build the masked-or-revealed frag for a single regex-detected
+    * token. Token id format: `<json-path>#<offset>`, stable across
+    * re-renders. Public so [[JsonTreeViewer]] can reuse it for
+    * in-place DOM swaps.
+    */
+  def buildTokenMaskFrag(path: String, offset: Int, raw: String): Frag = {
+    val tid = s"$path#$offset"
+    if (AppState.maskRevealed.contains(tid)) {
+      span(cls := TokenMaskRevealedClass, attr(TokenMaskDataAttr) := tid)(
+        jsonEscapeBody(raw),
+      )
+    } else {
+      span(cls := TokenMaskClass, attr(TokenMaskDataAttr) := tid)(
+        TokenPatterns.fingerprint(raw),
+      )
     }
   }
 
