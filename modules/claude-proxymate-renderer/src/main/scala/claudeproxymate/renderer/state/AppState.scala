@@ -1,5 +1,6 @@
 package claudeproxymate.renderer.state
 
+import scala.collection.mutable
 import scala.scalajs.js
 
 /** All global mutable state for the renderer.
@@ -38,4 +39,12 @@ object AppState {
 
   // Monotonic counter for badge UIDs (replaces Math.random() in MessageRenderer)
   var badgeUidCounter: Int = 0
+
+  // Field-name masking layer (C3). Tracks the dot-path ids the user
+  // has clicked to reveal. Reset on capture switch and on Clear.
+  // Mask ids are derived from the JSON dot-path at render time
+  // (see `JsonTreeView`), so they are stable across re-renders of
+  // the same capture and survive the click → re-render → re-render
+  // cycle.
+  val maskRevealed: mutable.Set[String] = mutable.Set.empty
 }

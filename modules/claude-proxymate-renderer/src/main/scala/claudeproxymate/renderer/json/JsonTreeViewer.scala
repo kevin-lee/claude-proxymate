@@ -1,5 +1,7 @@
 package claudeproxymate.renderer.json
 
+import claudeproxymate.renderer.detail.DetailView
+import claudeproxymate.renderer.i18n.I18n
 import claudeproxymate.renderer.state.AppState
 import claudeproxymate.renderer.view.ViewHelpers
 import org.scalajs.dom
@@ -24,6 +26,12 @@ object JsonTreeViewer {
     val target = e.target.asInstanceOf[dom.Element]
     if (target == null) return
 
+    val maskEl = target.closest(s".${JsonTreeView.MaskClass},.${JsonTreeView.MaskRevealedClass}")
+    if (maskEl != null) {
+      val raw = maskEl.asInstanceOf[dom.html.Element].getAttribute(JsonTreeView.MaskDataAttr)
+      if (raw != null && raw.nonEmpty) { toggleMaskReveal(raw); return }
+    }
+
     val containerEl = target.closest(
       s".${JsonTreeView.ContainerToggleClass},.${JsonTreeView.ContainerSummaryClass}",
     )
@@ -39,6 +47,71 @@ object JsonTreeViewer {
       val raw = stringEl.asInstanceOf[dom.html.Element].getAttribute(JsonTreeView.StringDataAttr)
       if (raw != null && raw.nonEmpty) { jtStrToggle(raw); return }
     }
+  }
+
+  /** Toggle the per-value reveal state for a masked field, then swap
+    * just the single `[data-mask-id]` element in the live DOM. We
+    * avoid a full `DetailView.renderProxyDetail()` so the scrollable
+    * container's `scrollTop` is not reset; the user stays where
+    * they were.
+    *
+    * Falls back to a full re-render only if the live DOM lookup or
+    * the path-walk against the capture body fails — that should not
+    * happen in practice, but the safety net keeps the user-visible
+    * behaviour correct if the data shape changed under us.
+    */
+  private def toggleMaskReveal(maskId: String): Unit = {
+    if (AppState.maskRevealed.contains(maskId)) {
+      val _ = AppState.maskRevealed.remove(maskId)
+    } else {
+      val _ = AppState.maskRevealed.add(maskId)
+    }
+
+    val swapped = trySwapMaskInPlace(maskId)
+    if (!swapped) DetailView.renderProxyDetail()
+  }
+
+  private def trySwapMaskInPlace(path: String): Boolean = {
+    val container = dom.document.getElementById(claudeproxymate.core.HtmlIds.ProxyDetailCode)
+    if (container == null) return false
+
+    val cssEscape   = js.Dynamic.global.CSS.applyDynamic("escape")(path).asInstanceOf[String]
+    val live        = container.querySelector(s"[${JsonTreeView.MaskDataAttr}=\"$cssEscape\"]")
+    if (live == null) return false
+
+    // Resolve the value at `path` against the active capture body.
+    val entry = AppState.proxyCaptures.find(e => e.id == AppState.selectedProxyId.map(_.asInstanceOf[js.Any]).orNull)
+    val body: js.Dynamic = entry match {
+      case None    => null.asInstanceOf[js.Dynamic]
+      case Some(e) =>
+        if (AppState.proxyDetailTab == "request") e.selectDynamic("body")
+        else {
+          val resp = e.selectDynamic("response")
+          if (!js.isUndefined(resp) && resp != null) resp.selectDynamic("body")
+          else null.asInstanceOf[js.Dynamic]
+        }
+    }
+    if (body == null || js.isUndefined(body)) return false
+
+    val value = JsonTreeView.resolvePath(body, path)
+    if (value == null && path != "$") {
+      // Path didn't resolve. Bail out so the caller falls back to a
+      // full re-render rather than drawing nonsense.
+      return false
+    }
+
+    val maskLabel = I18n.t("mask.hiddenLabel")
+    val newFrag   = JsonTreeView.buildMaskFrag(path, value, maskLabel, depth = 0, totalBytes = 0).render
+
+    // Parse the freshly-rendered HTML and replace the live element
+    // with the new node. A throwaway <div> is fine as a parser
+    // sandbox; the outer span we want is its firstChild.
+    val sandbox = dom.document.createElement("div").asInstanceOf[dom.html.Element]
+    sandbox.innerHTML = newFrag
+    val replacement = sandbox.firstChild
+    if (replacement == null) return false
+    val _ = live.asInstanceOf[js.Dynamic].replaceWith(replacement)
+    true
   }
 
   /** Measure byte length of a string using TextEncoder (Web API). */
@@ -107,7 +180,7 @@ object JsonTreeViewer {
 
     val totalBytes = utf8ByteLength(js.JSON.stringify(obj))
     AppState.jtLine = 0
-    val tree     = JsonTreeView.buildJsonFrag(obj, totalBytes)
+    val tree     = JsonTreeView.buildJsonFrag(obj, totalBytes, I18n.t("mask.hiddenLabel"))
     val lineInfo = div(cls := "jt-line-info")(s"${AppState.jtLine} lines total")
     ViewHelpers.setInnerHtml(container, frag(tree, lineInfo))
     container.classList.add("jt-lined")

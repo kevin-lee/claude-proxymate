@@ -237,7 +237,14 @@ object IndexHtmlGenerator {
             dataDtab := "analysis",
             style    := "color:var(--purple)",
           )("Analysis"),
-          button(id := HtmlIds.CopyDetailBtn, cls := "copy-small", style := "margin-left:auto", i18n := "copy.copy")(
+          button(
+            id                := HtmlIds.CopyDetailBtn,
+            cls               := "copy-small",
+            style             := "margin-left:auto",
+            i18n              := "copy.copy",
+            attr("data-i18n-title") := "copy.detailTitle",
+            attr("title")     := tx(m, "copy.detailTitle"),
+          )(
             tx(m, "copy.copy"),
           ),
         ),

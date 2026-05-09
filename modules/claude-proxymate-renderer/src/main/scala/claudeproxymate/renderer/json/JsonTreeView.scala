@@ -1,5 +1,6 @@
 package claudeproxymate.renderer.json
 
+import claudeproxymate.core.SensitiveKeys
 import claudeproxymate.renderer.state.AppState
 import scalatags.Text.all.*
 
@@ -9,12 +10,20 @@ import scala.scalajs.js
   *
   * Builds Scalatags fragments for arbitrary JSON values. Mutates the
   * counters on [[claudeproxymate.renderer.state.AppState]] (`jtId`,
-  * `jtLine`) to assign unique element IDs and line numbers; tests reset
-  * them before each run.
+  * `jtLine`, `maskId`) to assign unique element IDs and line numbers;
+  * tests reset them before each run.
   *
   * Click dispatch is the orchestrator's responsibility — the view emits
-  * `data-jt-id` / `data-jt-str-id` attributes; [[JsonTreeViewer]] reads
-  * them in its document-level click handler.
+  * `data-jt-id` / `data-jt-str-id` / `data-mask-id` attributes;
+  * [[JsonTreeViewer]] reads them in its document-level click handler.
+  *
+  * Field-name masking (C3): values held under a key matching
+  * [[claudeproxymate.core.SensitiveKeys.isSensitive]] are rendered
+  * mask-by-default. The orchestrator passes the localized hidden
+  * label; the view consults
+  * [[claudeproxymate.renderer.state.AppState.maskRevealed]] to decide
+  * whether to render the masked placeholder or the original value.
+  * Pure: no `I18n` / DOM dependencies.
   */
 object JsonTreeView {
 
@@ -26,16 +35,31 @@ object JsonTreeView {
   val StringPreviewClass: String = "jt-str-preview"
   val StringDataAttr: String     = "data-jt-str-id"
 
+  val MaskClass: String          = "jt-mask"
+  val MaskRevealedClass: String  = "jt-mask-revealed"
+  val MaskDataAttr: String       = "data-mask-id"
+
   val CollapseLenThreshold: Int = 300
 
-  /** Convenience overload: trailing = empty frag, depth = 0. */
+  /** Convenience overload: trailing = empty frag, depth = 0,
+    * maskLabel = `""` (no localization — used by tests).
+    */
   def buildJsonFrag(value: js.Dynamic, totalBytes: Int): Frag =
-    buildJsonFrag(value, depth = 0, trailing = frag(), totalBytes = totalBytes)
+    buildJsonFrag(value, depth = 0, trailing = frag(), totalBytes = totalBytes, maskLabel = "", path = "$")
+
+  /** Convenience overload with a localized mask label. */
+  def buildJsonFrag(value: js.Dynamic, totalBytes: Int, maskLabel: String): Frag =
+    buildJsonFrag(value, depth = 0, trailing = frag(), totalBytes = totalBytes, maskLabel = maskLabel, path = "$")
 
   /** Build the Scalatags fragment for a JSON value plus a trailing
     * fragment (typically a comma between siblings).
+    *
+    * `path` is the stable dot-path identifier used for mask ids
+    * (e.g. `$.metadata.user_id`). Stable across re-renders of the
+    * same data, so the per-value reveal state in
+    * `AppState.maskRevealed` survives a re-render.
     */
-  def buildJsonFrag(value: js.Dynamic, depth: Int, trailing: Frag, totalBytes: Int): Frag = {
+  def buildJsonFrag(value: js.Dynamic, depth: Int, trailing: Frag, totalBytes: Int, maskLabel: String, path: String): Frag = {
     if (value == null || js.isUndefined(value)) {
       frag(span(cls := "jt-null")("null"), trailing)
     } else {
@@ -47,9 +71,9 @@ object JsonTreeView {
       } else if (typeOf == "string") {
         buildStringFrag(value.asInstanceOf[String], trailing)
       } else if (js.Array.isArray(value)) {
-        buildContainerFrag(value, isArr = true, depth, trailing, totalBytes)
+        buildContainerFrag(value, isArr = true, depth, trailing, totalBytes, maskLabel, path)
       } else {
-        buildContainerFrag(value, isArr = false, depth, trailing, totalBytes)
+        buildContainerFrag(value, isArr = false, depth, trailing, totalBytes, maskLabel, path)
       }
     }
   }
@@ -58,18 +82,29 @@ object JsonTreeView {
     if (s.length > CollapseLenThreshold) {
       AppState.jtId += 1
       val sid     = s"jts${AppState.jtId}"
-      val preview = s.take(80).replace("\\n", " ").replace("\n", " ") + "…"
-      val expanded = s.replace("\\n", "\n")
-      val lines   = expanded.split("\n", -1)
-      val baseLn  = AppState.jtLine
+      // Preview line: flatten newlines (both real and the literal
+      // `\n` two-char sequence that some captured payloads carry),
+      // JSON-escape `"` / `\` / control chars, truncate to 80 chars
+      // + ellipsis.
+      val flat    = s.replace("\\n", " ").replace('\n', ' ').replace('\r', ' ')
+      val preview = jsonEscapeBody(flat.take(80)) + "…"
+      // Expanded view: split on real newlines AND on the literal
+      // `\n` two-char sequence (legacy: some downstream payloads
+      // store newlines as literal backslash-n rather than as a
+      // real newline char). Each line is then JSON-escaped so `"`
+      // / `\` / tab show as their JSON literals (matches clipboard
+      // format).
+      val lines  = s.replace("\\n", "\n").split("\n", -1)
+      val baseLn = AppState.jtLine
 
       val rowFrags: List[Frag] = lines.indices.toList.map { li =>
         val ln = if (li == 0) baseLn else { AppState.jtLine += 1; AppState.jtLine }
         val isLast     = li == lines.length - 1
         val openQuote  = if (li == 0) "\"" else ""
         val closeQuote = if (isLast) "\"" else ""
+        val escaped    = jsonEscapeBody(lines(li))
         div(cls := "jt-exp-line", attr("data-ln") := ln.toString)(
-          s"$openQuote${lines(li)}$closeQuote",
+          s"$openQuote$escaped$closeQuote",
         )
       }
 
@@ -105,7 +140,40 @@ object JsonTreeView {
         trailing,
       )
     } else {
-      frag(span(cls := "jt-str")("\"", s, "\""), trailing)
+      // `js.JSON.stringify(s)` emits a fully-escaped JSON string
+      // literal — including the surrounding `"`s and inner `\"`,
+      // `\\`, `\n`, control-char escapes. Matches the clipboard
+      // representation and any standard JSON viewer.
+      val display = js.JSON.stringify(s.asInstanceOf[js.Any])
+      frag(span(cls := "jt-str")(display), trailing)
+    }
+  }
+
+  /** Build the masked-or-revealed frag for a single sensitive-key
+    * value. Public so [[JsonTreeViewer]] can reuse it for in-place
+    * DOM swaps on click without doing a full detail re-render.
+    *
+    * Returns one outer `<span>` with the data-mask-id attribute,
+    * containing either the lock placeholder or the recursive value
+    * tree. Trailing commas / siblings are the caller's
+    * responsibility.
+    */
+  def buildMaskFrag(
+    path: String,
+    value: js.Dynamic,
+    maskLabel: String,
+    depth: Int,
+    totalBytes: Int,
+  ): Frag = {
+    if (AppState.maskRevealed.contains(path)) {
+      span(cls := MaskRevealedClass, attr(MaskDataAttr) := path)(
+        buildJsonFrag(value, depth + 1, frag(), totalBytes, maskLabel, path),
+      )
+    } else {
+      span(cls := MaskClass, attr(MaskDataAttr) := path)(
+        span(cls := "jt-mask-icon")("🔒"),
+        span(cls := "jt-mask-label")(if (maskLabel.isEmpty) "hidden" else maskLabel),
+      )
     }
   }
 
@@ -115,6 +183,8 @@ object JsonTreeView {
     depth: Int,
     trailing: Frag,
     totalBytes: Int,
+    maskLabel: String,
+    path: String,
   ): Frag = {
     val entries: js.Array[js.Tuple2[String | Null, js.Dynamic]] =
       if (isArr) {
@@ -151,13 +221,33 @@ object JsonTreeView {
             span(style := "color:var(--dim)")(": "),
           )
         else frag()
+
+      // Per-entry path: `parent.key` for objects, `parent[i]` for arrays.
+      val childPath: String =
+        if (k != null) s"$path.${k.toString}"
+        else s"$path[$i]"
+
+      // Field-name masking branch. When the key is sensitive, render
+      // either a masked placeholder or (when revealed) the original
+      // value wrapped in a click-to-remask span. Arrays don't have
+      // keys (`k == null`), so this branch never fires for array
+      // entries. The comma is rendered separately so the masked /
+      // revealed span is a single replaceable element (used by
+      // `JsonTreeViewer.toggleMaskReveal` for in-place swap).
+      val valueFrag: Frag =
+        if (k != null && SensitiveKeys.isSensitive(k.toString)) {
+          frag(buildMaskFrag(childPath, v, maskLabel, depth, totalBytes), comma)
+        } else {
+          buildJsonFrag(v, depth + 1, comma, totalBytes, maskLabel, childPath)
+        }
+
       div(
         cls          := "jt-row",
         attr("data-ln") := ln.toString,
         style        := "padding-left:16px",
       )(
         keyPart,
-        buildJsonFrag(v, depth + 1, comma, totalBytes),
+        valueFrag,
       )
     }
 
@@ -211,4 +301,61 @@ object JsonTreeView {
     */
   private def utf8ByteLength(s: String): Int =
     s.getBytes(java.nio.charset.StandardCharsets.UTF_8).length
+
+  /** JSON-escape the body of a string (no surrounding `"`s).
+    * Delegates to `JSON.stringify` and strips the outer quotes so
+    * callers can compose the surrounding context themselves
+    * (e.g. add their own `"…"` wrapping or split the body across
+    * lines). Produces the same `\"` / `\\` / `\n` / `\uXXXX` escapes
+    * the clipboard-copy path emits.
+    */
+  private def jsonEscapeBody(s: String): String = {
+    val stringified = js.JSON.stringify(s.asInstanceOf[js.Any])
+    if (stringified.length >= 2) stringified.substring(1, stringified.length - 1)
+    else stringified
+  }
+
+  /** Walk a JSON value to the location identified by `path`. The path
+    * format matches what [[buildJsonFrag]] generates: `$` for the
+    * root, `.key` for object members, `[i]` for array indices.
+    *
+    * Returns `null` if the path doesn't resolve (key missing,
+    * out-of-range index, primitive-encountered-where-container-
+    * expected). Pure; used by [[JsonTreeViewer.toggleMaskReveal]] to
+    * swap a single masked element in-place without a full re-render.
+    */
+  def resolvePath(root: js.Dynamic, path: String): js.Dynamic = {
+    if (path == null || path.isEmpty || path == "$") return root
+    if (!path.startsWith("$")) return null.asInstanceOf[js.Dynamic]
+    var current: js.Dynamic = root
+    var i: Int              = 1 // skip the leading `$`
+    while (i < path.length) {
+      if (current == null || js.isUndefined(current)) return null.asInstanceOf[js.Dynamic]
+      val c = path.charAt(i)
+      if (c == '.') {
+        // Read key up to next `.` or `[` or end-of-string.
+        var j = i + 1
+        while (j < path.length && path.charAt(j) != '.' && path.charAt(j) != '[') j += 1
+        val key = path.substring(i + 1, j)
+        current = current.selectDynamic(key)
+        i = j
+      } else if (c == '[') {
+        // Read digits up to `]`.
+        val close = path.indexOf(']', i)
+        if (close < 0) return null.asInstanceOf[js.Dynamic]
+        val idxStr = path.substring(i + 1, close)
+        val idx =
+          try idxStr.toInt
+          catch { case _: NumberFormatException => return null.asInstanceOf[js.Dynamic] }
+        if (!js.Array.isArray(current)) return null.asInstanceOf[js.Dynamic]
+        val arr = current.asInstanceOf[js.Array[js.Dynamic]]
+        if (idx < 0 || idx >= arr.length) return null.asInstanceOf[js.Dynamic]
+        current = arr(idx)
+        i = close + 1
+      } else {
+        return null.asInstanceOf[js.Dynamic]
+      }
+    }
+    current
+  }
 }

@@ -454,6 +454,26 @@
     }
     .jt-tag:hover { color: var(--text); }
     .jt-tok { color: var(--dim); font-size: 9px; opacity: 0.7; margin-left: 4px; }
+    /* C3 — display-only field-name masking */
+    .jt-mask {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 1px 6px; border-radius: 3px;
+      background: color-mix(in srgb, var(--yellow) 14%, transparent);
+      color: var(--dim); font-size: 11px;
+      cursor: pointer; user-select: none;
+      transition: background .1s;
+    }
+    .jt-mask:hover { background: color-mix(in srgb, var(--yellow) 22%, transparent); color: var(--text); }
+    .jt-mask-icon { font-size: 10px; }
+    .jt-mask-label { font-style: italic; }
+    .jt-mask-revealed {
+      cursor: pointer;
+      border-radius: 3px;
+      transition: background .1s;
+    }
+    .jt-mask-revealed:hover {
+      background: color-mix(in srgb, var(--yellow) 10%, transparent);
+    }
     .proxy-token-pill {
       padding: 6px 12px;
       font-size: 11px;

@@ -17,6 +17,7 @@ object JsonTreeViewSpec extends Properties {
     example("short string renders as jt-str span with literal quotes", testShortStr),
     // String escaping & long-string structure
     example("short string escapes <script>", testShortStrEscape),
+    example("short string with inner double-quotes JSON-escapes them", testShortStrInnerDoubleQuotes),
     example("long string builds jt-str-long envelope", testLongStrEnvelope),
     example("long string preview is 80 chars + ellipsis", testLongStrPreviewLength),
     example("long string expanded splits on newlines", testLongStrExpandedLines),
@@ -45,11 +46,27 @@ object JsonTreeViewSpec extends Properties {
     // Click-attr presence regression
     example("container output has no inline onclick", testNoContainerInlineOnclick),
     example("long-string output has no inline onclick", testNoStringInlineOnclick),
+    // Field-name masking (C3)
+    example("api_key value renders as masked placeholder, not raw", testMaskApiKeyHidesValue),
+    example("api_key value reveals when maskRevealed contains the id", testMaskApiKeyRevealed),
+    example("nested object under sensitive key is masked as a whole", testMaskNestedObject),
+    example("input_tokens does NOT render the masked placeholder", testMaskNoFalsePositiveOnTokenCount),
+    example("mask data-mask-id is the dot-path of the field (stable across re-renders)", testMaskIdIsDotPath),
+    example("masked placeholder uses provided maskLabel", testMaskUsesProvidedLabel),
+    // Path walker (used by JsonTreeViewer.toggleMaskReveal for in-place swap)
+    example("resolvePath: $ returns the root value", testResolvePathRoot),
+    example("resolvePath: $.key returns nested object value", testResolvePathDotKey),
+    example("resolvePath: $.parent.child returns deeply nested value", testResolvePathDeepObject),
+    example("resolvePath: $[0] returns array element", testResolvePathArrayIndex),
+    example("resolvePath: $.arr[2].leaf returns mixed nesting", testResolvePathMixed),
+    example("resolvePath: missing key returns null", testResolvePathMissingKey),
+    example("resolvePath: out-of-range array index returns null", testResolvePathOutOfRange),
   )
 
   private def reset(): Unit = {
     AppState.jtId = 0
     AppState.jtLine = 0
+    AppState.maskRevealed.clear()
   }
 
   private def render(value: js.Dynamic, totalBytes: Int = 0): String = {
@@ -128,6 +145,24 @@ object JsonTreeViewSpec extends Properties {
       List(
         Result.assert(!out.contains("<script>")).log(s"raw <script> leaked: $out"),
         Result.assert(out.contains("&lt;script&gt;")).log(s"not escaped: $out"),
+      )
+    )
+  }
+
+  def testShortStrInnerDoubleQuotes: Result = {
+    // The metadata.user_id case: a string value that itself contains
+    // JSON. On screen we want the inner `"`s to display as `\"` to
+    // match the clipboard / standard JSON viewer convention.
+    val payload = """{"device_id":"abc","account_uuid":"def"}"""
+    val out     = render(parse(js.JSON.stringify(payload)))
+    Result.all(
+      List(
+        // `\"` in source is rendered to `\&quot;` in the output
+        // (Scalatags HTML-escapes the `"`, the backslash stays).
+        Result.assert(out.contains("\\&quot;device_id\\&quot;"))
+          .log(s"inner double-quote not JSON-escaped: $out"),
+        Result.assert(!out.contains("\"device_id\""))
+          .log(s"raw inner literal `\"device_id\"` leaked: $out"),
       )
     )
   }
@@ -364,5 +399,126 @@ object JsonTreeViewSpec extends Properties {
     val out  = render(parse(js.JSON.stringify(long)))
     Result.assert(!out.contains("onclick="))
       .log(s"unexpected inline onclick in long-string output: $out")
+  }
+
+  // ── Field-name masking (C3) ────────────────────────────────────────────
+
+  private def renderWithLabel(value: js.Dynamic, maskLabel: String): String = {
+    reset()
+    val totalBytes = js.JSON.stringify(value).length
+    JsonTreeView.buildJsonFrag(value, totalBytes, maskLabel).render
+  }
+
+  def testMaskApiKeyHidesValue: Result = {
+    val out = renderWithLabel(parse("""{"api_key":"sk-secret-value-123"}"""), "hidden")
+    Result.all(
+      List(
+        Result.assert(out.contains(s"""class="${JsonTreeView.MaskClass}"""")).log(s"jt-mask span missing: $out"),
+        Result.assert(!out.contains("sk-secret-value-123")).log(s"raw value leaked: $out"),
+      )
+    )
+  }
+
+  def testMaskApiKeyRevealed: Result = {
+    val raw = "sk-secret-value-123"
+    val value = parse(s"""{"api_key":"$raw"}""")
+    reset()
+    val totalBytes = js.JSON.stringify(value).length
+    // Mask id is the dot-path; pre-add it to the reveal set, then render.
+    val _ = AppState.maskRevealed.add("$.api_key")
+    val out = JsonTreeView.buildJsonFrag(value, totalBytes, "hidden").render
+    Result.all(
+      List(
+        Result.assert(out.contains(s"""class="${JsonTreeView.MaskRevealedClass}"""")).log(s"jt-mask-revealed missing: $out"),
+        Result.assert(out.contains(raw)).log(s"raw value missing when revealed: $out"),
+      )
+    )
+  }
+
+  def testMaskNestedObject: Result = {
+    val out = renderWithLabel(parse("""{"authorization":{"type":"bearer","token":"x.y.z"}}"""), "hidden")
+    Result.all(
+      List(
+        Result.assert(out.contains(s"""class="${JsonTreeView.MaskClass}"""")).log(s"jt-mask span missing: $out"),
+        Result.assert(!out.contains("x.y.z")).log(s"inner token leaked: $out"),
+        Result.assert(!out.contains("\"type\"")).log(s"inner key leaked: $out"),
+      )
+    )
+  }
+
+  def testMaskNoFalsePositiveOnTokenCount: Result = {
+    val out = renderWithLabel(parse("""{"input_tokens":1234,"output_tokens":56}"""), "hidden")
+    Result.all(
+      List(
+        Result.assert(!out.contains(s"""class="${JsonTreeView.MaskClass}"""")).log(s"jt-mask span unexpectedly present: $out"),
+        Result.assert(out.contains("1234")).log(s"input_tokens value missing: $out"),
+        Result.assert(out.contains("56")).log(s"output_tokens value missing: $out"),
+      )
+    )
+  }
+
+  def testMaskIdIsDotPath: Result = {
+    val value = parse("""{"metadata":{"user_id":"u","api_key":"a"}}""")
+    val out1  = renderWithLabel(value, "hidden")
+    val out2  = renderWithLabel(value, "hidden")
+    Result.all(
+      List(
+        Result.assert(out1.contains(s"""${JsonTreeView.MaskDataAttr}="$$.metadata.user_id"""")).log(s"expected stable dot-path id `$$.metadata.user_id`: $out1"),
+        Result.assert(out1.contains(s"""${JsonTreeView.MaskDataAttr}="$$.metadata.api_key"""")).log(s"expected stable dot-path id `$$.metadata.api_key`: $out1"),
+        Result.assert(out1 == out2).log(s"renders should be identical across calls — masking is deterministic on the data"),
+      )
+    )
+  }
+
+  def testMaskUsesProvidedLabel: Result = {
+    val out = renderWithLabel(parse("""{"api_key":"v"}"""), "REDACTED-LABEL")
+    Result.assert(out.contains("REDACTED-LABEL"))
+      .log(s"provided maskLabel not in output: $out")
+  }
+
+  // ── Path walker ────────────────────────────────────────────────────────
+
+  def testResolvePathRoot: Result = {
+    val root = parse("""{"a":1}""")
+    val v    = JsonTreeView.resolvePath(root, "$")
+    Result.assert(v == root).log(s"`$$` should return root, got $v")
+  }
+
+  def testResolvePathDotKey: Result = {
+    val root = parse("""{"a":42}""")
+    val v    = JsonTreeView.resolvePath(root, "$.a")
+    Result.assert(v.asInstanceOf[Int] == 42).log(s"`$$.a` should return 42, got $v")
+  }
+
+  def testResolvePathDeepObject: Result = {
+    val root = parse("""{"metadata":{"user_id":"u-7"}}""")
+    val v    = JsonTreeView.resolvePath(root, "$.metadata.user_id")
+    Result.assert(v.asInstanceOf[String] == "u-7").log(s"deep nested missing: $v")
+  }
+
+  def testResolvePathArrayIndex: Result = {
+    val root = parse("""[10,20,30]""")
+    val v    = JsonTreeView.resolvePath(root, "$[1]")
+    Result.assert(v.asInstanceOf[Int] == 20).log(s"`$$[1]` should return 20, got $v")
+  }
+
+  def testResolvePathMixed: Result = {
+    val root = parse("""{"arr":[{"k":"x"},{"k":"y"},{"k":"z","leaf":"L"}]}""")
+    val v    = JsonTreeView.resolvePath(root, "$.arr[2].leaf")
+    Result.assert(v.asInstanceOf[String] == "L").log(s"mixed-nesting walk failed: $v")
+  }
+
+  def testResolvePathMissingKey: Result = {
+    val root = parse("""{"a":1}""")
+    val v    = JsonTreeView.resolvePath(root, "$.nope")
+    Result.assert(v == null || js.isUndefined(v))
+      .log(s"missing key should return null/undefined, got $v")
+  }
+
+  def testResolvePathOutOfRange: Result = {
+    val root = parse("""[1,2]""")
+    val v    = JsonTreeView.resolvePath(root, "$[10]")
+    Result.assert(v == null || js.isUndefined(v))
+      .log(s"out-of-range index should return null, got $v")
   }
 }

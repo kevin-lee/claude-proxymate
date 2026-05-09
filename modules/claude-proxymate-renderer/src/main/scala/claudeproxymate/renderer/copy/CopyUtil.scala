@@ -27,7 +27,12 @@ object CopyUtil {
       copyProxyCmd()
       return
     }
-    if (target.closest(s"#${HtmlIds.CopyDetailBtn}") != null) copyProxyDetail()
+    if (target.closest(s"#${HtmlIds.CopyDetailBtn}") != null) {
+      // Default copies are masked (sensitive values → ***); Shift-click
+      // copies the raw body. The Shift escape hatch matches the
+      // click-to-reveal model in the JSON tree (mask by default).
+      copyProxyDetail(masked = !e.shiftKey)
+    }
   }
 
   private def flashCopyButton(selector: String): js.Function1[Any, Unit] = { (_: Any) =>
@@ -52,7 +57,16 @@ object CopyUtil {
       .`catch`(onCopyError) }
   }
 
-  def copyProxyDetail(): Unit = {
+  /** Backward-compatible overload — masks by default. */
+  def copyProxyDetail(): Unit = copyProxyDetail(masked = true)
+
+  /** Copy the active capture's body to the clipboard. When `masked`
+    * is true (the default), sensitive field values are replaced with
+    * `***` via [[MaskedCopy.maskBody]]; when false, the raw body is
+    * copied verbatim. Strings are emitted verbatim either way (they
+    * have no field structure to mask).
+    */
+  def copyProxyDetail(masked: Boolean): Unit = {
     val entry = AppState.proxyCaptures.find(e => e.id == AppState.selectedProxyId.map(_.asInstanceOf[js.Any]).orNull)
     entry match {
       case None => ()
@@ -67,7 +81,10 @@ object CopyUtil {
         if (js.isUndefined(data) || data == null) return
 
         val text = if (js.typeOf(data) == "string") data.asInstanceOf[String]
-        else js.JSON.stringify(data, null.asInstanceOf[js.Array[js.Any]], 2)
+        else {
+          val toEmit = if (masked) MaskedCopy.maskBody(data) else data
+          js.JSON.stringify(toEmit, null.asInstanceOf[js.Array[js.Any]], 2)
+        }
 
         locally { val _ = dom.window.navigator.clipboard.writeText(text)
           .asInstanceOf[js.Dynamic]

@@ -104,6 +104,9 @@ object ProxyList {
     * (`clearProxyCaptures`, the click handler).
     */
   def selectProxyEntry(id: Double): Unit = {
+    // Mask reveal state is per-capture (mask ids aren't stable
+    // across re-renders); drop it on capture switch.
+    AppState.maskRevealed.clear()
     AppState.selectedProxyId = Some(id)
     renderProxyList()
     ProxyControl.callRenderProxyDetail()
@@ -112,6 +115,7 @@ object ProxyList {
   def clearProxyCaptures(): Unit = {
     AppState.proxyCaptures = Nil
     AppState.selectedProxyId = None
+    AppState.maskRevealed.clear()
     renderProxyList()
     ProxyControl.callRenderProxyDetail()
   }
