@@ -19,6 +19,8 @@ object MessageCopySpec extends Properties {
     example("masked=true replaces sk-ant-… with ***", testMaskedRedacts),
     example("masked=false preserves raw token verbatim", testMaskedFalsePreserves),
     example("masked=true does not mask tool name (out of scope)", testMaskedNotToolName),
+    // PR3: correlation IDs are NOT redacted in copy
+    example("masked=true preserves correlation id (msg_…) verbatim", testCorrIdNotRedacted),
   )
 
   private def textCard(role: String, text: String): MsgCard =
@@ -133,5 +135,16 @@ object MessageCopySpec extends Properties {
     val out  = MessageCopy.toPlainText(List(card), masked = true)
     Result.assert(out.contains("[tool: Read]"))
       .log(s"tool name missing: $out")
+  }
+
+  def testCorrIdNotRedacted: Result = {
+    // Correlation ids (msg_…, toolu_…, srvtoolu_…) are visual-only
+    // masks (PR 3). Copy emits them raw so cross-capture
+    // correlation stays useful.
+    val msgId = "msg_01ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    val card  = textCard("assistant", s"response id: $msgId done")
+    val out   = MessageCopy.toPlainText(List(card), masked = true)
+    Result.assert(out.contains(msgId))
+      .log(s"correlation id was unexpectedly redacted: $out")
   }
 }

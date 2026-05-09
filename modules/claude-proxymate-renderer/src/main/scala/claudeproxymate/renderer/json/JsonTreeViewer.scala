@@ -36,6 +36,16 @@ object JsonTreeViewer {
       if (raw != null && raw.startsWith("m.")) return
     }
 
+    val corrEl = target.closest(s".${JsonTreeView.CorrMaskClass},.${JsonTreeView.CorrMaskRevealedClass}")
+    if (corrEl != null) {
+      val raw = corrEl.asInstanceOf[dom.html.Element].getAttribute(JsonTreeView.CorrMaskDataAttr)
+      /* Same namespace discrimination as token mask: messages-tab
+       * corr-ids are prefixed `corr:m.` and owned by MessageRenderer.
+       */
+      if (raw != null && raw.nonEmpty && !raw.startsWith("corr:m.")) { toggleCorrReveal(raw); return }
+      if (raw != null && raw.startsWith("corr:m.")) return
+    }
+
     val maskEl = target.closest(s".${JsonTreeView.MaskClass},.${JsonTreeView.MaskRevealedClass}")
     if (maskEl != null) {
       val raw = maskEl.asInstanceOf[dom.html.Element].getAttribute(JsonTreeView.MaskDataAttr)
@@ -181,6 +191,73 @@ object JsonTreeViewer {
       case Some(m) =>
         val raw     = parentStr.substring(m.start, m.end)
         val newFrag = JsonTreeView.buildTokenMaskFrag(path, m.start, raw).render
+        val sandbox = dom.document.createElement("div").asInstanceOf[dom.html.Element]
+        sandbox.innerHTML = newFrag
+        val replacement = sandbox.firstChild
+        if (replacement == null) false
+        else {
+          val _ = live.asInstanceOf[js.Dynamic].replaceWith(replacement)
+          true
+        }
+    }
+  }
+
+  /** Toggle reveal state for a correlation-id mask (PR 3). Same
+    * shape as `toggleTokenReveal` but routes to the corr-mask
+    * builder + `CorrelationIds.scan` for value lookup.
+    */
+  private def toggleCorrReveal(corrId: String): Unit = {
+    if (AppState.maskRevealed.contains(corrId)) {
+      val _ = AppState.maskRevealed.remove(corrId)
+    } else {
+      val _ = AppState.maskRevealed.add(corrId)
+    }
+
+    val swapped = trySwapCorrInPlace(corrId)
+    if (!swapped) DetailView.renderProxyDetail()
+  }
+
+  private def trySwapCorrInPlace(corrId: String): Boolean = {
+    val container = dom.document.getElementById(claudeproxymate.core.HtmlIds.ProxyDetailCode)
+    if (container == null) return false
+
+    val cssEscape = js.Dynamic.global.CSS.applyDynamic("escape")(corrId).asInstanceOf[String]
+    val live      = container.querySelector(s"[${JsonTreeView.CorrMaskDataAttr}=\"$cssEscape\"]")
+    if (live == null) return false
+
+    // Strip the `corr:` namespace prefix, then split `path#offset`.
+    if (!corrId.startsWith("corr:")) return false
+    val payload = corrId.substring("corr:".length)
+    val hashAt  = payload.lastIndexOf('#')
+    if (hashAt < 0) return false
+    val path   = payload.substring(0, hashAt)
+    val offset =
+      try payload.substring(hashAt + 1).toInt
+      catch { case _: NumberFormatException => return false }
+
+    val entry = AppState.proxyCaptures.find(e => e.id == AppState.selectedProxyId.map(_.asInstanceOf[js.Any]).orNull)
+    val body: js.Dynamic = entry match {
+      case None    => null.asInstanceOf[js.Dynamic]
+      case Some(e) =>
+        if (AppState.proxyDetailTab == "request") e.selectDynamic("body")
+        else {
+          val resp = e.selectDynamic("response")
+          if (!js.isUndefined(resp) && resp != null) resp.selectDynamic("body")
+          else null.asInstanceOf[js.Dynamic]
+        }
+    }
+    if (body == null || js.isUndefined(body)) return false
+
+    val parent = JsonTreeView.resolvePath(body, path)
+    if (parent == null || js.isUndefined(parent) || js.typeOf(parent) != "string") return false
+    val parentStr = parent.asInstanceOf[String]
+
+    val matches = claudeproxymate.core.CorrelationIds.scan(parentStr)
+    matches.find(_.start == offset) match {
+      case None    => false
+      case Some(m) =>
+        val raw     = parentStr.substring(m.start, m.end)
+        val newFrag = JsonTreeView.buildCorrMaskFrag(path, m.start, raw, m.name).render
         val sandbox = dom.document.createElement("div").asInstanceOf[dom.html.Element]
         sandbox.innerHTML = newFrag
         val replacement = sandbox.firstChild

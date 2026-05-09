@@ -60,6 +60,12 @@ object JsonTreeViewSpec extends Properties {
     example("token-mask reveals when maskRevealed contains the path#offset id", testTokenMaskRevealed),
     example("plain string with no tokens renders without token-mask", testTokenMaskNoFalsePositive),
     example("sensitive key wins over inner token (no inner mask rendered)", testTokenMaskSensitiveKeyWins),
+    // Correlation-id masking (C3 PR3)
+    example("msg_… value renders as a corr-mask span", testCorrMaskMsg),
+    example("corr-mask renders prefix + … + last-4 (msg_…XYZ4)", testCorrMaskFingerprint),
+    example("corr-mask reveals when maskRevealed contains corr:path#offset", testCorrMaskReveal),
+    example("plain integer id does NOT render a corr-mask", testCorrMaskNoFalsePositive),
+    example("sensitive key wins over inner correlation id (no corr-mask)", testCorrMaskSensitiveKeyWins),
     // Long-string token masking (C3 PR2c)
     example("long string with token renders token-mask in expanded view", testLongStrTokenInExpanded),
     example("long string with token does not leak the raw token", testLongStrTokenNoLeak),
@@ -502,6 +508,62 @@ object JsonTreeViewSpec extends Properties {
     val out = renderWithLabel(parse("""{"api_key":"v"}"""), "REDACTED-LABEL")
     Result.assert(out.contains("REDACTED-LABEL"))
       .log(s"provided maskLabel not in output: $out")
+  }
+
+  // ── Correlation-id masking (C3 PR3) ───────────────────────────────────
+
+  private val FakeMsgId = "msg_01ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+  def testCorrMaskMsg: Result = {
+    val out = renderWithLabel(parse(s"""{"id":"$FakeMsgId"}"""), "hidden")
+    Result.all(
+      List(
+        Result.assert(out.contains(s"""class="${JsonTreeView.CorrMaskClass}""""))
+          .log(s"jt-corr-mask span missing: $out"),
+        Result.assert(!out.contains(FakeMsgId)).log(s"raw id leaked: $out"),
+      )
+    )
+  }
+
+  def testCorrMaskFingerprint: Result = {
+    val out = renderWithLabel(parse(s"""{"id":"$FakeMsgId"}"""), "hidden")
+    // Fingerprint is `msg_…<last-4>` where last-4 of `msg_01ABCDEFGHIJKLMNOPQRSTUVWXYZ` is `WXYZ`.
+    Result.assert(out.contains("msg_") && out.contains("…") && out.contains("WXYZ"))
+      .log(s"fingerprint shape missing: $out")
+  }
+
+  def testCorrMaskReveal: Result = {
+    val data       = parse(s"""{"id":"$FakeMsgId"}""")
+    reset()
+    val totalBytes = js.JSON.stringify(data).length
+    val _          = AppState.maskRevealed.add(s"corr:$$.id#0")
+    val out        = JsonTreeView.buildJsonFrag(data, totalBytes, "hidden").render
+    Result.all(
+      List(
+        Result.assert(out.contains(s"""class="${JsonTreeView.CorrMaskRevealedClass}""""))
+          .log(s"jt-corr-mask-revealed missing: $out"),
+        Result.assert(out.contains(FakeMsgId)).log(s"raw id missing when revealed: $out"),
+      )
+    )
+  }
+
+  def testCorrMaskNoFalsePositive: Result = {
+    val out = renderWithLabel(parse("""{"id":42,"count":100}"""), "hidden")
+    Result.assert(!out.contains(s"""class="${JsonTreeView.CorrMaskClass}""""))
+      .log(s"unexpected corr-mask on integer id: $out")
+  }
+
+  def testCorrMaskSensitiveKeyWins: Result = {
+    // `id_token` is a sensitive key (PR 1). The whole value should
+    // be field-masked; no inner corr-mask should be emitted.
+    val out = renderWithLabel(parse(s"""{"id_token":"$FakeMsgId"}"""), "hidden")
+    Result.all(
+      List(
+        Result.assert(out.contains(s"""class="${JsonTreeView.MaskClass}"""")).log(s"field-name mask missing: $out"),
+        Result.assert(!out.contains(s"""class="${JsonTreeView.CorrMaskClass}"""")).log(s"unexpected inner corr-mask: $out"),
+        Result.assert(!out.contains(FakeMsgId)).log(s"raw id leaked: $out"),
+      )
+    )
   }
 
   // ── Long-string token masking (C3 PR2c) ───────────────────────────────

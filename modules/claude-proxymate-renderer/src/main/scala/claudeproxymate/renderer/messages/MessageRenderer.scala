@@ -47,6 +47,18 @@ object MessageRenderer {
       if (tid != null && tid.startsWith("m.")) { toggleMessageToken(tid); return }
     }
 
+    // Messages-tab correlation-id reveal. Corr ids carry the
+    // `corr:m.` namespace; the JSON tree handler skips them.
+    val corrEl = target.closest(
+      s".${claudeproxymate.renderer.json.JsonTreeView.CorrMaskClass},.${claudeproxymate.renderer.json.JsonTreeView.CorrMaskRevealedClass}",
+    )
+    if (corrEl != null) {
+      val cid = corrEl.asInstanceOf[dom.html.Element].getAttribute(
+        claudeproxymate.renderer.json.JsonTreeView.CorrMaskDataAttr,
+      )
+      if (cid != null && cid.startsWith("corr:m.")) { toggleMessageToken(cid); return }
+    }
+
     val filterEl = target.closest(s".${MessageView.FilterButtonClass}[${MessageView.FilterDataAttr}]")
     if (filterEl != null) {
       val key = filterEl.asInstanceOf[dom.html.Element].getAttribute(MessageView.FilterDataAttr)

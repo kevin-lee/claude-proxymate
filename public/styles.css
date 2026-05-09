@@ -498,6 +498,31 @@
     .jt-token-mask-revealed:hover {
       background: color-mix(in srgb, var(--orange) 14%, transparent);
     }
+    /* C3 PR3 — correlation-id mask (informational compaction, not
+       sensitive redaction; visually distinct from PR1/2 yellow/orange) */
+    .jt-corr-mask {
+      display: inline;
+      padding: 0 4px;
+      border-radius: 3px;
+      background: color-mix(in srgb, var(--blue) 14%, transparent);
+      color: var(--dim);
+      cursor: pointer;
+      font-style: italic;
+      transition: background .1s;
+    }
+    .jt-corr-mask:hover {
+      background: color-mix(in srgb, var(--blue) 22%, transparent);
+      color: var(--text);
+    }
+    .jt-corr-mask-revealed {
+      cursor: pointer;
+      border-radius: 3px;
+      background: color-mix(in srgb, var(--blue) 8%, transparent);
+      transition: background .1s;
+    }
+    .jt-corr-mask-revealed:hover {
+      background: color-mix(in srgb, var(--blue) 14%, transparent);
+    }
     .proxy-token-pill {
       padding: 6px 12px;
       font-size: 11px;

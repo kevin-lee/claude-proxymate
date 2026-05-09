@@ -44,6 +44,10 @@ object MessageViewSpec extends Properties {
     example("InjectedMsgPart with embedded token is masked", testTokenMaskInInjectedMsgPart),
     example("ToolResultContent.preview with embedded token is masked", testTokenMaskInToolResult),
     example("token id includes the m. namespace prefix", testTokenIdNamespace),
+    // Correlation-id masking (C3 PR3)
+    example("TextContent with msg_… renders a corr-mask span", testCorrMaskInTextContent),
+    example("corr-mask in TextContent does not leak the raw id", testCorrMaskNoLeakInTextContent),
+    example("corr id in messages tab uses corr:m. namespace", testCorrIdNamespace),
   )
 
   // ── Helpers ───────────────────────────────────────────────────────────
@@ -371,5 +375,42 @@ object MessageViewSpec extends Properties {
     val out = renderCards(List(card))
     Result.assert(out.contains("data-token-id=\"m.7.text.0#0\""))
       .log(s"expected `data-token-id=\"m.7.text.0#0\"` in: $out")
+  }
+
+  // ── Correlation-id masking (C3 PR3) ───────────────────────────────────
+
+  private val FakeMsgId = "msg_01ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+  def testCorrMaskInTextContent: Result = {
+    val card = MsgCard("assistant", List(TextContent(s"response id: $FakeMsgId done")), Nil, rawIdx = 0)
+    val out  = renderCards(List(card))
+    Result.all(
+      List(
+        Result.assert(out.contains("class=\"jt-corr-mask\""))
+          .log(s"jt-corr-mask span missing: $out"),
+        Result.assert(out.contains("data-corr-id=\"corr:m."))
+          .log(s"messages-namespace corr id missing: $out"),
+      )
+    )
+  }
+
+  def testCorrMaskNoLeakInTextContent: Result = {
+    val card = MsgCard("assistant", List(TextContent(s"id=$FakeMsgId")), Nil, rawIdx = 0)
+    val out  = renderCards(List(card))
+    Result.assert(!out.contains(FakeMsgId))
+      .log(s"raw id leaked: $out")
+  }
+
+  def testCorrIdNamespace: Result = {
+    // Card at rawIdx = 5, first text content. msg_… at offset 0.
+    val card = MsgCard(
+      role      = "assistant",
+      contents  = List(TextContent(FakeMsgId)),
+      userParts = Nil,
+      rawIdx    = 5,
+    )
+    val out = renderCards(List(card))
+    Result.assert(out.contains("data-corr-id=\"corr:m.5.text.0#0\""))
+      .log(s"expected `data-corr-id=\"corr:m.5.text.0#0\"` in: $out")
   }
 }

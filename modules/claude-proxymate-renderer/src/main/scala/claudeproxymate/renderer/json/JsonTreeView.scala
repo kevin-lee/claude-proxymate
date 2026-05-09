@@ -1,6 +1,6 @@
 package claudeproxymate.renderer.json
 
-import claudeproxymate.core.{SensitiveKeys, TokenPatterns}
+import claudeproxymate.core.{CorrelationIds, SensitiveKeys, TokenPatterns}
 import claudeproxymate.renderer.state.AppState
 import scalatags.Text.all.*
 
@@ -42,6 +42,15 @@ object JsonTreeView {
   val TokenMaskClass: String         = "jt-token-mask"
   val TokenMaskRevealedClass: String = "jt-token-mask-revealed"
   val TokenMaskDataAttr: String      = "data-token-id"
+
+  /* Correlation-id mask (C3 3): visually distinct from C3 1/2 because
+   * these are identifiers, not credentials. Reveal state still uses
+   * the shared `AppState.maskRevealed` set; ids are namespaced by
+   * the `corr:` prefix to avoid collision with token / field-name ids.
+   */
+  val CorrMaskClass: String          = "jt-corr-mask"
+  val CorrMaskRevealedClass: String  = "jt-corr-mask-revealed"
+  val CorrMaskDataAttr: String       = "data-corr-id"
 
   val CollapseLenThreshold: Int = 300
 
@@ -85,8 +94,8 @@ object JsonTreeView {
   private def buildStringFrag(s: String, trailing: Frag, path: String): Frag = {
     if (s.length > CollapseLenThreshold) {
       AppState.jtId += 1
-      val sid    = s"jts${AppState.jtId}"
-      val tokens = TokenPatterns.scan(s)
+      val sid  = s"jts${AppState.jtId}"
+      val hits = collectHits(s)
 
       // Collapsed preview: render the first 80 raw chars with
       // newlines flattened to spaces and tokens masked inline.
@@ -95,7 +104,7 @@ object JsonTreeView {
       val previewSliceLen = math.min(80, s.length)
       val previewSlice    = s.substring(0, previewSliceLen)
       val previewParts: List[Frag] =
-        buildTokenizedSlice(previewSlice, tokens, sliceOffset = 0, path, flattenNewlines = true)
+        buildTokenizedSlice(previewSlice, hits, sliceOffset = 0, path, flattenNewlines = true)
           .getOrElse(List(stringFrag(jsonEscapeBody(maybeFlatten(previewSlice, flatten = true)))))
 
       // Expanded view: split raw `s` on real newlines. Each line
@@ -115,7 +124,7 @@ object JsonTreeView {
         val openQuote  = if (li == 0) "\"" else ""
         val closeQuote = if (isLast) "\"" else ""
         val lineParts: List[Frag] =
-          buildTokenizedSlice(line, tokens, sliceOffset = sliceAt, path, flattenNewlines = false)
+          buildTokenizedSlice(line, hits, sliceOffset = sliceAt, path, flattenNewlines = false)
             .getOrElse(List(stringFrag(jsonEscapeBody(line))))
         sliceAt += line.length + 1 // +1 for the consumed `\n`
         div(cls := "jt-exp-line", attr("data-ln") := ln.toString)(
@@ -157,58 +166,78 @@ object JsonTreeView {
         trailing,
       )
     } else {
-      /* Short string — scan for token-shape matches and either
-       * render plain (when no matches) or interleave mask spans
-       * with JSON-escaped surrounding text.
+      /* Short string — scan for token-shape matches AND
+       * correlation-id matches (PR 3), then either render plain
+       * (when no hits) or interleave mask spans with JSON-escaped
+       * surrounding text.
        */
-      val tokens = TokenPatterns.scan(s)
-      if (tokens.isEmpty) {
+      val hits = collectHits(s)
+      if (hits.isEmpty) {
         val display = js.JSON.stringify(s.asInstanceOf[js.Any])
         frag(span(cls := "jt-str")(display), trailing)
       } else {
-        val parts = buildTokenizedSlice(s, tokens, sliceOffset = 0, path).getOrElse(List(stringFrag(s)))
+        val parts = buildTokenizedSlice(s, hits, sliceOffset = 0, path).getOrElse(List(stringFrag(s)))
         frag(span(cls := "jt-str")("\"", frag(parts*), "\""), trailing)
       }
     }
   }
 
-  /** Tokenize `text` using the pre-scanned `tokens` list (whose
+  /** A merged mask candidate (regex-token from PR 2 OR
+    * correlation-id from PR 3) used by the unified walk in
+    * [[buildTokenizedSlice]]. The two surfaces are disjoint by
+    * pattern prefix in practice, so a sort + sequential walk
+    * suffices.
+    */
+  private sealed trait MaskHit { def start: Int; def end: Int }
+  private final case class TokenHit(start: Int, end: Int)              extends MaskHit
+  private final case class CorrHit (start: Int, end: Int, name: String) extends MaskHit
+
+  private def collectHits(s: String): List[MaskHit] = {
+    val tokens = TokenPatterns.scan(s).map(t => TokenHit(t.start, t.end))
+    val corrs  = CorrelationIds.scan(s).map(c => CorrHit(c.start, c.end, c.name))
+    (tokens ++ corrs).sortBy(_.start)
+  }
+
+  /** Tokenize `text` using the pre-collected `hits` list (whose
     * offsets are relative to the raw value the slice came from).
-    * `sliceOffset` is the offset of `text[0]` within that raw value,
-    * which is also the offset used in token ids.
+    * `sliceOffset` is the offset of `text[0]` within that raw
+    * value, which is also the offset used in mask ids.
     *
     * When `flattenNewlines` is true, real `\n` / `\r` chars in the
     * plain segments are replaced with space before JSON-escape — used
     * by the long-string collapsed preview to keep everything on one
     * visual line.
     *
-    * Returns `None` when no token matches fall inside the slice
-    * (caller can fall back to a single plain frag), or `Some(parts)`
-    * with the interleaved sequence of plain-text and `<span>`
-    * frags. Plain-text parts go through `jsonEscapeBody` so `"` /
-    * `\` / control chars render as JSON literals (matching the
-    * unmasked branch).
+    * Returns `None` when no hits fall inside the slice (caller can
+    * fall back to a single plain frag), or `Some(parts)` with the
+    * interleaved sequence of plain-text and `<span>` frags. Plain-
+    * text parts go through `jsonEscapeBody` so `"` / `\` /
+    * control chars render as JSON literals (matching the unmasked
+    * branch).
     */
   private def buildTokenizedSlice(
     text: String,
-    tokens: List[TokenPatterns.TokenMatch],
+    hits: List[MaskHit],
     sliceOffset: Int,
     path: String,
     flattenNewlines: Boolean = false,
   ): Option[List[Frag]] = {
     val sliceEnd = sliceOffset + text.length
-    val inSlice  = tokens.filter(t => t.start >= sliceOffset && t.end <= sliceEnd)
+    val inSlice  = hits.filter(h => h.start >= sliceOffset && h.end <= sliceEnd)
     if (inSlice.isEmpty) return None
     val parts = scala.collection.mutable.ListBuffer.empty[Frag]
     var cursor = sliceOffset
-    inSlice.foreach { t =>
-      if (t.start > cursor) {
-        val plain = text.substring(cursor - sliceOffset, t.start - sliceOffset)
+    inSlice.foreach { h =>
+      if (h.start > cursor) {
+        val plain = text.substring(cursor - sliceOffset, h.start - sliceOffset)
         parts += stringFrag(jsonEscapeBody(maybeFlatten(plain, flattenNewlines)))
       }
-      val raw = text.substring(t.start - sliceOffset, t.end - sliceOffset)
-      parts += buildTokenMaskFrag(path, t.start, raw)
-      cursor = t.end
+      val raw = text.substring(h.start - sliceOffset, h.end - sliceOffset)
+      parts += (h match {
+        case TokenHit(_, _)        => buildTokenMaskFrag(path, h.start, raw)
+        case CorrHit(_, _, name)   => buildCorrMaskFrag(path, h.start, raw, name)
+      })
+      cursor = h.end
     }
     if (cursor < sliceEnd) {
       val plain = text.substring(cursor - sliceOffset, sliceEnd - sliceOffset)
@@ -234,6 +263,28 @@ object JsonTreeView {
     } else {
       span(cls := TokenMaskClass, attr(TokenMaskDataAttr) := tid)(
         TokenPatterns.fingerprint(raw),
+      )
+    }
+  }
+
+  /** Build the masked-or-revealed frag for a single correlation id
+    * (PR 3). Render shape: `<prefix>_…<last-4>` (e.g. `msg_…XYZ4`).
+    * Distinct CSS class from token mask so visual cue signals
+    * "informational compaction" rather than "sensitive redaction".
+    *
+    * Id format: `corr:<json-path>#<offset>`. The `corr:` prefix
+    * keeps the namespace disjoint from token-mask ids in the
+    * shared `AppState.maskRevealed` set.
+    */
+  def buildCorrMaskFrag(path: String, offset: Int, raw: String, name: String): Frag = {
+    val cid = s"corr:$path#$offset"
+    if (AppState.maskRevealed.contains(cid)) {
+      span(cls := CorrMaskRevealedClass, attr(CorrMaskDataAttr) := cid)(
+        jsonEscapeBody(raw),
+      )
+    } else {
+      span(cls := CorrMaskClass, attr(CorrMaskDataAttr) := cid)(
+        CorrelationIds.fingerprint(name, raw),
       )
     }
   }

@@ -1,69 +1,91 @@
 package claudeproxymate.renderer.messages
 
-import claudeproxymate.core.TokenPatterns
+import claudeproxymate.core.{CorrelationIds, TokenPatterns}
 import claudeproxymate.renderer.json.JsonTreeView
 import claudeproxymate.renderer.state.AppState
 import claudeproxymate.renderer.util.HtmlUtil
 import scalatags.Text.all.*
 
 /** Pure helper that emits a Scalatags `Frag` for message text,
-  * composing the regex-shape token mask (PR 2b) with the existing
-  * search-highlight pipeline.
+  * composing both the regex-shape credential mask (PR 2b) and the
+  * correlation-id mask (PR 3) with the existing search-highlight
+  * pipeline.
   *
   * Composition policy:
   *
-  *   1. Token matches (per
-  *      [[claudeproxymate.core.TokenPatterns.scan]]) take precedence
-  *      and render as `<first-4>…<last-4>` fingerprints inside a
-  *      click-to-reveal span. They are NOT search-highlighted —
-  *      you can't usefully search content you can't see.
-  *   2. Plain (non-token) segments pass through
+  *   1. Mask hits (TokenPatterns + CorrelationIds, merged and
+  *      sorted by start) take precedence. Token masks render as
+  *      `<first-4>…<last-4>` fingerprints; correlation-id masks
+  *      render as `<prefix>_…<last-4>`. Both are click-to-reveal
+  *      spans and NOT search-highlighted (you can't usefully
+  *      search content you can't see).
+  *   2. Plain (non-mask) segments pass through
   *      [[HtmlUtil.highlightSearchFrag]] so search hits inside
   *      surrounding text still wrap in `<mark>`.
-  *   3. When a token has been revealed (its id is in
+  *   3. When a mask is revealed (its id is in
   *      [[AppState.maskRevealed]]), the revealed text is rendered
-  *      *inside* the span and DOES go through the search highlighter
-  *      so a search hit inside a revealed token still wraps.
+  *      inside the span and DOES go through the search highlighter
+  *      so a search hit inside a revealed mask still wraps.
   *
-  * Token ids follow `<idPrefix>#<offset>` where `idPrefix` is
-  * caller-supplied (e.g. `m.0.user.0`) and `offset` is the start
-  * position of the match within `text`. Stable across re-renders of
-  * the same data.
+  * Token ids follow `<idPrefix>#<offset>`; correlation-id ids
+  * follow `corr:<idPrefix>#<offset>`. Stable across re-renders.
   *
   * Pure: no DOM access. Click dispatch is the orchestrator's
   * responsibility (`MessageRenderer.handleClick`).
   */
 object MessageTokenView {
 
-  /** Build the rendered fragment for a piece of message text.
-    * `query` is the active search query (empty when no search is
-    * active). `idPrefix` is the stable caller-supplied prefix for
-    * token ids.
-    */
+  private sealed trait Hit { def start: Int; def end: Int }
+  private final case class TokHit(start: Int, end: Int)              extends Hit
+  private final case class CorrHit(start: Int, end: Int, name: String) extends Hit
+
+  private def collectHits(text: String): List[Hit] = {
+    val tokens = TokenPatterns.scan(text).map(t => TokHit(t.start, t.end))
+    val corrs  = CorrelationIds.scan(text).map(c => CorrHit(c.start, c.end, c.name))
+    (tokens ++ corrs).sortBy(_.start)
+  }
+
+  /** Build the rendered fragment for a piece of message text. */
   def buildTextFrag(text: String, query: String, idPrefix: String): Frag = {
-    val tokens = TokenPatterns.scan(text)
-    if (tokens.isEmpty) HtmlUtil.highlightSearchFrag(text, query)
+    val hits = collectHits(text)
+    if (hits.isEmpty) HtmlUtil.highlightSearchFrag(text, query)
     else {
       val parts  = scala.collection.mutable.ListBuffer.empty[Frag]
       var cursor = 0
-      tokens.foreach { t =>
-        if (t.start > cursor) {
-          parts += HtmlUtil.highlightSearchFrag(text.substring(cursor, t.start), query)
+      hits.foreach { h =>
+        if (h.start > cursor) {
+          parts += HtmlUtil.highlightSearchFrag(text.substring(cursor, h.start), query)
         }
-        val raw = text.substring(t.start, t.end)
-        val tid = s"$idPrefix#${t.start}"
-        if (AppState.maskRevealed.contains(tid)) {
-          parts += span(
-            cls                            := JsonTreeView.TokenMaskRevealedClass,
-            attr(JsonTreeView.TokenMaskDataAttr) := tid,
-          )(HtmlUtil.highlightSearchFrag(raw, query))
-        } else {
-          parts += span(
-            cls                            := JsonTreeView.TokenMaskClass,
-            attr(JsonTreeView.TokenMaskDataAttr) := tid,
-          )(TokenPatterns.fingerprint(raw))
+        val raw = text.substring(h.start, h.end)
+        h match {
+          case TokHit(_, _) =>
+            val tid = s"$idPrefix#${h.start}"
+            if (AppState.maskRevealed.contains(tid)) {
+              parts += span(
+                cls                                  := JsonTreeView.TokenMaskRevealedClass,
+                attr(JsonTreeView.TokenMaskDataAttr) := tid,
+              )(HtmlUtil.highlightSearchFrag(raw, query))
+            } else {
+              parts += span(
+                cls                                  := JsonTreeView.TokenMaskClass,
+                attr(JsonTreeView.TokenMaskDataAttr) := tid,
+              )(TokenPatterns.fingerprint(raw))
+            }
+          case CorrHit(_, _, name) =>
+            val cid = s"corr:$idPrefix#${h.start}"
+            if (AppState.maskRevealed.contains(cid)) {
+              parts += span(
+                cls                                 := JsonTreeView.CorrMaskRevealedClass,
+                attr(JsonTreeView.CorrMaskDataAttr) := cid,
+              )(HtmlUtil.highlightSearchFrag(raw, query))
+            } else {
+              parts += span(
+                cls                                 := JsonTreeView.CorrMaskClass,
+                attr(JsonTreeView.CorrMaskDataAttr) := cid,
+              )(CorrelationIds.fingerprint(name, raw))
+            }
         }
-        cursor = t.end
+        cursor = h.end
       }
       if (cursor < text.length) {
         parts += HtmlUtil.highlightSearchFrag(text.substring(cursor), query)

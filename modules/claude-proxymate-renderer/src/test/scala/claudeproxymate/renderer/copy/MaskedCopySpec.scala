@@ -23,6 +23,8 @@ object MaskedCopySpec extends Properties {
     example("multiple regex tokens in one string are all redacted", testMultipleRegexTokens),
     example("non-token string preserved verbatim", testNonTokenStringPreserved),
     example("regex token inside sensitive-key value still field-replaced (no double mask)", testRegexInsideSensitiveKey),
+    // PR3: correlation IDs are NOT redacted in copy
+    example("correlation id (msg_…) is preserved verbatim in copy", testCorrIdNotRedacted),
   )
 
   private def parse(s: String): js.Dynamic = js.JSON.parse(s)
@@ -167,5 +169,17 @@ object MaskedCopySpec extends Properties {
         Result.assert(out.contains(MaskedCopy.Sentinel)).log(s"sentinel missing: $out"),
       )
     )
+  }
+
+  // ── PR3: correlation IDs are NOT redacted ─────────────────────────────
+
+  def testCorrIdNotRedacted: Result = {
+    // `msg_…` is a correlation id (PR 3 visual mask only). Copy
+    // emits it verbatim so cross-capture correlation stays useful
+    // when the output is pasted into another tool.
+    val msgId = "msg_01ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    val out   = stringify(MaskedCopy.maskBody(parse(s"""{"id":"$msgId","model":"claude"}""")))
+    Result.assert(out.contains(msgId))
+      .log(s"correlation id was unexpectedly redacted: $out")
   }
 }
