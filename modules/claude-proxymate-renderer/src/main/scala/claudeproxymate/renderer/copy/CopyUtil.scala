@@ -60,36 +60,57 @@ object CopyUtil {
   /** Backward-compatible overload — masks by default. */
   def copyProxyDetail(): Unit = copyProxyDetail(masked = true)
 
-  /** Copy the active capture's body to the clipboard. When `masked`
-    * is true (the default), sensitive field values are replaced with
-    * `***` via [[MaskedCopy.maskBody]]; when false, the raw body is
-    * copied verbatim. Strings are emitted verbatim either way (they
-    * have no field structure to mask).
+  /** Copy the active capture's detail to the clipboard. Routes by
+    * the active tab:
+    *   - `messages` → plain-text role-labeled rendering of the
+    *     visible cards via
+    *     [[claudeproxymate.renderer.messages.MessageCopy.toPlainText]].
+    *   - `request` / `response` (default) → JSON stringification
+    *     of the request/response body, with field-name + token
+    *     masking via [[MaskedCopy.maskBody]] when `masked = true`.
+    *
+    * `masked = true` redacts sensitive values; `masked = false`
+    * (Shift-click path) emits raw.
     */
   def copyProxyDetail(masked: Boolean): Unit = {
     val entry = AppState.proxyCaptures.find(e => e.id == AppState.selectedProxyId.map(_.asInstanceOf[js.Any]).orNull)
     entry match {
-      case None => ()
+      case None    => ()
       case Some(e) =>
-        val data: js.Dynamic = if (AppState.proxyDetailTab == "request") {
-          e.selectDynamic("body")
-        } else {
-          val resp = e.selectDynamic("response")
-          if (!js.isUndefined(resp) && resp != null) resp.selectDynamic("body")
-          else null
-        }
-        if (js.isUndefined(data) || data == null) return
-
-        val text = if (js.typeOf(data) == "string") data.asInstanceOf[String]
-        else {
-          val toEmit = if (masked) MaskedCopy.maskBody(data) else data
-          js.JSON.stringify(toEmit, null.asInstanceOf[js.Array[js.Any]], 2)
-        }
-
-        locally { val _ = dom.window.navigator.clipboard.writeText(text)
-          .asInstanceOf[js.Dynamic]
-          .`then`(flashCopyButton(s"#${HtmlIds.CopyDetailBtn}"))
-          .`catch`(onCopyError) }
+        if (AppState.proxyDetailTab == "messages") copyMessagesDetail(e, masked)
+        else copyJsonDetail(e, masked)
     }
+  }
+
+  private def copyMessagesDetail(entry: js.Dynamic, masked: Boolean): Unit = {
+    val cards = claudeproxymate.renderer.messages.MessageRenderer.buildVisibleCards(entry)
+    val text  = claudeproxymate.renderer.messages.MessageCopy.toPlainText(cards, masked)
+    if (text.isEmpty) return
+    locally { val _ = dom.window.navigator.clipboard.writeText(text)
+      .asInstanceOf[js.Dynamic]
+      .`then`(flashCopyButton(s"#${HtmlIds.CopyDetailBtn}"))
+      .`catch`(onCopyError) }
+  }
+
+  private def copyJsonDetail(entry: js.Dynamic, masked: Boolean): Unit = {
+    val data: js.Dynamic = if (AppState.proxyDetailTab == "request") {
+      entry.selectDynamic("body")
+    } else {
+      val resp = entry.selectDynamic("response")
+      if (!js.isUndefined(resp) && resp != null) resp.selectDynamic("body")
+      else null
+    }
+    if (js.isUndefined(data) || data == null) return
+
+    val text = if (js.typeOf(data) == "string") data.asInstanceOf[String]
+    else {
+      val toEmit = if (masked) MaskedCopy.maskBody(data) else data
+      js.JSON.stringify(toEmit, null.asInstanceOf[js.Array[js.Any]], 2)
+    }
+
+    locally { val _ = dom.window.navigator.clipboard.writeText(text)
+      .asInstanceOf[js.Dynamic]
+      .`then`(flashCopyButton(s"#${HtmlIds.CopyDetailBtn}"))
+      .`catch`(onCopyError) }
   }
 }

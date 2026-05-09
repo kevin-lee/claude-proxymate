@@ -23,6 +23,9 @@ object ProxyListViewSpec extends Properties {
     example("buildListFrag status None renders ellipsis placeholder", testStatusNone),
     property("buildListFrag never leaks literal <script> for any field", testNoScriptLeak),
     property("buildListFrag round-trips id as data-id parsable Double", testIdRoundTrip),
+    // Query-string masking (C3 PR4)
+    example("path with sensitive query param renders masked value", testPathQueryMaskSensitive),
+    example("path with non-sensitive query param renders verbatim", testPathQueryMaskNonSensitive),
   )
 
   private val sampleLabels = ProxyListLabels(
@@ -182,4 +185,26 @@ object ProxyListViewSpec extends Properties {
       Result.assert(html.contains(pattern))
         .log(s"data-id round-trip failed for id=$id html=$html")
     }
+
+  // ── Query-string masking (C3 PR4) ─────────────────────────────────────
+
+  def testPathQueryMaskSensitive: Result = {
+    val html = render(List(sampleEntry(path = "/v1/x?token=fakeKEY12345")))
+    Result.all(
+      List(
+        Result.assert(html.contains("/v1/x?token=***")).log(s"masked path missing: $html"),
+        Result.assert(!html.contains("fakeKEY12345")).log(s"raw token leaked: $html"),
+      )
+    )
+  }
+
+  def testPathQueryMaskNonSensitive: Result = {
+    val html = render(List(sampleEntry(path = "/v1/x?model=claude")))
+    Result.all(
+      List(
+        Result.assert(html.contains("/v1/x?model=claude")).log(s"non-sensitive param mangled: $html"),
+        Result.assert(!html.contains("***")).log(s"unexpected sentinel: $html"),
+      )
+    )
+  }
 }

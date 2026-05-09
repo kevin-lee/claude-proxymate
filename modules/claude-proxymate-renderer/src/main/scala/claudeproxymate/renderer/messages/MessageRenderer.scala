@@ -120,7 +120,16 @@ object MessageRenderer {
     s"b${AppState.badgeUidCounter}"
   }
 
-  def renderProxyMessages(entry: js.Dynamic, container: dom.html.Element): Unit = {
+  /** Visible cards for the active capture, honoring the active
+    * filter (`AppState.msgFilter`) and search query
+    * (`AppState.msgSearchQuery`). Pure on `entry` (no DOM access)
+    * so `CopyUtil` can reuse it for the Messages-tab Copy path
+    * without doing the rendering side-effects.
+    *
+    * Returns the empty list when the capture has no messages or
+    * when the filter / search yields no matches.
+    */
+  def buildVisibleCards(entry: js.Dynamic): List[MsgCard] = {
     val body = entry.selectDynamic("body")
     val msgs: js.Array[js.Dynamic] =
       if (!js.isUndefined(body) && body != null) {
@@ -129,18 +138,12 @@ object MessageRenderer {
         else js.Array[js.Dynamic]()
       } else js.Array[js.Dynamic]()
 
-    if (msgs.length == 0) {
-      ViewHelpers.setInnerHtml(container, MessageView.buildEmptyFrag(I18n.t("proxy.noMessages")))
-      return
-    }
+    if (msgs.length == 0) return Nil
 
     val typedOnly    = AppState.msgFilter == "typed"
     val isUserFilter = AppState.msgFilter == "user" || typedOnly
     val q            = AppState.msgSearchQuery
 
-    // Carry the raw index along with each filtered message so the
-    // token-mask layer can build stable ids that don't shift when
-    // filters change.
     val indexed: js.Array[(js.Dynamic, Int)] =
       msgs.zipWithIndex.filter { case (m, _) =>
         val role = m.role.asInstanceOf[String]
@@ -174,6 +177,26 @@ object MessageRenderer {
         if (cardIsNonEmpty(card) && cardMatchesQuery(card, q)) cards += card
       }
     }
+    cards.toList
+  }
+
+  def renderProxyMessages(entry: js.Dynamic, container: dom.html.Element): Unit = {
+    val body = entry.selectDynamic("body")
+    val msgs: js.Array[js.Dynamic] =
+      if (!js.isUndefined(body) && body != null) {
+        val m = body.selectDynamic("messages")
+        if (!js.isUndefined(m) && m != null) m.asInstanceOf[js.Array[js.Dynamic]]
+        else js.Array[js.Dynamic]()
+      } else js.Array[js.Dynamic]()
+
+    if (msgs.length == 0) {
+      ViewHelpers.setInnerHtml(container, MessageView.buildEmptyFrag(I18n.t("proxy.noMessages")))
+      return
+    }
+
+    val isUserFilter = AppState.msgFilter == "user" || AppState.msgFilter == "typed"
+    val q            = AppState.msgSearchQuery
+    val cards        = buildVisibleCards(entry)
 
     container.style.cssText = "flex:1;overflow-y:auto;display:block"
 
@@ -199,7 +222,7 @@ object MessageRenderer {
 
     val body2: Frag =
       if (cards.isEmpty) MessageView.buildNoResultsFrag(I18n.t("proxy.noResults"))
-      else MessageView.buildCardsFrag(cards.toList, isUserFilter, q)
+      else MessageView.buildCardsFrag(cards, isUserFilter, q)
 
     val full = frag(
       div(style := "position:sticky;top:0;z-index:1;background:var(--bg)")(header),

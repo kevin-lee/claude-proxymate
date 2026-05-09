@@ -1,5 +1,6 @@
 package claudeproxymate.renderer.proxy
 
+import claudeproxymate.core.QueryParamMask
 import claudeproxymate.renderer.view.I18nTemplate
 import scalatags.Text.all.*
 
@@ -66,7 +67,7 @@ object ProxyListView {
     )(
       div(style := "display:flex;align-items:center;overflow:hidden")(
         span(cls := "prx-method")(e.method),
-        span(cls := "prx-path")(e.path),
+        span(cls := "prx-path")(QueryParamMask.maskPath(e.path)),
         statusBadge,
         span(cls := "prx-ts")(e.ts),
       ),

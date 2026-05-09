@@ -294,7 +294,7 @@ object DetailView {
     if (cachePct > 0) badges += TokenBadge(s"${I18n.t("token.cache")} $cachePct%", Some("var(--green)"))
     badges += TokenBadge(costStr, Some("var(--yellow)"))
 
-    TokenPill(badges = badges.toList, dataCost = popData.asInstanceOf[String])
+    TokenPill(badges = badges.toList, dataCost = popData)
   }
 
   def showDetailTab(tab: String): Unit = {
@@ -311,11 +311,13 @@ object DetailView {
       i += 1
     }
 
-    // Hide copy button for analysis/messages tabs
+    /* Hide copy button for analysis tab only. Messages tab now has
+     * its own plain-text Copy path (PR 2d).
+     */
     val copyBtn = dom.document.getElementById(HtmlIds.CopyDetailBtn)
     if (copyBtn != null) {
       copyBtn.asInstanceOf[dom.html.Element].style.display =
-        if (tab == "analysis" || tab == "messages") "none" else ""
+        if (tab == "analysis") "none" else ""
     }
 
     renderProxyDetail()
