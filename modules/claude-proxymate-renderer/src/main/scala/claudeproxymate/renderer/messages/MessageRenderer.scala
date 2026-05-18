@@ -84,10 +84,10 @@ object MessageRenderer {
     * container's scrollTop so the user stays where they were.
     */
   private def toggleMessageToken(tokenId: String): Unit = {
-    if (AppState.maskRevealed.contains(tokenId)) {
-      val _ = AppState.maskRevealed.remove(tokenId)
+    if (AppState.maskOverrides.contains(tokenId)) {
+      val _ = AppState.maskOverrides.remove(tokenId)
     } else {
-      val _ = AppState.maskRevealed.add(tokenId)
+      val _ = AppState.maskOverrides.add(tokenId)
     }
 
     val container = dom.document.getElementById(HtmlIds.ProxyDetailView)

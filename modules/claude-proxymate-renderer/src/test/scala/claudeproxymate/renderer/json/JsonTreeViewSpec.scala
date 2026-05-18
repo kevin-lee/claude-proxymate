@@ -49,7 +49,7 @@ object JsonTreeViewSpec extends Properties {
     example("long-string output has no inline onclick", testNoStringInlineOnclick),
     // Field-name masking (C3)
     example("api_key value renders as masked placeholder, not raw", testMaskApiKeyHidesValue),
-    example("api_key value reveals when maskRevealed contains the id", testMaskApiKeyRevealed),
+    example("api_key value reveals when maskOverrides contains the id (presenterMaskAll=true)", testMaskApiKeyRevealed),
     example("nested object under sensitive key is masked as a whole", testMaskNestedObject),
     example("input_tokens does NOT render the masked placeholder", testMaskNoFalsePositiveOnTokenCount),
     example("mask data-mask-id is the dot-path of the field (stable across re-renders)", testMaskIdIsDotPath),
@@ -57,13 +57,13 @@ object JsonTreeViewSpec extends Properties {
     // Token-shape masking (C3 PR2)
     example("string containing sk-ant-… renders as a token-mask span", testTokenMaskAnthropic),
     example("masked token renders the fingerprint, not the raw value", testTokenMaskFingerprint),
-    example("token-mask reveals when maskRevealed contains the path#offset id", testTokenMaskRevealed),
+    example("token-mask reveals when maskOverrides contains the path#offset id", testTokenMaskRevealed),
     example("plain string with no tokens renders without token-mask", testTokenMaskNoFalsePositive),
     example("sensitive key wins over inner token (no inner mask rendered)", testTokenMaskSensitiveKeyWins),
     // Correlation-id masking (C3 PR3)
     example("msg_… value renders as a corr-mask span", testCorrMaskMsg),
     example("corr-mask renders prefix + … + last-4 (msg_…XYZ4)", testCorrMaskFingerprint),
-    example("corr-mask reveals when maskRevealed contains corr:path#offset", testCorrMaskReveal),
+    example("corr-mask reveals when maskOverrides contains corr:path#offset", testCorrMaskReveal),
     example("plain integer id does NOT render a corr-mask", testCorrMaskNoFalsePositive),
     example("sensitive key wins over inner correlation id (no corr-mask)", testCorrMaskSensitiveKeyWins),
     // Long-string token masking (C3 PR2c)
@@ -85,7 +85,12 @@ object JsonTreeViewSpec extends Properties {
   private def reset(): Unit = {
     AppState.jtId = 0
     AppState.jtLine = 0
-    AppState.maskRevealed.clear()
+    AppState.maskOverrides.clear()
+    // Existing tests were written for the "default = all masked"
+    // baseline. Pin it explicitly so a test that flips the flag
+    // (e.g. PresenterModeSpec running in the same suite) can't
+    // bleed state into a later test.
+    AppState.presenterMaskAll = true
   }
 
   private def render(value: js.Dynamic, totalBytes: Int = 0): String = {
@@ -459,7 +464,7 @@ object JsonTreeViewSpec extends Properties {
     reset()
     val totalBytes = js.JSON.stringify(value).length
     // Mask id is the dot-path; pre-add it to the reveal set, then render.
-    val _ = AppState.maskRevealed.add("$.api_key")
+    val _ = AppState.maskOverrides.add("$.api_key")
     val out = JsonTreeView.buildJsonFrag(value, totalBytes, "hidden").render
     Result.all(
       List(
@@ -536,7 +541,7 @@ object JsonTreeViewSpec extends Properties {
     val data       = parse(s"""{"id":"$FakeMsgId"}""")
     reset()
     val totalBytes = js.JSON.stringify(data).length
-    val _          = AppState.maskRevealed.add(s"corr:$$.id#0")
+    val _          = AppState.maskOverrides.add(s"corr:$$.id#0")
     val out        = JsonTreeView.buildJsonFrag(data, totalBytes, "hidden").render
     Result.all(
       List(
@@ -663,7 +668,7 @@ object JsonTreeViewSpec extends Properties {
     val totalBytes = js.JSON.stringify(data).length
     // The token offset within the value `prefix sk-ant-... suffix` is 7
     // (length of "prefix "). Token id = `$.text#7`.
-    val _ = AppState.maskRevealed.add("$.text#7")
+    val _ = AppState.maskOverrides.add("$.text#7")
     val out = JsonTreeView.buildJsonFrag(data, totalBytes, "hidden").render
     Result.all(
       List(

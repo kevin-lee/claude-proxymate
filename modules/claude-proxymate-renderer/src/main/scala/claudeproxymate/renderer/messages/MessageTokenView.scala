@@ -22,8 +22,8 @@ import scalatags.Text.all.*
   *   2. Plain (non-mask) segments pass through
   *      [[HtmlUtil.highlightSearchFrag]] so search hits inside
   *      surrounding text still wrap in `<mark>`.
-  *   3. When a mask is revealed (its id is in
-  *      [[AppState.maskRevealed]]), the revealed text is rendered
+  *   3. When a mask is revealed (per
+  *      [[AppState.isRevealed]]), the revealed text is rendered
   *      inside the span and DOES go through the search highlighter
   *      so a search hit inside a revealed mask still wraps.
   *
@@ -60,7 +60,7 @@ object MessageTokenView {
         h match {
           case TokHit(_, _) =>
             val tid = s"$idPrefix#${h.start}"
-            if (AppState.maskRevealed.contains(tid)) {
+            if (AppState.isRevealed(tid)) {
               parts += span(
                 cls                                  := JsonTreeView.TokenMaskRevealedClass,
                 attr(JsonTreeView.TokenMaskDataAttr) := tid,
@@ -73,7 +73,7 @@ object MessageTokenView {
             }
           case CorrHit(_, _, name) =>
             val cid = s"corr:$idPrefix#${h.start}"
-            if (AppState.maskRevealed.contains(cid)) {
+            if (AppState.isRevealed(cid)) {
               parts += span(
                 cls                                 := JsonTreeView.CorrMaskRevealedClass,
                 attr(JsonTreeView.CorrMaskDataAttr) := cid,

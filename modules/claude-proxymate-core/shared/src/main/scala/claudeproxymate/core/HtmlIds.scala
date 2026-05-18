@@ -18,6 +18,8 @@ object HtmlIds {
   val ProxyInfoBtn: String    = "proxyInfoBtn"
   val ProxyCmdCopyBtn: String = "proxyCmdCopyBtn"
   val ProxyClearBtn: String   = "proxyClearBtn"
+  val MaskToggleBtn: String   = "maskToggleBtn"
+  val MaskStateChip: String   = "maskStateChip"
 
   // ── Proxy Panel ──
   val ProxyPanel: String = "proxyPanel"

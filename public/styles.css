@@ -229,6 +229,19 @@
     /* address-bar sized action buttons */
     .proxy-bar-btn-primary { padding: 6px 14px; font-size: 12px; flex: 0 0 auto; }
     .proxy-bar-btn-clear { padding: 6px 12px; font-size: 12px; flex: 0 0 auto; }
+    .proxy-bar-btn-mask  { padding: 6px 12px; font-size: 12px; flex: 0 0 auto; white-space: nowrap; }
+
+    /* C3 PR 5 — presenter-mode state chip (status indicator next to
+       Stopped/Running). Echoes mask.toggle button text but compact. */
+    .mask-state-chip {
+      padding: 2px 8px; border-radius: 10px;
+      background: color-mix(in srgb, var(--blue) 12%, transparent);
+      color: var(--dim); font-size: 11px; font-weight: 600;
+      cursor: pointer; user-select: none;
+      transition: background .15s, color .15s;
+      white-space: nowrap;
+    }
+    .mask-state-chip:hover { background: color-mix(in srgb, var(--blue) 22%, transparent); color: var(--text); }
 
     /* info button */
     .proxy-bar-info {

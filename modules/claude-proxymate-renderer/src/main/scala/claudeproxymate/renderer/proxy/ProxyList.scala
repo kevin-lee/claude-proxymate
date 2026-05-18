@@ -2,7 +2,7 @@ package claudeproxymate.renderer.proxy
 
 import claudeproxymate.core.HtmlIds
 import claudeproxymate.renderer.i18n.I18n
-import claudeproxymate.renderer.state.AppState
+import claudeproxymate.renderer.state.{AppState, PresenterMode}
 import claudeproxymate.renderer.view.ViewHelpers
 import org.scalajs.dom
 
@@ -104,9 +104,13 @@ object ProxyList {
     * (`clearProxyCaptures`, the click handler).
     */
   def selectProxyEntry(id: Double): Unit = {
-    // Mask reveal state is per-capture (mask ids aren't stable
-    // across re-renders); drop it on capture switch.
-    AppState.maskRevealed.clear()
+    // Per-span overrides are per-capture (mask ids aren't stable
+    // across captures); drop them on capture switch. The presenter
+    // baseline (`presenterMaskAll`) is intentionally preserved
+    // across captures — a presenter who flipped to "Reveal All"
+    // doesn't want it reset every time they click a different
+    // request.
+    AppState.maskOverrides.clear()
     AppState.selectedProxyId = Some(id)
     renderProxyList()
     ProxyControl.callRenderProxyDetail()
@@ -115,7 +119,14 @@ object ProxyList {
   def clearProxyCaptures(): Unit = {
     AppState.proxyCaptures = Nil
     AppState.selectedProxyId = None
-    AppState.maskRevealed.clear()
+    AppState.maskOverrides.clear()
+    // Reset the presenter baseline to the safe default on Clear.
+    // The invariant: post-Clear, the next capture loads with
+    // everything masked — useful for presenters who hit Clear
+    // immediately before screen-sharing a fresh session.
+    AppState.presenterMaskAll = true
+    PresenterMode.renderButton()
+    PresenterMode.renderChip()
     renderProxyList()
     ProxyControl.callRenderProxyDetail()
   }

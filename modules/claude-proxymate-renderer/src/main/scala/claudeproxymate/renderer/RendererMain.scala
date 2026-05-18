@@ -13,7 +13,7 @@ import claudeproxymate.renderer.proxy.ProxyControl
 import claudeproxymate.renderer.proxy.ProxyInfoPopover
 import claudeproxymate.renderer.proxy.ProxyList
 import claudeproxymate.renderer.search.{ProxyDetailSearchListeners, SearchNavigation}
-import claudeproxymate.renderer.state.AppState
+import claudeproxymate.renderer.state.{AppState, PresenterMode}
 import claudeproxymate.renderer.theme.Theme
 import claudeproxymate.renderer.update.UpdateChecker
 import org.scalajs.dom
@@ -53,7 +53,28 @@ object RendererMain {
     I18n.install()
     ProxyControl.install()
     CopyUtil.install()
+    installPresenterModeClicks()
+    PresenterMode.renderButton()
+    PresenterMode.renderChip()
     Onboarding.showIfNeeded()
+  }
+
+  /** Wire the toolbar button + status chip to PresenterMode.toggle.
+    * Uses document-level delegation rather than direct
+    * `addEventListener` on the elements so the listener survives
+    * any future re-rendering of the proxy bar.
+    */
+  private def installPresenterModeClicks(): Unit = {
+    dom.document.addEventListener("click", { (e: dom.MouseEvent) =>
+      val target = e.target.asInstanceOf[dom.Element]
+      if (target != null) {
+        val hit = target.closest(s"#${HtmlIds.MaskToggleBtn},#${HtmlIds.MaskStateChip}")
+        if (hit != null) {
+          e.preventDefault()
+          PresenterMode.toggle()
+        }
+      }
+    })
   }
 
   private def installKeydownHandler(): Unit = {
@@ -78,6 +99,15 @@ object RendererMain {
         } else if (msgInp != null && dom.document.activeElement == msgInp && AppState.msgSearchQuery.nonEmpty) {
           MessageRenderer.setMsgSearch("")
         }
+      }
+      // Cmd+Shift+M / Ctrl+Shift+M: toggle presenter mode (C3 PR 5).
+      // Some browsers report shifted letters in upper case, others
+      // pass the unshifted key; check both. Doesn't collide with
+      // Electron's Cmd+M ("Minimize") because the shifted variant
+      // is free.
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key == "M" || e.key == "m")) {
+        e.preventDefault()
+        PresenterMode.toggle()
       }
       // Enter / Shift+Enter: navigate search matches.
       // Triggers from either the proxy detail search input (Request /

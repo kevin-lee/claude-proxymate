@@ -81,10 +81,10 @@ object JsonTreeViewer {
     * behaviour correct if the data shape changed under us.
     */
   private def toggleMaskReveal(maskId: String): Unit = {
-    if (AppState.maskRevealed.contains(maskId)) {
-      val _ = AppState.maskRevealed.remove(maskId)
+    if (AppState.maskOverrides.contains(maskId)) {
+      val _ = AppState.maskOverrides.remove(maskId)
     } else {
-      val _ = AppState.maskRevealed.add(maskId)
+      val _ = AppState.maskOverrides.add(maskId)
     }
 
     val swapped = trySwapMaskInPlace(maskId)
@@ -141,10 +141,10 @@ object JsonTreeViewer {
     * matched substring.
     */
   private def toggleTokenReveal(tokenId: String): Unit = {
-    if (AppState.maskRevealed.contains(tokenId)) {
-      val _ = AppState.maskRevealed.remove(tokenId)
+    if (AppState.maskOverrides.contains(tokenId)) {
+      val _ = AppState.maskOverrides.remove(tokenId)
     } else {
-      val _ = AppState.maskRevealed.add(tokenId)
+      val _ = AppState.maskOverrides.add(tokenId)
     }
 
     val swapped = trySwapTokenInPlace(tokenId)
@@ -207,10 +207,10 @@ object JsonTreeViewer {
     * builder + `CorrelationIds.scan` for value lookup.
     */
   private def toggleCorrReveal(corrId: String): Unit = {
-    if (AppState.maskRevealed.contains(corrId)) {
-      val _ = AppState.maskRevealed.remove(corrId)
+    if (AppState.maskOverrides.contains(corrId)) {
+      val _ = AppState.maskOverrides.remove(corrId)
     } else {
-      val _ = AppState.maskRevealed.add(corrId)
+      val _ = AppState.maskOverrides.add(corrId)
     }
 
     val swapped = trySwapCorrInPlace(corrId)

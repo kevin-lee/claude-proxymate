@@ -21,7 +21,7 @@ import scala.scalajs.js
   * [[claudeproxymate.core.SensitiveKeys.isSensitive]] are rendered
   * mask-by-default. The orchestrator passes the localized hidden
   * label; the view consults
-  * [[claudeproxymate.renderer.state.AppState.maskRevealed]] to decide
+  * [[claudeproxymate.renderer.state.AppState.isRevealed]] to decide
   * whether to render the masked placeholder or the original value.
   * Pure: no `I18n` / DOM dependencies.
   */
@@ -45,7 +45,7 @@ object JsonTreeView {
 
   /* Correlation-id mask (C3 3): visually distinct from C3 1/2 because
    * these are identifiers, not credentials. Reveal state still uses
-   * the shared `AppState.maskRevealed` set; ids are namespaced by
+   * the shared `AppState.maskOverrides` set; ids are namespaced by
    * the `corr:` prefix to avoid collision with token / field-name ids.
    */
   val CorrMaskClass: String          = "jt-corr-mask"
@@ -70,7 +70,7 @@ object JsonTreeView {
     * `path` is the stable dot-path identifier used for mask ids
     * (e.g. `$.metadata.user_id`). Stable across re-renders of the
     * same data, so the per-value reveal state in
-    * `AppState.maskRevealed` survives a re-render.
+    * `AppState.maskOverrides` survives a re-render.
     */
   def buildJsonFrag(value: js.Dynamic, depth: Int, trailing: Frag, totalBytes: Int, maskLabel: String, path: String): Frag = {
     if (value == null || js.isUndefined(value)) {
@@ -256,7 +256,7 @@ object JsonTreeView {
     */
   def buildTokenMaskFrag(path: String, offset: Int, raw: String): Frag = {
     val tid = s"$path#$offset"
-    if (AppState.maskRevealed.contains(tid)) {
+    if (AppState.isRevealed(tid)) {
       span(cls := TokenMaskRevealedClass, attr(TokenMaskDataAttr) := tid)(
         jsonEscapeBody(raw),
       )
@@ -274,11 +274,11 @@ object JsonTreeView {
     *
     * Id format: `corr:<json-path>#<offset>`. The `corr:` prefix
     * keeps the namespace disjoint from token-mask ids in the
-    * shared `AppState.maskRevealed` set.
+    * shared `AppState.maskOverrides` set.
     */
   def buildCorrMaskFrag(path: String, offset: Int, raw: String, name: String): Frag = {
     val cid = s"corr:$path#$offset"
-    if (AppState.maskRevealed.contains(cid)) {
+    if (AppState.isRevealed(cid)) {
       span(cls := CorrMaskRevealedClass, attr(CorrMaskDataAttr) := cid)(
         jsonEscapeBody(raw),
       )
@@ -305,7 +305,7 @@ object JsonTreeView {
     depth: Int,
     totalBytes: Int,
   ): Frag = {
-    if (AppState.maskRevealed.contains(path)) {
+    if (AppState.isRevealed(path)) {
       span(cls := MaskRevealedClass, attr(MaskDataAttr) := path)(
         buildJsonFrag(value, depth + 1, frag(), totalBytes, maskLabel, path),
       )

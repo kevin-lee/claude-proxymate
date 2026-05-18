@@ -175,6 +175,11 @@ object IndexHtmlGenerator {
           span(cls := "ps-dot"),
           span(id := HtmlIds.ProxyStatusText, i18n := "proxy.stopped")(tx(m, "proxy.stopped")),
         ),
+        span(
+          id   := HtmlIds.MaskStateChip,
+          cls  := "mask-state-chip",
+          i18n := "mask.chipMaskAll",
+        )(tx(m, "mask.chipMaskAll")),
       ),
       div(id := HtmlIds.ProxyCmdBox, cls := "proxy-bar-cmd")(
         span(id := HtmlIds.ProxyCmdText, style := "color:var(--dim)", i18n := "proxy.startFirst")(
@@ -198,6 +203,13 @@ object IndexHtmlGenerator {
           cls := "btn btn-copy proxy-bar-btn-clear",
           i18n := "proxy.clear",
         )(tx(m, "proxy.clear")),
+        button(
+          id    := HtmlIds.MaskToggleBtn,
+          cls   := "btn btn-copy proxy-bar-btn-mask",
+          i18n  := "mask.toggleRevealAll",
+          attr("title") := tx(m, "mask.toggleRevealAll"),
+          attr("aria-label") := tx(m, "mask.toggleRevealAll"),
+        )(tx(m, "mask.toggleRevealAll")),
         button(
           id := HtmlIds.ProxyInfoBtn,
           cls := "proxy-bar-info",
