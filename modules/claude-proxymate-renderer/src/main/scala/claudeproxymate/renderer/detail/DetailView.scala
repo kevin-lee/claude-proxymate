@@ -153,7 +153,16 @@ object DetailView {
       locally { val _ = dom.window.requestAnimationFrame { _ =>
         val scrollEl = detail.querySelector("[style*=\"overflow:auto\"]")
         if (scrollEl != null) scrollEl.asInstanceOf[dom.html.Element].scrollTop = prevAnalysisScroll
-        val activeSection = detail.querySelector(s"""[data-mech-key="$mechFilter"]""")
+        /* `mechFilter` is currently drawn from a closed alphabet
+         * (`cm`, `sc_<i>`, `sk_<i>`, `sa`, `st`, `mc_<i>` — `<i>` an
+         * integer), none of which contain CSS metacharacters. Escape
+         * defensively anyway so a future mechanism key carrying a
+         * `"`, `\`, or other special char can't break the selector
+         * (which would silently fail to scroll/highlight). Mirrors the
+         * CSS.escape usage already in `JsonTreeViewer`.
+         */
+        val escapedKey    = js.Dynamic.global.CSS.applyDynamic("escape")(mechFilter).asInstanceOf[String]
+        val activeSection = detail.querySelector(s"""[data-mech-key="$escapedKey"]""")
         if (activeSection != null) {
           locally { val _ = activeSection.classList.add("mech-section-active") }
           locally { val _ = activeSection.asInstanceOf[js.Dynamic].scrollIntoView(
