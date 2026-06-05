@@ -1,6 +1,6 @@
 package claudeproxymate.electron
 
-import claudeproxymate.core.{IpcChannels, UrlScheme}
+import claudeproxymate.core.{IpcChannels, JsonLineProtocol, ProxyEvent, UrlScheme}
 import claudeproxymate.electron.facades._
 
 import java.util.concurrent.atomic.AtomicReference
@@ -40,7 +40,7 @@ object IpcHandlers {
     IpcMain.handle(
       IpcChannels.ProxyStatus,
       { (_: js.Dynamic, _: js.Dynamic) =>
-        getStatus()
+        getStatus
       }: js.Function2[js.Dynamic, js.Dynamic, js.Any]
     )
 
@@ -128,7 +128,7 @@ object IpcHandlers {
             .on(
               "data",
               { (chunk: js.Any) =>
-                val text    = chunk.toString()
+                val text    = chunk.toString
                 val updated = state.updateAndGet(s => s.copy(buffer = s.buffer + text))
                 val parts   = updated.buffer.split("\n", -1)
                 state.updateAndGet(s => s.copy(buffer = parts.last)): Unit
@@ -159,28 +159,49 @@ object IpcHandlers {
     }
   }
 
-  /** Parse a JSON line from the native proxy and forward to the renderer. */
+  /** Validate a JSON line from the native proxy and forward the
+    * renderer-facing events.
+    *
+    * The line is decoded through [[JsonLineProtocol.decode]] — the
+    * exact typed counterpart of the proxy's `EventEmitter.encode` — so
+    * a malformed line or an unexpected event shape produces a `Left`
+    * that is logged rather than silently swallowed, and the
+    * event-type dispatch is an exhaustive match on the `ProxyEvent`
+    * ADT (a new event case becomes a compile-time prompt here).
+    *
+    * On success we forward the original `JSON.parse`d `js.Dynamic`
+    * payload over IPC — the renderer consumes captures as
+    * `js.Dynamic`, so re-encoding the typed ADT back to JS would add
+    * a per-event JSON round-trip for no benefit. The typed `event`
+    * drives channel selection; the raw dynamic carries the payload.
+    */
   private def processProxyEvent(
     line: String,
     getMainWindow: () => Option[BrowserWindow],
   ): Unit = {
-    try {
-      val parsed    = JSON.parse(line)
-      val eventType = parsed.selectDynamic("type").asInstanceOf[String]
-
-      getMainWindow().foreach { win =>
-        if (!win.isDestroyed()) {
-          eventType match {
-            case "request_captured" =>
-              win.webContents.send(IpcChannels.ProxyRequest, parsed.selectDynamic("request"))
-            case "response_captured" =>
-              win.webContents.send(IpcChannels.ProxyResponse, parsed.selectDynamic("response"))
-            case _ => () // proxy_started, proxy_stopped, proxy_error — internal events
-          }
-        } else ()
-      }
-    } catch {
-      case _: Throwable => () // ignore malformed lines
+    JsonLineProtocol.decode(line) match {
+      case Left(err) =>
+        /* No longer silent: a malformed or unexpected line is logged.
+         * The proxy's stdout is the IPC protocol channel (see
+         * `EventEmitter`); only encoded `ProxyEvent`s appear there, so
+         * this warns only on genuine drift, never on benign output. */
+        val _ = js.Dynamic.global.console.warn("Dropped proxy event line:", err)
+      case Right(event) =>
+        getMainWindow().foreach { win =>
+          if (!win.isDestroyed()) {
+            // Forced only for the two renderer-facing cases; internal
+            // events skip the second parse.
+            lazy val parsed = JSON.parse(line)
+            event match {
+              case _: ProxyEvent.RequestCaptured =>
+                win.webContents.send(IpcChannels.ProxyRequest, parsed.selectDynamic("request"))
+              case _: ProxyEvent.ResponseCaptured =>
+                win.webContents.send(IpcChannels.ProxyResponse, parsed.selectDynamic("response"))
+              case ProxyEvent.ProxyStarted(_) | ProxyEvent.ProxyStopped | ProxyEvent.ProxyError(_) =>
+                () // internal events — not forwarded to the renderer
+            }
+          } else ()
+        }
     }
   }
 
@@ -189,7 +210,7 @@ object IpcHandlers {
     js.Dynamic.literal(stopped = true)
   }
 
-  private def getStatus(): js.Dynamic = {
+  private def getStatus: js.Dynamic = {
     val current = state.get()
     current.process match {
       case Some(child) if !child.killed =>
