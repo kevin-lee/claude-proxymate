@@ -108,7 +108,21 @@ object CurlHttpClient {
             respData(j) = !(buf + j)
           }
 
-          parseResponse(respData)
+          /* Ask libcurl for the parsed status code rather than
+           * scraping it from the raw status line. libcurl parses the
+           * status line internally and is robust across the
+           * HTTP/1.0/1.1/2/3 shape variation (`HTTP/2 200` with no
+           * reason phrase vs `HTTP/1.1 200 OK`) that made a manual
+           * split brittle. Read while `curl` is still live (before
+           * `curl_easy_cleanup` in the caller's finally). A non-zero
+           * getinfo result or a 0 code falls through to 500 in
+           * `parseResponse` via `Status.fromInt(...).getOrElse(...)`. */
+          val codePtr: Ptr[CLong] = alloc[CLong]()
+          val statusCode: Int =
+            if (LibCurl.curl_easy_getinfo(curl, CurlInfo.ResponseCode, codePtr) == 0) (!codePtr).toInt
+            else 0
+
+          parseResponse(respData, statusCode)
         }
       } finally {
         stdio.fclose(tmpFile): Unit
@@ -116,8 +130,16 @@ object CurlHttpClient {
     }
   }
 
-  /** Parse raw HTTP response (headers + body) from curl -i style output. */
-  private def parseResponse(data: Array[Byte]): Response[IO] = {
+  /** Parse a curl `-i`-style response buffer (status line + headers +
+    * body) into an http4s `Response`.
+    *
+    * `statusCode` is supplied by the caller from
+    * `CURLINFO_RESPONSE_CODE` (libcurl's own parse), so the raw
+    * status line (`lines.head`) is skipped here — only the header
+    * lines are parsed. An unknown / 0 code maps to 500 via
+    * `Status.fromInt(...).getOrElse(...)`.
+    */
+  private def parseResponse(data: Array[Byte], statusCode: Int): Response[IO] = {
     val str    = new String(data, "ISO-8859-1")
     val sepIdx = str.indexOf("\r\n\r\n")
     if (sepIdx < 0) {
@@ -127,13 +149,10 @@ object CurlHttpClient {
       val bodyStart  = sepIdx + 4
       val bodyBytes  = java.util.Arrays.copyOfRange(data, bodyStart, data.length)
 
-      val lines = headerPart.split("\r\n")
+      val status = Status.fromInt(statusCode).getOrElse(Status.InternalServerError)
 
-      // Status line: "HTTP/2 200" or "HTTP/1.1 200 OK"
-      val statusCode = lines.head.split("\\s+", 3)(1).toInt
-      val status     = Status.fromInt(statusCode).getOrElse(Status.InternalServerError)
-
-      // Response headers
+      // `lines.tail` skips the status line; parse only header lines.
+      val lines       = headerPart.split("\r\n")
       val respHeaders = lines.tail.flatMap { line =>
         val colonIdx = line.indexOf(':')
         if (colonIdx > 0) {
