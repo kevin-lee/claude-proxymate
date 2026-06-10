@@ -32,16 +32,23 @@ object TokenPatterns {
   /** Pattern table. Order matters when prefixes overlap: longer /
     * more specific patterns are listed first so `sk-ant-...` is
     * preferred over the generic OpenAI `sk-...`.
+    *
+    * Quantifiers are open-ended minimums (`{n,}`) even for formats
+    * whose canonical length is fixed (GitHub PAT, AWS, Google). A
+    * fixed `{n}` matches only a prefix of a longer-than-expected
+    * token, leaving its tail outside the masked span — exposed on
+    * screen and in copies. Greedy minimums fail closed: the whole
+    * run is masked instead.
     */
   val Patterns: List[Pattern] = List(
     Pattern("anthropic-api-key", raw"sk-ant-[a-zA-Z0-9_\-]{20,}".r),
     Pattern("jwt", raw"eyJ[a-zA-Z0-9_\-]+\.eyJ[a-zA-Z0-9_\-]+\.[a-zA-Z0-9_\-]+".r),
-    Pattern("github-pat", raw"ghp_[a-zA-Z0-9]{36}".r),
+    Pattern("github-pat", raw"ghp_[a-zA-Z0-9]{36,}".r),
     Pattern("github-fine-grained-pat", raw"github_pat_[a-zA-Z0-9_]{60,}".r),
-    Pattern("github-oauth", raw"gho_[a-zA-Z0-9]{36}".r),
-    Pattern("aws-access-key", raw"AKIA[A-Z0-9]{16}".r),
-    Pattern("aws-temp-key", raw"ASIA[A-Z0-9]{16}".r),
-    Pattern("google-api-key", raw"AIza[a-zA-Z0-9_\-]{35}".r),
+    Pattern("github-oauth", raw"gho_[a-zA-Z0-9]{36,}".r),
+    Pattern("aws-access-key", raw"AKIA[A-Z0-9]{16,}".r),
+    Pattern("aws-temp-key", raw"ASIA[A-Z0-9]{16,}".r),
+    Pattern("google-api-key", raw"AIza[a-zA-Z0-9_\-]{35,}".r),
     Pattern("stripe-live-secret", raw"sk_live_[a-zA-Z0-9]{24,}".r),
     Pattern("bearer", raw"Bearer [a-zA-Z0-9._\-+/=]{16,}".r),
     Pattern("openai-api-key", raw"sk-[a-zA-Z0-9]{20,}".r),

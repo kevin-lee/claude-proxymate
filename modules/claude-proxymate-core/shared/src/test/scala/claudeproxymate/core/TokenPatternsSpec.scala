@@ -15,6 +15,7 @@ object TokenPatternsSpec extends Properties {
     example("AWS access key (AKIA…) matches", testAwsAkia),
     example("AWS temp key (ASIA…) matches", testAwsAsia),
     example("Google API key (AIza…) matches", testGoogle),
+    example("Google API key longer than canonical 39 chars is covered whole", testGoogleOverlong),
     example("Stripe sk_live_ matches", testStripe),
     example("Bearer header form matches", testBearer),
     example("OpenAI sk- matches when not preceded by sk-ant-", testOpenAi),
@@ -35,65 +36,74 @@ object TokenPatternsSpec extends Properties {
     example("fingerprint empty: ***", testFingerprintEmpty),
     // Property
     property("random alphanumeric of length 50 with no recognized prefix produces zero matches", testRandomNoMatch),
+    property("fixed-length tokens extended with charset chars are covered whole (no tail leak)", testOverlongTokenFullyCovered),
   )
 
   // ---- helpers -----------------------------------------------------------
 
-  private def hasMatch(s: String, name: String): Boolean =
-    TokenPatterns.scan(s).exists(_.name == name)
+  /* Full-coverage assertion: the scan must yield a match of the given
+   * name spanning the entire input. A prefix-only match would leave
+   * the token's tail outside the masked span (exposed on screen and
+   * in copies). */
+  private def coversWhole(s: String, name: String): Result = {
+    val ms = TokenPatterns.scan(s)
+    Result.assert(ms.exists(m => m.name == name && m.start == 0 && m.end == s.length))
+      .log(s"expected $name covering [0, ${s.length}) in: $s, got: $ms")
+  }
+
+  /* The substring actually matched for the given pattern name, if any
+   * — lets embedded-token tests pin the exact matched slice. */
+  private def matchedSlice(s: String, name: String): Option[String] =
+    TokenPatterns.scan(s).find(_.name == name).map(m => s.substring(m.start, m.end))
 
   // ---- positive cases ----------------------------------------------------
 
   def testAnthropic: Result = {
-    val s = "use sk-ant-abcdefghijklmnopqrstuvwxyz12345 to authenticate"
-    Result.assert(hasMatch(s, "anthropic-api-key"))
-      .log(s"expected anthropic-api-key match in: $s")
+    val token = "sk-ant-abcdefghijklmnopqrstuvwxyz12345"
+    matchedSlice(s"use $token to authenticate", "anthropic-api-key") ==== Some(token)
   }
 
   def testJwt: Result = {
-    val s = "token: eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjMifQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c rest"
-    Result.assert(hasMatch(s, "jwt"))
-      .log(s"expected jwt match in: $s")
+    val token = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjMifQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+    matchedSlice(s"token: $token rest", "jwt") ==== Some(token)
   }
 
   def testGhPat: Result =
-    Result.assert(hasMatch("ghp_abcdefghijklmnopqrstuvwxyz0123456789", "github-pat"))
-      .log("expected github-pat")
+    coversWhole("ghp_abcdefghijklmnopqrstuvwxyz0123456789", "github-pat")
 
-  def testGhFineGrained: Result = {
-    val s = "github_pat_" + "A" * 70
-    Result.assert(hasMatch(s, "github-fine-grained-pat"))
-      .log(s"expected github-fine-grained-pat in: $s")
-  }
+  def testGhFineGrained: Result =
+    coversWhole("github_pat_" + "A" * 70, "github-fine-grained-pat")
 
   def testGhOauth: Result =
-    Result.assert(hasMatch("gho_abcdefghijklmnopqrstuvwxyz0123456789", "github-oauth"))
-      .log("expected github-oauth")
+    coversWhole("gho_abcdefghijklmnopqrstuvwxyz0123456789", "github-oauth")
 
   def testAwsAkia: Result =
-    Result.assert(hasMatch("AKIA0123456789ABCDEF", "aws-access-key"))
-      .log("expected aws-access-key")
+    coversWhole("AKIA0123456789ABCDEF", "aws-access-key")
 
   def testAwsAsia: Result =
-    Result.assert(hasMatch("ASIA0123456789ABCDEF", "aws-temp-key"))
-      .log("expected aws-temp-key")
+    coversWhole("ASIA0123456789ABCDEF", "aws-temp-key")
 
   def testGoogle: Result =
-    Result.assert(hasMatch("AIzaSyAbCdEfGhIjKlMnOpQrStUvWxYz01234567", "google-api-key"))
-      .log("expected google-api-key")
+    coversWhole("AIzaSyAbCdEfGhIjKlMnOpQrStUvWxYz0123456", "google-api-key")
+
+  /* Regression: a token one char longer than the canonical 39-char
+   * Google key must be masked whole, not split into a 39-char match
+   * plus an exposed trailing char (was rendered as `AIza…3456` + `7`
+   * and copied as `***7`). */
+  def testGoogleOverlong: Result =
+    coversWhole("AIzaSyAbCdEfGhIjKlMnOpQrStUvWxYz01234567", "google-api-key")
 
   def testStripe: Result =
-    Result.assert(hasMatch("sk_live_abcdefghijklmnopqrstuvwxyz", "stripe-live-secret"))
-      .log("expected stripe-live-secret")
+    coversWhole("sk_live_abcdefghijklmnopqrstuvwxyz", "stripe-live-secret")
 
-  def testBearer: Result =
-    Result.assert(hasMatch("Authorization: Bearer eyJabcdefghijklmno", "bearer"))
-      .log("expected bearer")
+  def testBearer: Result = {
+    val token = "Bearer eyJabcdefghijklmno"
+    matchedSlice(s"Authorization: $token", "bearer") ==== Some(token)
+  }
 
   def testOpenAi: Result = {
-    val s = "OPENAI_API_KEY=sk-abcdefghijklmnopqrstuvwxyz0123456789"
-    Result.assert(hasMatch(s, "openai-api-key"))
-      .log(s"expected openai-api-key in: $s")
+    val token = "sk-abcdefghijklmnopqrstuvwxyz0123456789"
+    matchedSlice(s"OPENAI_API_KEY=$token", "openai-api-key") ==== Some(token)
   }
 
   // ---- negative cases ----------------------------------------------------
@@ -180,4 +190,23 @@ object TokenPatternsSpec extends Properties {
       Result.assert(TokenPatterns.scan(s).isEmpty)
         .log(s"random digit string should not match: $s")
     }
+
+  def testOverlongTokenFullyCovered: Property = {
+    /* Canonical-length tokens for every fixed-length format. */
+    val canonical = List(
+      ("ghp_abcdefghijklmnopqrstuvwxyz0123456789", "github-pat"),
+      ("gho_abcdefghijklmnopqrstuvwxyz0123456789", "github-oauth"),
+      ("AKIA0123456789ABCDEF", "aws-access-key"),
+      ("ASIA0123456789ABCDEF", "aws-temp-key"),
+      ("AIzaSyAbCdEfGhIjKlMnOpQrStUvWxYz0123456", "google-api-key"),
+    )
+    for {
+      /* Upper / digit chars are valid in all of these formats'
+       * charsets ([a-zA-Z0-9], [A-Z0-9], [a-zA-Z0-9_\-]), so the
+       * suffix always extends the token rather than terminating it. */
+      suffix <- Gen.string(Gen.choice1(Gen.upper, Gen.digit), Range.linear(1, 12)).log("suffix")
+    } yield Result.all(
+      canonical.map { case (token, name) => coversWhole(token + suffix, name) }
+    )
+  }
 }
