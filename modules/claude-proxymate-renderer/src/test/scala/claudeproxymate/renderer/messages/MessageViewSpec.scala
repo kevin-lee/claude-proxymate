@@ -44,6 +44,7 @@ object MessageViewSpec extends Properties {
     example("InjectedMsgPart with embedded token is masked", testTokenMaskInInjectedMsgPart),
     example("ToolResultContent.preview with embedded token is masked", testTokenMaskInToolResult),
     example("token id includes the m. namespace prefix", testTokenIdNamespace),
+    example("injected token mask id uses partIdx, not badge uid", testInjTokenIdUsesPartIdx),
     // Correlation-id masking (C3 PR3)
     example("TextContent with msg_… renders a corr-mask span", testCorrMaskInTextContent),
     example("corr-mask in TextContent does not leak the raw id", testCorrMaskNoLeakInTextContent),
@@ -375,6 +376,27 @@ object MessageViewSpec extends Properties {
     val out = renderCards(List(card))
     Result.assert(out.contains("data-token-id=\"m.7.text.0#0\""))
       .log(s"expected `data-token-id=\"m.7.text.0#0\"` in: $out")
+  }
+
+  def testInjTokenIdUsesPartIdx: Result = {
+    /* The badge uid ("u9") is minted from a global counter per parse
+     * and must NOT appear in mask ids — those derive from partIdx so
+     * they're stable across re-parses and reconstructible by Copy. */
+    val card = MsgCard(
+      role      = "user",
+      contents  = Nil,
+      userParts = List(TextMsgPart("x"), InjectedMsgPart("u9", "L", FakeAnthropic, "badge-x")),
+      rawIdx    = 3,
+    )
+    val out = renderCards(List(card))
+    Result.all(
+      List(
+        Result.assert(out.contains("data-token-id=\"m.3.inj.1#0\""))
+          .log(s"expected `data-token-id=\"m.3.inj.1#0\"` in: $out"),
+        Result.assert(!out.contains("data-token-id=\"m.3.inj.u9#0\""))
+          .log(s"uid-based mask id still rendered: $out"),
+      )
+    )
   }
 
   // ── Correlation-id masking (C3 PR3) ───────────────────────────────────

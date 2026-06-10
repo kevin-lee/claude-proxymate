@@ -21,10 +21,10 @@ import org.scalajs.dom
   * `MessageRenderer` are per-id and don't scale here. Scroll
   * position is preserved across the re-render.
   *
-  * Independent of Copy semantics: `MaskedCopy.maskBody` and
-  * `MessageCopy.toPlainText(masked=true)` continue to redact
-  * credentials regardless of presenter mode. Presenter mode is
-  * about what is visible on screen, not what is on the clipboard.
+  * Copy follows presenter mode: `MaskedCopy.maskBody` and
+  * `MessageCopy.toPlainText` are driven by [[AppState.isRevealed]],
+  * so the global baseline (and any per-span overrides) directly
+  * determines what lands on the clipboard — WYSIWYG.
   */
 object PresenterMode {
 

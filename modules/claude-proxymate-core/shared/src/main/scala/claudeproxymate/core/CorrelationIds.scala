@@ -8,9 +8,11 @@ import scala.util.matching.Regex
   * pattern prefix so users can recognize the id type at a glance.
   *
   * Distinct from [[TokenPatterns]]: correlation IDs are NOT
-  * secrets, just verbose identifiers. The mask is informational
-  * compaction, not redaction. Copy paths emit the raw id verbatim
-  * so cross-capture correlation stays usable in pasted output.
+  * secrets, just verbose identifiers — but a full id uniquely
+  * identifies one API request, so copy follows the on-screen mask
+  * state like any other span (masked → `***`, revealed →
+  * verbatim). Reveal the spans before copying when cross-capture
+  * correlation should stay usable in pasted output.
   */
 object CorrelationIds {
 

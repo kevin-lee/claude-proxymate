@@ -4,6 +4,12 @@ import scalatags.Text.all.*
 
 /** A parsed user-text part, ready for rendering. Mirrors
   * [[MessageParser.Part]] but with a pre-assigned UID for injected blocks.
+  *
+  * The `uid` is used for badge DOM ids only (`bb_…` / `bc_…` /
+  * `data-msg-badge-uid`). It is minted from a global counter on every
+  * parse, so it must NOT participate in mask ids — those use the
+  * deterministic `partIdx` so reveal state survives re-parses and the
+  * Copy path can reconstruct the same ids.
   */
 sealed trait MsgPart
 final case class TextMsgPart(content: String) extends MsgPart
@@ -130,7 +136,7 @@ object MessageView {
       val contentClasses =
         if (matched) "badge-expand-content badge-section-hl"
         else "badge-expand-content"
-      val idPrefix = s"m.$cardIdx.inj.$uid"
+      val idPrefix = s"m.$cardIdx.inj.$partIdx"
       div(cls := "msg-injected-row")(
         span(
           id                  := s"bb_$uid",
