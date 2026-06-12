@@ -132,6 +132,54 @@ object MessageRenderer {
     s"b${AppState.badgeUidCounter}"
   }
 
+  /** All messages of the capture: the request's `body.messages` plus,
+    * when the response has already arrived and is an assistant message,
+    * that response appended at the end.
+    *
+    * The request body only carries the conversation up to the user's
+    * latest turn — the reply to it lives on `entry.response.body` and
+    * would otherwise not appear in the Messages tab until the next
+    * request echoes it back as history.
+    *
+    * Non-mutating: appending builds a new array via `concat`, so the
+    * captured request body (shared with the Request tab and Copy paths)
+    * is never modified.
+    */
+  def captureMessages(entry: js.Dynamic): js.Array[js.Dynamic] = {
+    val body = entry.selectDynamic("body")
+    val msgs: js.Array[js.Dynamic] =
+      if (!js.isUndefined(body) && body != null) {
+        val m = body.selectDynamic("messages")
+        if (!js.isUndefined(m) && m != null) m.asInstanceOf[js.Array[js.Dynamic]]
+        else js.Array[js.Dynamic]()
+      } else js.Array[js.Dynamic]()
+
+    responseAssistantMessage(entry) match {
+      case Some(respMsg) => msgs.concat(js.Array(respMsg))
+      case None          => msgs
+    }
+  }
+
+  /** The capture's response body when it parses as an assistant message
+    * (`role == "assistant"` with a `content` field). Error strings,
+    * error objects, and non-message bodies yield `None`.
+    */
+  private def responseAssistantMessage(entry: js.Dynamic): Option[js.Dynamic] = {
+    val resp = entry.selectDynamic("response")
+    val respBody =
+      if (!js.isUndefined(resp) && resp != null) resp.selectDynamic("body")
+      else null
+    if (respBody != null && !js.isUndefined(respBody) && js.typeOf(respBody) == "object") {
+      val role    = respBody.selectDynamic("role")
+      val content = respBody.selectDynamic("content")
+      if (
+        !js.isUndefined(role) && role != null && role.toString == "assistant" &&
+        !js.isUndefined(content) && content != null
+      ) Some(respBody)
+      else None
+    } else None
+  }
+
   /** Visible cards for the active capture, honoring the active
     * filter (`AppState.msgFilter`) and search query
     * (`AppState.msgSearchQuery`). Pure on `entry` (no DOM access)
@@ -142,13 +190,7 @@ object MessageRenderer {
     * when the filter / search yields no matches.
     */
   def buildVisibleCards(entry: js.Dynamic): List[MsgCard] = {
-    val body = entry.selectDynamic("body")
-    val msgs: js.Array[js.Dynamic] =
-      if (!js.isUndefined(body) && body != null) {
-        val m = body.selectDynamic("messages")
-        if (!js.isUndefined(m) && m != null) m.asInstanceOf[js.Array[js.Dynamic]]
-        else js.Array[js.Dynamic]()
-      } else js.Array[js.Dynamic]()
+    val msgs = captureMessages(entry)
 
     if (msgs.length == 0) return Nil
 
@@ -193,13 +235,7 @@ object MessageRenderer {
   }
 
   def renderProxyMessages(entry: js.Dynamic, container: dom.html.Element): Unit = {
-    val body = entry.selectDynamic("body")
-    val msgs: js.Array[js.Dynamic] =
-      if (!js.isUndefined(body) && body != null) {
-        val m = body.selectDynamic("messages")
-        if (!js.isUndefined(m) && m != null) m.asInstanceOf[js.Array[js.Dynamic]]
-        else js.Array[js.Dynamic]()
-      } else js.Array[js.Dynamic]()
+    val msgs = captureMessages(entry)
 
     if (msgs.length == 0) {
       ViewHelpers.setInnerHtml(container, MessageView.buildEmptyFrag(I18n.t("proxy.noMessages")))

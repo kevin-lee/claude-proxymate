@@ -26,9 +26,12 @@ final case class OtherContent(typeName: String) extends MsgContent
   * "user") the parsed user-text parts the orchestrator already produced.
   *
   * `rawIdx` is the position of this message in the raw
-  * `body.messages` array (NOT the filtered view) — used as part of
-  * the stable token-mask id prefix so reveal state survives filter
-  * changes and re-renders.
+  * `body.messages` array, with the capture's response message (when
+  * present) appended one past the end (NOT the filtered view) — used
+  * as part of the stable token-mask id prefix so reveal state
+  * survives filter changes and re-renders. Stable because the request
+  * messages are fixed per capture, so a late-arriving response never
+  * shifts existing indices.
   */
 final case class MsgCard(
   role: String,
