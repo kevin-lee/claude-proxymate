@@ -75,10 +75,10 @@ object MessageView {
     }
     frag(
       div(cls := "msg-filter")(
+        filterBtn("all", filterLabels.all),
         filterBtn("user", filterLabels.user),
         filterBtn("typed", filterLabels.typed),
         filterBtn("assistant", filterLabels.assistant),
-        filterBtn("all", filterLabels.all),
         span(cls := "msg-count", id := msgCountId),
       ),
       div(cls := "msg-search-bar")(

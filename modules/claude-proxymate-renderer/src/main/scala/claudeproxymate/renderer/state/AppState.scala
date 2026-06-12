@@ -13,7 +13,7 @@ object AppState {
   var proxyCaptures: List[js.Dynamic]   = Nil
   var selectedProxyId: Option[Double]   = None
   var proxyDetailTab: String            = "messages"
-  var msgFilter: String                 = "user"
+  var msgFilter: String                 = "all"
   var msgSearchQuery: String            = ""
   var proxyDetailSearch: String         = ""
   var proxyDetailMechFilter: Option[String] = None
