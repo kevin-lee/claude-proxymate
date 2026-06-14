@@ -402,6 +402,75 @@
     .analysis-block.highlight-purple{ border-color: color-mix(in srgb, var(--purple) 45%, transparent); }
     .analysis-block.highlight-orange{ border-color: color-mix(in srgb, var(--orange) 45%, transparent); }
 
+    /* ── Request Anatomy dashboard ── */
+    .anatomy-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 14px;
+      margin: 0 0 12px;
+    }
+    .anatomy-card-title {
+      font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .8px;
+      color: var(--blue);
+      padding-bottom: 7px; margin-bottom: 9px;
+      border-bottom: 1px solid var(--border);
+    }
+    .anatomy-row {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      font-size: 12px; line-height: 1.5; padding: 3px 0;
+    }
+    .anatomy-row .ak {
+      color: var(--dim); flex-shrink: 0;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .anatomy-row .av {
+      color: var(--text); font-weight: 600; text-align: right;
+      font-family: 'SF Mono', 'Consolas', monospace; font-size: 11px;
+      word-break: break-all;
+    }
+    .anatomy-row-strong {
+      margin-top: 4px; padding-top: 7px; border-top: 1px dashed var(--border);
+    }
+    .anatomy-row-strong .ak { color: var(--text); font-weight: 600; }
+    .anatomy-cost { color: var(--yellow); font-weight: 700; font-size: 12px; }
+    .anatomy-dot {
+      width: 9px; height: 9px; border-radius: 2px; flex-shrink: 0; display: inline-block;
+    }
+    .anatomy-bar {
+      display: flex; height: 9px; border-radius: 5px; overflow: hidden; margin: 5px 0;
+      background: color-mix(in srgb, var(--dim) 18%, transparent);
+    }
+    .anatomy-bar > span { height: 100%; }
+    .anatomy-seg { margin-bottom: 9px; }
+    .anatomy-seg:last-child { margin-bottom: 0; }
+    .anatomy-note {
+      font-size: 11px; line-height: 1.5; margin-top: 7px; padding: 7px 9px;
+      border-radius: 5px; color: var(--orange);
+      background: color-mix(in srgb, var(--orange) 10%, transparent);
+      border: 1px solid color-mix(in srgb, var(--orange) 30%, transparent);
+    }
+    .anatomy-anomaly {
+      font-size: 11px; line-height: 1.45; padding: 6px 9px; margin-top: 6px;
+      border-radius: 5px;
+    }
+    .anatomy-anomaly:first-of-type { margin-top: 0; }
+    .anatomy-anomaly-security {
+      color: var(--red); font-weight: 600;
+      background: color-mix(in srgb, var(--red) 10%, transparent);
+      border: 1px solid color-mix(in srgb, var(--red) 35%, transparent);
+    }
+    .anatomy-anomaly-warn {
+      color: var(--orange);
+      background: color-mix(in srgb, var(--orange) 9%, transparent);
+      border: 1px solid color-mix(in srgb, var(--orange) 28%, transparent);
+    }
+    .anatomy-anomaly-info {
+      color: var(--dim);
+      background: color-mix(in srgb, var(--dim) 9%, transparent);
+      border: 1px solid color-mix(in srgb, var(--dim) 24%, transparent);
+    }
+
     /* ── JSON Tree Viewer ── */
     .json-tree-view {
       font-family: 'SF Mono', 'Consolas', monospace;

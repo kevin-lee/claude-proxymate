@@ -1,8 +1,9 @@
 package claudeproxymate.renderer.analysis
 
-import claudeproxymate.core.{ClaudeMdParser, HtmlIds}
+import claudeproxymate.core.{ClaudeMdParser, HtmlIds, RequestAnatomy, SegmentSize}
 import claudeproxymate.renderer.i18n.I18n
 import claudeproxymate.renderer.json.JsonTreeViewer
+import claudeproxymate.renderer.util.JsJsonBridge
 import claudeproxymate.renderer.view.ViewHelpers
 import org.scalajs.dom
 
@@ -55,6 +56,14 @@ object AnalysisRenderer {
       ),
     )
 
+    // Request Anatomy dashboard: prepend the four cards above the existing
+    // mechanism sections inside `.analysis-view`.
+    val analysisViewEl = container.querySelector(".analysis-view").asInstanceOf[dom.html.Element]
+    if (analysisViewEl != null) {
+      val anatomyHtml = buildAnatomyHtml(entry, body)
+      if (anatomyHtml.nonEmpty) analysisViewEl.insertAdjacentHTML("afterbegin", anatomyHtml)
+    }
+
     // Post-render JSON-tree hydration. The view emits `jt-json-block` divs
     // with `data-json="<input>"`; render the live JSON tree into each.
     val jsonBlocks = container.querySelectorAll(s".${AnalysisView.JsonBlockClass}")
@@ -89,6 +98,101 @@ object AnalysisRenderer {
       mcpDesc           = I18n.t("mechDesc.mc.what"),
       searchPlaceholder = I18n.t("analysis.searchPlaceholder"),
       searchClear       = I18n.t("messages.searchClear"),
+    )
+
+  /** Build the Request Anatomy dashboard HTML for the given capture. Returns
+    * empty string when there's no usable body.
+    */
+  private def buildAnatomyHtml(entry: js.Dynamic, body: js.Dynamic): String = {
+    if (js.isUndefined(body) || body == null) return ""
+    val bodyJson = JsJsonBridge.toCirceJsonUnsafe(body)
+
+    val respBody         = readResponseBody(entry)
+    val usage            = if (respBody != null) respBody.selectDynamic("usage") else null
+    val responseCaptured = !js.isUndefined(usage) && usage != null
+    val stopReason       = readStopReason(respBody)
+
+    val anatomy = RequestAnatomy.analyze(bodyJson, responseCaptured, stopReason)
+
+    val reqBytes = {
+      val jsonStr = js.JSON.stringify(body)
+      val encoder = js.Dynamic.newInstance(dom.window.asInstanceOf[js.Dynamic].TextEncoder)()
+      encoder.encode(jsonStr).length.asInstanceOf[Int]
+    }
+    val reqKb = f"${reqBytes / 1024.0}%.1f"
+    val model = anatomy.model.getOrElse("")
+
+    val cost =
+      if (responseCaptured)
+        AnatomyCost.fromUsage(
+          model        = model,
+          reqKb        = reqKb,
+          inputTokens  = usageInt(usage, "input_tokens"),
+          cacheRead    = usageInt(usage, "cache_read_input_tokens"),
+          cacheWrite   = usageInt(usage, "cache_creation_input_tokens"),
+          outputTokens = usageInt(usage, "output_tokens"),
+        )
+      else
+        AnatomyCost.estimateOnly(model, reqKb, RequestAnatomy.estTokens(reqBytes))
+
+    val labels    = buildAnatomyLabels()
+    val segments  = resolveSegments(anatomy.segments)
+    val inventory = anatomy.inventory.map(r => InventoryDisplay(I18n.t(r.label), r.count, r.estTokens))
+    val anomalies = anatomy.anomalies.map(a => AnomalyDisplay(a.kind, I18n.t(a.key, a.params)))
+
+    AnatomyView.buildFrag(cost, anatomy, segments, inventory, anomalies, labels).render
+  }
+
+  private def resolveSegments(segments: List[SegmentSize]): List[SegmentRow] = {
+    val total = segments.map(_.estTokens).sum
+    segments.map { s =>
+      val pct = if (total > 0) math.round(s.estTokens.toDouble / total * 100).toInt else 0
+      SegmentRow(I18n.t(s.label), s.estTokens, pct)
+    }
+  }
+
+  private def readResponseBody(entry: js.Dynamic): js.Dynamic = {
+    val resp = entry.selectDynamic("response")
+    if (js.isUndefined(resp) || resp == null) null
+    else {
+      val rb = resp.selectDynamic("body")
+      if (js.isUndefined(rb) || rb == null) null else rb
+    }
+  }
+
+  private def readStopReason(respBody: js.Dynamic): Option[String] = {
+    if (respBody == null) None
+    else {
+      val sr = respBody.selectDynamic("stop_reason")
+      if (js.isUndefined(sr) || sr == null) None else Some(sr.toString)
+    }
+  }
+
+  private def usageInt(usage: js.Dynamic, name: String): Int = {
+    val v = usage.selectDynamic(name)
+    if (!js.isUndefined(v) && v != null) try v.asInstanceOf[Int]
+    catch { case _: Throwable => 0 }
+    else 0
+  }
+
+  private def buildAnatomyLabels(): AnatomyLabels =
+    AnatomyLabels(
+      costTitle        = I18n.t("anatomy.costTitle"),
+      attributionTitle = I18n.t("anatomy.attributionTitle"),
+      structureTitle   = I18n.t("anatomy.structureTitle"),
+      inventoryTitle   = I18n.t("anatomy.inventoryTitle"),
+      anomaliesTitle   = I18n.t("anatomy.anomaliesTitle"),
+      estimatedTag     = I18n.t("anatomy.estimatedTag"),
+      noResponseNote   = I18n.t("anatomy.noResponseNote"),
+      lblMessages      = I18n.t("anatomy.lblMessages"),
+      lblTurns         = I18n.t("anatomy.lblTurns"),
+      lblSystemBlocks  = I18n.t("anatomy.lblSystemBlocks"),
+      lblTools         = I18n.t("anatomy.lblTools"),
+      lblToolUse       = I18n.t("anatomy.lblToolUse"),
+      lblToolResult    = I18n.t("anatomy.lblToolResult"),
+      lblImages        = I18n.t("anatomy.lblImages"),
+      lblThinking      = I18n.t("anatomy.lblThinking"),
+      lblStream        = I18n.t("anatomy.lblStream"),
     )
 
   private def readModelName(body: js.Dynamic): Option[String] = {
