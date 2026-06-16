@@ -6,6 +6,12 @@ object HtmlIds {
   val OnboardModal: String    = "onboardModal"
   val OnboardCloseBtn: String = "onboardCloseBtn"
 
+  // ── Onboarding Carousel ──
+  val OnboardTrack: String = "onboardTrack"
+  val OnboardDots: String  = "onboardDots"
+  val OnboardPrev: String  = "onboardPrev"
+  val OnboardNext: String  = "onboardNext"
+
   // ── Header ──
   val BuildVer: String       = "buildVer"
   val UpdateBadge: String    = "updateBadge"

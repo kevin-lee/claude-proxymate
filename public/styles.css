@@ -673,7 +673,7 @@
     }
     .onboard-card {
       background: var(--bg1); border: 1px solid var(--border);
-      border-radius: 16px; padding: 36px 40px; max-width: 480px; width: 90%;
+      border-radius: 16px; padding: 28px 36px; max-width: 680px; width: 90%;
     }
     .onboard-title { font-size: 1.3rem; font-weight: 700; margin-bottom: 8px; }
     .onboard-sub { color: var(--fg2, var(--dim)); margin-bottom: 24px; font-size: .9rem; }
@@ -689,12 +689,64 @@
       user-select: all; cursor: text;
     }
     .onboard-note { font-size: .8rem; color: var(--fg2, var(--dim)); margin-bottom: 20px; }
-    .onboard-btn {
-      width: 100%; padding: 12px; border-radius: 8px;
-      background: var(--accent, var(--blue)); color: #fff; border: none;
-      font-size: 1rem; font-weight: 600; cursor: pointer;
+
+    /* ── Onboarding Carousel ──────────────────────────────────────────── */
+    .onboard-carousel { margin-bottom: 16px; }
+    .onboard-viewport {
+      position: relative; overflow: hidden;
+      height: 400px; /* fixed = tallest slide (1432x972 @ ~640w -> ~434h, capped) */
+      border: 1px solid var(--border); border-radius: 10px;
+      background: var(--bg2, var(--sidebar));
     }
-    .onboard-btn:hover { opacity: .9; }
+    .onboard-track {
+      display: flex; height: 100%;
+      transition: transform .32s ease;
+      will-change: transform;
+    }
+    .onboard-slide {
+      flex: 0 0 100%; height: 100%; box-sizing: border-box;
+      display: flex; align-items: center; justify-content: center;
+      padding: 16px;
+    }
+    .onboard-img {
+      max-width: 100%; max-height: 100%;
+      object-fit: contain; border-radius: 6px; display: block;
+    }
+    .onboard-slide.onboard-slide-text {
+      flex-direction: column; align-items: flex-start; justify-content: center; gap: 12px;
+    }
+    .onboard-s3-title { font-size: 1.05rem; font-weight: 700; }
+    .onboard-s3-body { font-size: .9rem; line-height: 1.6; }
+    .onboard-nav {
+      display: grid; grid-template-columns: 1fr auto 1fr;
+      align-items: center; gap: 14px; margin-top: 12px;
+    }
+    .onboard-nav > .onboard-arrow:first-child { justify-self: start; }
+    .onboard-nav-right { display: flex; align-items: center; justify-self: end; }
+    .onboard-arrow {
+      background: none; border: 1px solid var(--border); color: var(--text);
+      border-radius: 6px; width: 30px; height: 30px; line-height: 1;
+      font-size: 1.1rem; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all .15s;
+    }
+    .onboard-arrow:hover { background: var(--bg2, var(--sidebar)); }
+    .onboard-arrow.is-hidden { visibility: hidden; }
+    /* In the right nav cell, next-arrow and pill are mutually exclusive — fully remove the hidden one. */
+    .onboard-nav-right .is-hidden { display: none; }
+    .onboard-btn-pill {
+      background: var(--accent, var(--blue)); color: #fff; border: none;
+      border-radius: 8px; padding: 8px 16px;
+      font-size: .9rem; font-weight: 600; cursor: pointer;
+      white-space: nowrap; transition: opacity .15s;
+    }
+    .onboard-btn-pill:hover { opacity: .9; }
+    .onboard-dots { display: flex; gap: 8px; align-items: center; }
+    .onboard-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--border); cursor: pointer; transition: all .15s;
+    }
+    .onboard-dot.active { background: var(--accent, var(--blue)); transform: scale(1.25); }
 
     /* ── Dark Theme (Atom One Dark) ─────────────────────────────────────── */
     [data-theme="dark"] {

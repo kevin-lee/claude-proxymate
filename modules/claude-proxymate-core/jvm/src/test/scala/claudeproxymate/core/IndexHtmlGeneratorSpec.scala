@@ -8,6 +8,9 @@ object IndexHtmlGeneratorSpec extends Properties {
   override def tests: List[Test] = List(
     example("no inline event handler attributes are emitted", testNoInlineEventHandlers),
     example("onboard close button has the OnboardCloseBtn id", testOnboardCloseBtnId),
+    example("onboard carousel elements have their ids", testOnboardCarouselElements),
+    example("onboard slides reference the getting-started screenshots", testOnboardSlideImages),
+    example("onboard dots carry their data-onboard-slide attributes", testOnboardDotsDataAttr),
     example("proxy cmd copy button has the ProxyCmdCopyBtn id", testProxyCmdCopyBtnId),
     example("proxy clear button has the ProxyClearBtn id", testProxyClearBtnId),
     example("copy detail button has the CopyDetailBtn id", testCopyDetailBtnId),
@@ -23,9 +26,13 @@ object IndexHtmlGeneratorSpec extends Properties {
   private val sampleLocale: Map[String, String] = Map(
     "onboard.title"          -> "title",
     "onboard.sub"            -> "sub",
-    "onboard.step1"          -> "step1",
-    "onboard.step2"          -> "step2",
-    "onboard.step3"          -> "step3",
+    "onboard.s3.title"       -> "s3title",
+    "onboard.s3.body"        -> "s3body",
+    "onboard.s3.after"       -> "s3after",
+    "onboard.imgAlt1"        -> "imgAlt1",
+    "onboard.imgAlt2"        -> "imgAlt2",
+    "onboard.prev"           -> "prev",
+    "onboard.next"           -> "next",
     "onboard.note"           -> "note",
     "onboard.btn"            -> "btn",
     "header.logoSub"         -> "Proxy",
@@ -74,6 +81,30 @@ object IndexHtmlGeneratorSpec extends Properties {
   def testOnboardCloseBtnId: Result =
     Result.assert(rendered.contains(s"""id="${HtmlIds.OnboardCloseBtn}""""))
       .log(s"`id=\"${HtmlIds.OnboardCloseBtn}\"` missing from generated HTML")
+
+  def testOnboardCarouselElements: Result =
+    Result.all(
+      List(HtmlIds.OnboardTrack, HtmlIds.OnboardDots, HtmlIds.OnboardPrev, HtmlIds.OnboardNext).map { id =>
+        Result.assert(rendered.contains(s"""id="$id""""))
+          .log(s"`id=\"$id\"` missing from generated HTML")
+      }
+    )
+
+  def testOnboardSlideImages: Result =
+    Result.all(
+      List("getting-started-01.png", "getting-started-02.png").map { img =>
+        Result.assert(rendered.contains(img))
+          .log(s"`$img` missing from generated HTML")
+      }
+    )
+
+  def testOnboardDotsDataAttr: Result =
+    Result.all(
+      List("0", "1", "2").map { n =>
+        Result.assert(rendered.contains(s"""data-onboard-slide="$n""""))
+          .log(s"`data-onboard-slide=\"$n\"` missing from generated HTML")
+      }
+    )
 
   def testProxyCmdCopyBtnId: Result =
     Result.assert(rendered.contains(s"""id="${HtmlIds.ProxyCmdCopyBtn}""""))

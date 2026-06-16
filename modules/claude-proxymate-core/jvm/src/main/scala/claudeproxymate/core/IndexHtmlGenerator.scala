@@ -13,9 +13,12 @@ import scalatags.Text.tags2.{title as titleTag}
   */
 object IndexHtmlGenerator {
 
-  private val i18n     = attr("data-i18n")
-  private val i18nHtml = attr("data-i18n-html")
-  private val dataDtab = attr("data-dtab")
+  private val i18n             = attr("data-i18n")
+  private val i18nHtml         = attr("data-i18n-html")
+  private val i18nAlt          = attr("data-i18n-alt")
+  private val i18nTitle        = attr("data-i18n-title")
+  private val dataDtab         = attr("data-dtab")
+  private val dataOnboardSlide = attr("data-onboard-slide")
 
   /** Strict Content-Security-Policy applied via `<meta http-equiv>`.
     *
@@ -73,16 +76,72 @@ object IndexHtmlGenerator {
       div(cls := "onboard-card")(
         div(cls := "onboard-title", i18n := "onboard.title")(tx(m, "onboard.title")),
         div(cls := "onboard-sub", i18n := "onboard.sub")(tx(m, "onboard.sub")),
-        ol(cls := "onboard-steps")(
-          li(i18nHtml := "onboard.step1")(raw(tx(m, "onboard.step1"))),
-          li(
-            span(i18nHtml := "onboard.step2")(raw(tx(m, "onboard.step2"))),
-            code(cls := "onboard-cmd")("ANTHROPIC_BASE_URL=http://localhost:8888 claude"),
+        div(cls := "onboard-carousel")(
+          div(cls := "onboard-viewport")(
+            div(id := HtmlIds.OnboardTrack, cls := "onboard-track")(
+              // Slide 0 — Start Proxy screenshot (image-only)
+              div(cls := "onboard-slide")(
+                img(
+                  cls     := "onboard-img",
+                  src     := "../assets/getting-started/getting-started-01.png",
+                  i18nAlt := "onboard.imgAlt1",
+                  alt     := tx(m, "onboard.imgAlt1"),
+                ),
+              ),
+              // Slide 1 — Copy command screenshot (image-only)
+              div(cls := "onboard-slide")(
+                img(
+                  cls     := "onboard-img",
+                  src     := "../assets/getting-started/getting-started-02.png",
+                  i18nAlt := "onboard.imgAlt2",
+                  alt     := tx(m, "onboard.imgAlt2"),
+                ),
+              ),
+              // Slide 2 — instructions (text)
+              div(cls := "onboard-slide onboard-slide-text")(
+                div(cls := "onboard-s3-title", i18n := "onboard.s3.title")(tx(m, "onboard.s3.title")),
+                div(cls := "onboard-s3-body")(
+                  span(i18n := "onboard.s3.body")(tx(m, "onboard.s3.body")),
+                  code(cls := "onboard-cmd")("ANTHROPIC_BASE_URL=http://localhost:8888 claude"),
+                  span(i18nHtml := "onboard.s3.after")(raw(tx(m, "onboard.s3.after"))),
+                ),
+              ),
+            ),
           ),
-          li(i18nHtml := "onboard.step3")(raw(tx(m, "onboard.step3"))),
+          div(cls := "onboard-nav")(
+            button(
+              id        := HtmlIds.OnboardPrev,
+              cls       := "onboard-arrow",
+              attr("aria-label") := tx(m, "onboard.prev"),
+              i18nTitle := "onboard.prev",
+              attr("title")      := tx(m, "onboard.prev"),
+            )("‹"),
+            div(id := HtmlIds.OnboardDots, cls := "onboard-dots")(
+              (0 until 3).map { i =>
+                span(
+                  cls              := (if (i == 0) "onboard-dot active" else "onboard-dot"),
+                  dataOnboardSlide := i.toString,
+                )
+              },
+            ),
+            div(cls := "onboard-nav-right")(
+              button(
+                id        := HtmlIds.OnboardNext,
+                cls       := "onboard-arrow",
+                attr("aria-label") := tx(m, "onboard.next"),
+                i18nTitle := "onboard.next",
+                attr("title")      := tx(m, "onboard.next"),
+              )("›"),
+              // Shown only on the last slide (toggled by Onboarding.render); replaces the › arrow there.
+              button(
+                id   := HtmlIds.OnboardCloseBtn,
+                cls  := "onboard-btn-pill is-hidden",
+                i18n := "onboard.btn",
+              )(tx(m, "onboard.btn")),
+            ),
+          ),
         ),
         div(cls := "onboard-note", i18n := "onboard.note")(tx(m, "onboard.note")),
-        button(id := HtmlIds.OnboardCloseBtn, cls := "onboard-btn", i18n := "onboard.btn")(tx(m, "onboard.btn")),
       ),
     )
 
