@@ -8,5 +8,8 @@ package-lock.json
 /package.json
 claude-proxymate
 
-build/
+# electron-builder buildResources dir: inputs, not build output. Track the
+# entitlements; ignore anything generated into it.
+build/*
+!build/entitlements.mac.plist
 release/

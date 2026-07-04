@@ -83,9 +83,15 @@ jobs:
       # open; users must right-click → Open (see README "Install"). To sign +
       # notarize once you have a Developer ID: enroll in the Apple Developer
       # Program, add the CSC_* and APPLE_* repo secrets, uncomment the env keys
-      # below, and add hardenedRuntime/entitlements/"notarize": true to the mac
-      # block in project/package.json.template (the source of the generated
-      # electron-app/package.json).
+      # below, and flip "notarize" to true in project/package.json.template
+      # (hardenedRuntime + entitlements are already configured there).
+      #
+      # The template's mac.target deliberately has NO "arch" list: an explicit
+      # arch list in config overrides the CLI --arm64/--x64 flag, which made
+      # each runner cross-build BOTH arches. The x64 DMG built on the arm64
+      # runner contained an arm64 native proxy binary (broken on Intel), and
+      # the duplicate filenames across artifacts corrupted the merged release
+      # assets (v0.1.0). Keep arch selection on the CLI flag only.
       - name: Package with electron-builder
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"   # don't attempt signing without a cert
@@ -96,11 +102,36 @@ jobs:
 #          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: cd electron-app && npx electron-builder --mac --${{ matrix.arch }}
 
+      # Guard against the two failure modes that broke v0.1.0: a runner
+      # building more than its own arch, and a DMG whose bundled native proxy
+      # binary doesn't match the DMG's arch.
+      - name: Verify DMG
+        run: |
+          set -euo pipefail
+          cd electron-app/release
+          DMGS=(*.dmg)
+          if [ "${#DMGS[@]}" -ne 1 ]; then
+            echo "Expected exactly 1 DMG for ${{ matrix.arch }}, got: ${DMGS[*]}"
+            exit 1
+          fi
+          hdiutil verify "${DMGS[0]}"
+          MNT=$(hdiutil attach "${DMGS[0]}" -nobrowse -readonly | awk -F'\t' '/\/Volumes\//{print $NF}')
+          trap 'hdiutil detach "$MNT" -quiet' EXIT
+          EXPECTED="${{ matrix.arch == 'x64' && 'x86_64' || 'arm64' }}"
+          for bin in "Contents/MacOS/Claude Proxymate" "Contents/Resources/claude-proxymate"; do
+            ARCH_INFO=$(file "$MNT/Claude Proxymate.app/$bin")
+            echo "$ARCH_INFO"
+            if ! echo "$ARCH_INFO" | grep -q "$EXPECTED"; then
+              echo "ERROR: $bin is not $EXPECTED"
+              exit 1
+            fi
+          done
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: release-${{ matrix.arch }}
-          path: electron-app/release/*.dmg
+          path: electron-app/release/*-${{ matrix.arch }}.dmg
 
   release:
     needs: build
@@ -113,6 +144,22 @@ jobs:
         with:
           path: artifacts
           merge-multiple: true
+
+      # Each artifact now carries only its own arch's DMG, so merge-multiple
+      # cannot collide. Assert we have exactly one DMG per arch before
+      # publishing anything.
+      - name: Sanity-check artifacts
+        run: |
+          set -euo pipefail
+          ls -la artifacts/
+          for arch in arm64 x64; do
+            COUNT=$(ls artifacts/*-"$arch".dmg 2>/dev/null | wc -l)
+            if [ "$COUNT" -ne 1 ]; then
+              echo "ERROR: expected exactly 1 $arch DMG, found $COUNT"
+              exit 1
+            fi
+          done
+          sha256sum artifacts/*.dmg
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

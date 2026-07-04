@@ -36,13 +36,14 @@
       "icon": "assets/icon.icns",
       "category": "public.app-category.developer-tools",
       "artifactName": "Claude-Proxy-${version}-${arch}.${ext}",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "notarize": false,
       "target": [
         {
-          "target": "dmg",
-          "arch": [
-            "arm64",
-            "x64"
-          ]
+          "target": "dmg"
         }
       ]
     },
