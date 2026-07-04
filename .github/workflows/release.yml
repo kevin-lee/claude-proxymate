@@ -1,0 +1,121 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: sbt/setup-sbt@v1
+
+      - name: Run core tests
+        run: sbt "coreJVM/test; coreJS/test; proxyServer/test; renderer/test"
+
+  build:
+    needs: test
+    # Scala.js fullLinkJS (Closure full optimization) is heap-hungry; the sbt
+    # launcher default of 1 GB OOMs during the renderer link. .jvmopts sets the
+    # heap for local + CI builds; this reasserts it in CI in case a runner image
+    # ignores .jvmopts. Keep the two in sync.
+    env:
+      SBT_OPTS: "-Xms1G -Xmx4G -XX:+UseG1GC -XX:ReservedCodeCacheSize=512m"
+    strategy:
+      matrix:
+        include:
+          # Apple Silicon runner → arm64 build
+          - os: macos-latest
+            arch: arm64
+          # Intel runner → x64 build. Required: the Scala Native proxy binary is
+          # compiled for the host CPU, so an arm64 runner would produce an x64
+          # DMG containing an arm64 binary that cannot run on Intel Macs.
+          - os: macos-15-intel
+            arch: x64
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: sbt/setup-sbt@v1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+#      - name: Build native proxy binary
+#        run: sbt proxyServer/nativeLink
+#
+#      - name: Build Scala.js Electron main
+#        run: sbt electron/fullLinkJS
+      - name: Build binary for production
+        env:
+          GA_MEASUREMENT_ID: ${{ secrets.GA_MEASUREMENT_ID }}
+          GA_API_SECRET: ${{ secrets.GA_API_SECRET }}
+        run: sbt prodUi
+
+#      - name: Assemble electron-app
+#        run: |
+#          cp modules/claude-proxymate-server/target/scala-3.3.7/claude-proxymate-server-out electron-app/claude-proxy
+#          chmod +x electron-app/claude-proxy
+#          cp modules/claude-proxymate-electron/target/scala-3.3.7/claude-proxymate-electron-opt/main.js electron-app/main.js
+#          cp -r public electron-app/public
+#          cp -r assets electron-app/assets
+
+      - name: Install Electron dependencies
+        run: cd electron-app && npm install
+
+      # Ships an UNSIGNED, un-notarized DMG. Gatekeeper will block it on first
+      # open; users must right-click → Open (see README "Install"). To sign +
+      # notarize once you have a Developer ID: enroll in the Apple Developer
+      # Program, add the CSC_* and APPLE_* repo secrets, uncomment the env keys
+      # below, and add hardenedRuntime/entitlements/"notarize": true to the mac
+      # block in project/package.json.template (the source of the generated
+      # electron-app/package.json).
+      - name: Package with electron-builder
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"   # don't attempt signing without a cert
+#          CSC_LINK: ${{ secrets.CSC_LINK }}
+#          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+#          APPLE_ID: ${{ secrets.APPLE_ID }}
+#          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+#          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: cd electron-app && npx electron-builder --mac --${{ matrix.arch }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.arch }}
+          path: electron-app/release/*.dmg
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**/*.dmg
+          generate_release_notes: true

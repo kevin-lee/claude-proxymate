@@ -7,3 +7,6 @@ package-lock.json
 /preload.js
 /package.json
 claude-proxymate
+
+build/
+release/
