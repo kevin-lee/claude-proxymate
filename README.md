@@ -22,7 +22,38 @@ Inspired by an early version of [claude-inspector](https://github.com/kangraemin
 
 ## Install
 
-Prebuilt macOS DMGs are published on the [Releases](../../releases) page. Download
+### Homebrew (recommended)
+
+The easiest way to install on macOS is via the [`kevin-lee/tap`](https://github.com/kevin-lee/homebrew-tap)
+Homebrew tap. Because the cask installs a notarized build, Gatekeeper lets it
+launch without any of the manual steps below.
+
+```bash
+brew install --cask kevin-lee/tap/claude-proxymate
+```
+
+Or tap first, then install:
+
+```bash
+brew tap kevin-lee/tap
+brew install --cask claude-proxymate
+```
+
+Upgrade to the latest release:
+
+```bash
+brew upgrade --cask claude-proxymate
+```
+
+Uninstall (add `--zap` to also remove preferences):
+
+```bash
+brew uninstall --cask claude-proxymate
+```
+
+### Manual download (DMG)
+
+Prebuilt macOS DMGs are published on the [Releases](https://github.com/kevin-lee/claude-proxymate/releases) page. Download
 the one matching your Mac:
 
 - **Apple Silicon** (M1/M2/M3/…): `Claude-Proxy-<version>-arm64.dmg`
