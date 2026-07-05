@@ -79,12 +79,19 @@ jobs:
       - name: Install Electron dependencies
         run: cd electron-app && npm install
 
-      # Ships an UNSIGNED, un-notarized DMG. Gatekeeper will block it on first
-      # open; users must right-click → Open (see README "Install"). To sign +
-      # notarize once you have a Developer ID: enroll in the Apple Developer
-      # Program, add the CSC_* and APPLE_* repo secrets, uncomment the env keys
-      # below, and flip "notarize" to true in project/package.json.template
-      # (hardenedRuntime + entitlements are already configured there).
+      # Signs with the Developer ID cert from CSC_LINK and notarizes via the
+      # APPLE_* credentials ("notarize": true in project/package.json.template;
+      # hardenedRuntime + entitlements are configured there too). Required repo
+      # secrets:
+      #   CSC_LINK                     base64-encoded Developer ID .p12
+      #   CSC_KEY_PASSWORD             password for the .p12
+      #   APPLE_ID                     Apple ID email of the developer account
+      #   APPLE_APP_SPECIFIC_PASSWORD  app-specific password (appleid.apple.com)
+      #   APPLE_TEAM_ID                10-char team ID
+      # Degradation is graceful and verified against app-builder-lib source:
+      # with NO credentials set, electron-builder ad-hoc signs and skips
+      # notarization with a warning (downloaders then need the Gatekeeper
+      # workaround in the README); with PARTIAL credentials it fails the build.
       #
       # The template's mac.target deliberately has NO "arch" list: an explicit
       # arch list in config overrides the CLI --arm64/--x64 flag, which made
@@ -92,20 +99,28 @@ jobs:
       # runner contained an arm64 native proxy binary (broken on Intel), and
       # the duplicate filenames across artifacts corrupted the merged release
       # assets (v0.1.0). Keep arch selection on the CLI flag only.
+      # Do NOT set CSC_IDENTITY_AUTO_DISCOVERY=false here: it suppresses
+      # electron-builder's ad-hoc signing fallback and yields an app with no
+      # bundle seal, which macOS reports as "damaged" with no Open Anyway
+      # escape (v0.1.0). With auto-discovery on and no identity in the
+      # keychain, electron-builder ad-hoc signs, giving downloaders the
+      # recoverable Gatekeeper flow instead.
       - name: Package with electron-builder
         env:
-          CSC_IDENTITY_AUTO_DISCOVERY: "false"   # don't attempt signing without a cert
-#          CSC_LINK: ${{ secrets.CSC_LINK }}
-#          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-#          APPLE_ID: ${{ secrets.APPLE_ID }}
-#          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-#          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: cd electron-app && npx electron-builder --mac --${{ matrix.arch }}
 
-      # Guard against the two failure modes that broke v0.1.0: a runner
-      # building more than its own arch, and a DMG whose bundled native proxy
-      # binary doesn't match the DMG's arch.
+      # Guard against the failure modes that broke v0.1.0: a runner building
+      # more than its own arch, a DMG whose bundled native proxy binary doesn't
+      # match the DMG's arch, and (when signing credentials are configured) an
+      # app that isn't actually Developer-ID signed + notarized + stapled.
       - name: Verify DMG
+        env:
+          HAS_SIGNING: ${{ secrets.CSC_LINK != '' }}
         run: |
           set -euo pipefail
           cd electron-app/release
@@ -117,6 +132,18 @@ jobs:
           hdiutil verify "${DMGS[0]}"
           MNT=$(hdiutil attach "${DMGS[0]}" -nobrowse -readonly | awk -F'\t' '/\/Volumes\//{print $NF}')
           trap 'hdiutil detach "$MNT" -quiet' EXIT
+          # At minimum an ad-hoc signature with a valid resource seal; a
+          # seal-less app is reported by macOS as "damaged" with no recovery.
+          codesign --verify --deep --strict "$MNT/Claude Proxymate.app"
+          if [ "$HAS_SIGNING" = "true" ]; then
+            # Fail the release if the app is not Developer-ID signed, accepted
+            # by Gatekeeper as notarized, and carrying a stapled ticket.
+            codesign -dvvv "$MNT/Claude Proxymate.app" 2>&1 | grep "Authority=Developer ID Application"
+            spctl -a -vvv "$MNT/Claude Proxymate.app"
+            xcrun stapler validate "$MNT/Claude Proxymate.app"
+          else
+            echo "No signing credentials configured — shipping ad-hoc signed build."
+          fi
           EXPECTED="${{ matrix.arch == 'x64' && 'x86_64' || 'arm64' }}"
           for bin in "Contents/MacOS/Claude Proxymate" "Contents/Resources/claude-proxymate"; do
             ARCH_INFO=$(file "$MNT/Claude Proxymate.app/$bin")

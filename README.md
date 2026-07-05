@@ -32,21 +32,26 @@ Open the DMG and drag **Claude Proxymate** to Applications.
 
 ### First launch (Gatekeeper)
 
-These builds are **not yet signed with an Apple Developer ID or notarized**, so
-macOS Gatekeeper will refuse to open the app on the first try ("Apple could not
-verify … is free of malware", or "… is damaged"). This is expected. To open it:
+If the app opens normally with no warning, it is a signed + notarized build
+and none of the steps below are needed.
 
-1. In **Applications**, right-click (or Control-click) **Claude Proxymate** and
-   choose **Open**, then confirm **Open** in the dialog. macOS remembers this
-   choice, so subsequent launches work normally by double-click.
-2. If macOS still blocks it, run once in Terminal to clear the download
-   quarantine flag:
-   ```bash
-   xattr -dr com.apple.quarantine "/Applications/Claude Proxymate.app"
-   ```
+**Unsigned builds** (early releases, or builds made without the project's
+Developer ID credentials) are refused by macOS Gatekeeper on the first try
+("Apple could not verify … is free of malware", or "… is damaged"). If you are
+opening one of those:
 
-> Signed + notarized builds (no workaround needed) are planned once an Apple
-> Developer ID is available.
+- **macOS 15 Sequoia and later** (right-click → Open no longer bypasses
+  Gatekeeper): double-click the app once and dismiss the dialog, then open
+  **System Settings → Privacy & Security**, scroll down to the message about
+  Claude Proxymate, and click **Open Anyway**. Alternatively, clear the
+  download quarantine flag once in Terminal:
+  ```bash
+  xattr -dr com.apple.quarantine "/Applications/Claude Proxymate.app"
+  ```
+- **macOS 14 and earlier**: in **Applications**, right-click (or Control-click)
+  **Claude Proxymate**, choose **Open**, then confirm **Open** in the dialog.
+  macOS remembers this choice, so subsequent launches work by double-click.
+
 
 ## Architecture
 
@@ -248,7 +253,7 @@ sbt generateI18n   # i18n/*.properties → electron-app/public/i18n/*.json
 ./scripts/package.sh
 ```
 
-This runs all build steps (native binary, electron JS, renderer JS, preload JS, copy artifacts, generate index.html, generate i18n JSON, npm install, electron-builder) and produces a DMG in `electron-app/release/`. Signing and notarization run only when the `CSC_*` / `APPLE_*` environment variables are set (see [`scripts/notarize.sh`](scripts/notarize.sh)); otherwise the DMG is unsigned.
+This runs all build steps (native binary, electron JS, renderer JS, preload JS, copy artifacts, generate index.html, generate i18n JSON, npm install, electron-builder) and produces a DMG in `electron-app/release/`. Signing uses the Developer ID certificate from the login keychain (electron-builder auto-discovery; ad-hoc if none is present), and notarization runs when the `APPLE_ID` / `APPLE_APP_SPECIFIC_PASSWORD` / `APPLE_TEAM_ID` environment variables are set — electron-builder handles it inline (`"notarize": true`). [`scripts/notarize.sh`](scripts/notarize.sh) remains as a standalone tool for re-notarizing an existing DMG.
 
 ### Releases (CI)
 
@@ -257,11 +262,15 @@ Pushing a `v*` tag (or manual dispatch) triggers
 then builds the app with `sbt prodUi` + electron-builder on both an Apple
 Silicon and an Intel macOS runner — each architecture must build on matching
 hardware because the Scala Native proxy binary is compiled for the host CPU —
-and attaches the resulting unsigned DMGs to a GitHub Release. The
+verifies each DMG (image integrity, single arch, matching binary
+architectures, and — when signing is configured — Developer ID signature,
+notarization, and stapled ticket), and attaches the DMGs to a GitHub Release.
+With the `CSC_LINK` / `CSC_KEY_PASSWORD` / `APPLE_ID` /
+`APPLE_APP_SPECIFIC_PASSWORD` / `APPLE_TEAM_ID` repository secrets configured,
+the DMGs are Developer-ID signed and notarized; without them, electron-builder
+falls back to an ad-hoc signature and skips notarization. The
 `GA_MEASUREMENT_ID` / `GA_API_SECRET` repository secrets are passed to the
-build step for the GA4 analytics integration; code signing stays disabled
-(`CSC_IDENTITY_AUTO_DISCOVERY: "false"`) until Apple Developer ID secrets are
-available.
+build step for the GA4 analytics integration.
 
 ## Usage
 
