@@ -1,6 +1,7 @@
 package claudeproxymate.proxy
 
 import cats.effect.IO
+import cats.syntax.all.*
 import claudeproxymate.core.ProxyError
 import org.http4s.{Headers, Method, Request, Response, Status, Uri}
 import org.http4s.client.Client
@@ -46,7 +47,7 @@ object CurlHttpClient {
         val emptyList: LibCurl.SList = null.asInstanceOf[LibCurl.SList]
         val forwardedHeaders         = headers.headers.filterNot { h =>
           val name = h.name.toString.toLowerCase
-          name == "host" || name == "accept-encoding"
+          name === "host" || name === "accept-encoding"
         }
         val builtList                = forwardedHeaders.foldLeft(emptyList) { (acc, h) =>
           LibCurl.curl_slist_append(acc, toCString(s"${h.name}: ${h.value}"))
@@ -93,7 +94,7 @@ object CurlHttpClient {
 
         // Perform the request (blocks)
         val code = LibCurl.curl_easy_perform(curl)
-        if (code != 0) {
+        if (code =!= 0) {
           ProxyErrorHttp4s.asResponse(ProxyError.CurlPerformFailed(code))
         } else {
           // Read response from temp file
@@ -118,8 +119,8 @@ object CurlHttpClient {
            * getinfo result or a 0 code falls through to 500 in
            * `parseResponse` via `Status.fromInt(...).getOrElse(...)`. */
           val codePtr: Ptr[CLong] = alloc[CLong]()
-          val statusCode: Int =
-            if (LibCurl.curl_easy_getinfo(curl, CurlInfo.ResponseCode, codePtr) == 0) (!codePtr).toInt
+          val statusCode: Int     =
+            if (LibCurl.curl_easy_getinfo(curl, CurlInfo.ResponseCode, codePtr) === 0) (!codePtr).toInt
             else 0
 
           parseResponse(respData, statusCode)
@@ -155,12 +156,10 @@ object CurlHttpClient {
       val lines       = headerPart.split("\r\n")
       val respHeaders = lines.tail.flatMap { line =>
         val colonIdx = line.indexOf(':')
-        if (colonIdx > 0) {
+        Option.when(colonIdx > 0) {
           val name  = line.substring(0, colonIdx).trim
           val value = line.substring(colonIdx + 1).trim
-          Some(org.http4s.Header.Raw(CIString(name), value))
-        } else {
-          None
+          org.http4s.Header.Raw(CIString(name), value)
         }
       }
 

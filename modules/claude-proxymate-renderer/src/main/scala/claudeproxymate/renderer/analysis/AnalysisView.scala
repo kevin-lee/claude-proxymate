@@ -1,5 +1,6 @@
 package claudeproxymate.renderer.analysis
 
+import cats.syntax.all.*
 import claudeproxymate.renderer.view.I18nTemplate
 import scalatags.Text.all.*
 
@@ -12,7 +13,14 @@ final case class CmSectionView(label: String, path: String, content: String, sco
 final case class SlashCommandView(name: String, full: String)
 final case class SkillView(id: String, inputJson: String, result: Option[String])
 final case class SubAgentView(name: String, subagentType: String, inputJson: String, prompt: String, isJson: Boolean)
-final case class McpToolView(id: String, serverName: String, toolName: String, inputJson: String, isJson: Boolean, result: Option[String])
+final case class McpToolView(
+  id: String,
+  serverName: String,
+  toolName: String,
+  inputJson: String,
+  isJson: Boolean,
+  result: Option[String]
+)
 
 final case class AnalysisData(
   modelName: Option[String],
@@ -89,7 +97,7 @@ object AnalysisView {
       div(style := "flex:1;overflow:auto")(
         div(cls := "analysis-view")(
           data match {
-            case None    => buildEmptyFrag(labels)
+            case None => buildEmptyFrag(labels)
             case Some(d) => buildBody(d, labels)
           },
         ),
@@ -101,15 +109,15 @@ object AnalysisView {
     // ProxyDetailSearchListeners installed once from RendererMain.
     div(cls := "msg-search-bar", style := "flex-shrink:0")(
       input(
-        tpe         := "text",
-        cls         := SearchInputClass,
-        id          := searchInputId,
+        tpe := "text",
+        cls := SearchInputClass,
+        id := searchInputId,
         placeholder := labels.searchPlaceholder,
-        value       := query,
+        value := query,
       ),
       if (query.nonEmpty)
         button(
-          cls           := SearchClearClass,
+          cls := SearchClearClass,
           attr("title") := labels.searchClear,
         )("✕")
       else frag(),
@@ -154,38 +162,40 @@ object AnalysisView {
       )
     }
 
-    d.slashCommands.zipWithIndex.foreach { case (cmd, i) =>
-      val desc = labels.slashCmdDescs.lift(i).getOrElse(labels.slashCmdTitle)
-      sections += div(cls := "analysis-section", attr(MechKeyAttr) := s"sc_$i")(
-        div(cls := "analysis-section-title", style := "color:var(--yellow)")(labels.slashCmdTitle),
-        div(cls := "analysis-desc")(desc),
-        div(cls := "analysis-block highlight-yellow")(cmd.full),
-      )
+    d.slashCommands.zipWithIndex.foreach {
+      case (cmd, i) =>
+        val desc = labels.slashCmdDescs.lift(i).getOrElse(labels.slashCmdTitle)
+        sections += div(cls := "analysis-section", attr(MechKeyAttr) := s"sc_$i")(
+          div(cls := "analysis-section-title", style := "color:var(--yellow)")(labels.slashCmdTitle),
+          div(cls := "analysis-desc")(desc),
+          div(cls := "analysis-block highlight-yellow")(cmd.full),
+        )
     }
 
-    d.skills.zipWithIndex.foreach { case (sk, i) =>
-      val titleText = if (d.slashSkillLinked) labels.skillLinkedTitle else labels.skillTitle
-      val descText  = if (d.slashSkillLinked) labels.skillLinkedDesc else labels.skillDesc
-      sections += div(cls := "analysis-section", attr(MechKeyAttr) := s"sk_$i")(
-        div(cls := "analysis-section-title", style := "color:var(--purple)")(titleText),
-        div(cls := "analysis-desc")(descText),
-        div(cls := "analysis-kv")(span(cls := "ak")("id"), span(cls := "av")(sk.id)),
-        div(
-          cls               := s"analysis-block highlight-purple $JsonBlockClass",
-          attr(JsonDataAttr) := sk.inputJson,
-        ),
-        sk.result match {
-          case Some(r) =>
-            frag(
-              div(cls := "analysis-kv")(span(cls := "ak")("result (tool_result)")),
-              div(cls := "analysis-block highlight-purple")(r),
-            )
-          case None =>
-            div(cls := "analysis-kv")(
-              span(cls := "ak", style := "color:var(--dim)")(labels.noToolResult),
-            )
-        },
-      )
+    d.skills.zipWithIndex.foreach {
+      case (sk, i) =>
+        val titleText = if (d.slashSkillLinked) labels.skillLinkedTitle else labels.skillTitle
+        val descText  = if (d.slashSkillLinked) labels.skillLinkedDesc else labels.skillDesc
+        sections += div(cls := "analysis-section", attr(MechKeyAttr) := s"sk_$i")(
+          div(cls := "analysis-section-title", style := "color:var(--purple)")(titleText),
+          div(cls := "analysis-desc")(descText),
+          div(cls := "analysis-kv")(span(cls := "ak")("id"), span(cls := "av")(sk.id)),
+          div(
+            cls := s"analysis-block highlight-purple $JsonBlockClass",
+            attr(JsonDataAttr) := sk.inputJson,
+          ),
+          sk.result match {
+            case Some(r) =>
+              frag(
+                div(cls := "analysis-kv")(span(cls := "ak")("result (tool_result)")),
+                div(cls := "analysis-block highlight-purple")(r),
+              )
+            case None =>
+              div(cls := "analysis-kv")(
+                span(cls := "ak", style := "color:var(--dim)")(labels.noToolResult),
+              )
+          },
+        )
     }
 
     d.subAgents.foreach { sa =>
@@ -198,7 +208,7 @@ object AnalysisView {
         ),
         if (sa.isJson)
           div(
-            cls               := s"analysis-block highlight-orange $JsonBlockClass",
+            cls := s"analysis-block highlight-orange $JsonBlockClass",
             attr(JsonDataAttr) := sa.inputJson,
           )
         else
@@ -206,42 +216,43 @@ object AnalysisView {
       )
     }
 
-    d.mcpTools.zipWithIndex.foreach { case (mc, i) =>
-      val cyanStyle =
-        "border-left:2px solid color-mix(in srgb, var(--cyan) 45%, transparent);" +
-          "background:color-mix(in srgb, var(--cyan) 10%, transparent)"
-      sections += div(cls := "analysis-section", attr(MechKeyAttr) := s"mc_$i")(
-        div(cls := "analysis-section-title", style := "color:var(--cyan)")(
-          s"🔌 ${mc.toolName} ",
-          span(style := "font-weight:400;opacity:.7")(s"(${mc.serverName})"),
-        ),
-        div(cls := "analysis-desc")(labels.mcpDesc),
-        div(cls := "analysis-kv")(span(cls := "ak")("id"), span(cls := "av")(mc.id)),
-        if (mc.isJson)
-          div(
-            cls               := s"analysis-block $JsonBlockClass",
-            style             := cyanStyle,
-            attr(JsonDataAttr) := mc.inputJson,
-          )
-        else
-          div(cls := "analysis-block", style := cyanStyle)(mc.inputJson),
-        mc.result match {
-          case Some(r) =>
-            frag(
-              div(cls := "analysis-kv")(span(cls := "ak")("result (tool_result)")),
-              div(cls := "analysis-block", style := cyanStyle)(r),
+    d.mcpTools.zipWithIndex.foreach {
+      case (mc, i) =>
+        val cyanStyle =
+          "border-left:2px solid color-mix(in srgb, var(--cyan) 45%, transparent);" +
+            "background:color-mix(in srgb, var(--cyan) 10%, transparent)"
+        sections += div(cls := "analysis-section", attr(MechKeyAttr) := s"mc_$i")(
+          div(cls := "analysis-section-title", style := "color:var(--cyan)")(
+            s"🔌 ${mc.toolName} ",
+            span(style := "font-weight:400;opacity:.7")(s"(${mc.serverName})"),
+          ),
+          div(cls := "analysis-desc")(labels.mcpDesc),
+          div(cls := "analysis-kv")(span(cls := "ak")("id"), span(cls := "av")(mc.id)),
+          if (mc.isJson)
+            div(
+              cls := s"analysis-block $JsonBlockClass",
+              style := cyanStyle,
+              attr(JsonDataAttr) := mc.inputJson,
             )
-          case None => frag()
-        },
-      )
+          else
+            div(cls := "analysis-block", style := cyanStyle)(mc.inputJson),
+          mc.result match {
+            case Some(r) =>
+              frag(
+                div(cls := "analysis-kv")(span(cls := "ak")("result (tool_result)")),
+                div(cls := "analysis-block", style := cyanStyle)(r),
+              )
+            case None => frag()
+          },
+        )
     }
 
     frag(sections.toList)
   }
 
   private def buildCmSection(s: CmSectionView, idx: Int): Frag = {
-    val color   = if (s.scope == "global") "var(--green)" else "var(--blue)"
-    val hlClass = if (s.scope == "global") "highlight-green" else "highlight-blue"
+    val color   = if (s.scope === "global") "var(--green)" else "var(--blue)"
+    val hlClass = if (s.scope === "global") "highlight-green" else "highlight-blue"
     div(style := "margin-top:8px", attr(MechKeyAttr) := s"cm_$idx")(
       div(style := s"font-size:10px;font-weight:700;color:$color;margin-bottom:4px")(s.label),
       div(style := "font-size:10px;color:var(--dim);margin-bottom:4px;word-break:break-all")(s.path),

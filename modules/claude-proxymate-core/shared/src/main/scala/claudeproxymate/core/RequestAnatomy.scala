@@ -1,5 +1,6 @@
 package claudeproxymate.core
 
+import cats.syntax.all.*
 import io.circe.Json
 
 /** Per-input-segment size estimate (bytes + estimated tokens). */
@@ -82,14 +83,14 @@ object RequestAnatomy {
   private val echoInstructions: List[String] =
     List("echo back", "verbatim", "every token", "print the", "repeat the")
 
-  private val McpInstrMarker  = "MCP Server Instructions"
+  private val McpInstrMarker   = "MCP Server Instructions"
   private val SkillsListMarker = "skills are available for use with the Skill tool"
 
   def estTokens(bytes: Int): Int =
     if (bytes <= 0) 0 else math.ceil(bytes / 3.5).toInt
 
-  private def byteLen(s: String): Int    = s.getBytes("UTF-8").length
-  private def jsonBytes(j: Json): Int    = byteLen(j.noSpaces)
+  private def byteLen(s: String): Int = s.getBytes("UTF-8").length
+  private def jsonBytes(j: Json): Int = byteLen(j.noSpaces)
 
   def analyze(body: Json, responseCaptured: Boolean, stopReason: Option[String]): RequestAnatomy = {
     val obj      = body.asObject
@@ -105,15 +106,15 @@ object RequestAnatomy {
     val msgTexts = collectUserTexts(messages)
 
     /* segment byte sizes */
-    val systemBytes   = systemBytesOf(systemJs)
-    val toolsBytes    = if (toolsArr.isEmpty) 0 else jsonBytes(Json.fromValues(toolsArr))
-    val thinkingBytes = thinkingSignatureBytes(messages)
-    val claudeMdBytes = mech.claudeMd.map(byteLen).getOrElse(0)
-    val mcpInstrBytes = matchingReminderBytes(msgTexts, McpInstrMarker)
-    val skillsBytes   = matchingReminderBytes(msgTexts, SkillsListMarker)
+    val systemBytes     = systemBytesOf(systemJs)
+    val toolsBytes      = if (toolsArr.isEmpty) 0 else jsonBytes(Json.fromValues(toolsArr))
+    val thinkingBytes   = thinkingSignatureBytes(messages)
+    val claudeMdBytes   = mech.claudeMd.map(byteLen).getOrElse(0)
+    val mcpInstrBytes   = matchingReminderBytes(msgTexts, McpInstrMarker)
+    val skillsBytes     = matchingReminderBytes(msgTexts, SkillsListMarker)
     val latestUserBytes = latestUserTurnBytes(messages)
-    val messagesBytes = messages.map(jsonBytes).sum
-    val historyBytes  = math.max(
+    val messagesBytes   = messages.map(jsonBytes).sum
+    val historyBytes    = math.max(
       0,
       messagesBytes - claudeMdBytes - mcpInstrBytes - skillsBytes - thinkingBytes - latestUserBytes,
     )
@@ -128,7 +129,7 @@ object RequestAnatomy {
       SegmentSize(SegHistory, historyBytes, estTokens(historyBytes)),
       SegmentSize(SegLatestUser, latestUserBytes, estTokens(latestUserBytes)),
     )
-    val segments = rawSegments.filter(_.bytes > 0).sortBy(s => -s.estTokens)
+    val segments    = rawSegments.filter(_.bytes > 0).sortBy(s => -s.estTokens)
 
     val totalBytes = segments.map(_.bytes).sum
 
@@ -136,13 +137,13 @@ object RequestAnatomy {
     val anomalies = buildAnomalies(structure, mech, msgTexts, responseCaptured, stopReason)
 
     RequestAnatomy(
-      model           = model,
-      totalEstBytes   = totalBytes,
-      totalEstTokens  = estTokens(totalBytes),
-      segments        = segments,
-      structure       = structure,
-      inventory       = inventory,
-      anomalies       = anomalies,
+      model = model,
+      totalEstBytes = totalBytes,
+      totalEstTokens = estTokens(totalBytes),
+      segments = segments,
+      structure = structure,
+      inventory = inventory,
+      anomalies = anomalies,
     )
   }
 
@@ -152,36 +153,36 @@ object RequestAnatomy {
     systemJs: Option[Json],
     toolsArr: Vector[Json],
   ): StructureFacts = {
-    val roles = messages.flatMap(_.asObject).flatMap(_.apply("role")).flatMap(_.asString)
-    val userTurns      = roles.count(_ == "user")
-    val assistantTurns = roles.count(_ == "assistant")
+    val roles          = messages.flatMap(_.asObject).flatMap(_.apply("role")).flatMap(_.asString)
+    val userTurns      = roles.count(_ === "user")
+    val assistantTurns = roles.count(_ === "assistant")
 
     val (systemBlocks, cachedSystemBlocks) = systemJs match {
       case Some(j) if j.isArray =>
-        val arr = j.asArray.getOrElse(Vector.empty)
+        val arr    = j.asArray.getOrElse(Vector.empty)
         val cached = arr.flatMap(_.asObject).count(_.contains("cache_control"))
         (arr.size, cached)
       case Some(j) if j.isString => (1, 0)
-      case _                     => (0, 0)
+      case Some(_) | None => (0, 0)
     }
 
-    val blocks = messages.flatMap(contentBlocks)
+    val blocks                    = messages.flatMap(contentBlocks)
     def countType(t: String): Int = blocks.flatMap(_.asObject).count(_.apply("type").flatMap(_.asString).contains(t))
 
     val stream = body.asObject.flatMap(_.apply("stream")).flatMap(_.asBoolean)
 
     StructureFacts(
-      messageCount       = messages.size,
-      userTurns          = userTurns,
-      assistantTurns     = assistantTurns,
-      systemBlocks       = systemBlocks,
+      messageCount = messages.size,
+      userTurns = userTurns,
+      assistantTurns = assistantTurns,
+      systemBlocks = systemBlocks,
       cachedSystemBlocks = cachedSystemBlocks,
-      toolsDefined       = toolsArr.size,
-      toolUseCount       = countType("tool_use"),
-      toolResultCount    = countType("tool_result"),
-      imageCount         = countType("image"),
-      thinkingBlocks     = countType("thinking"),
-      stream             = stream,
+      toolsDefined = toolsArr.size,
+      toolUseCount = countType("tool_use"),
+      toolResultCount = countType("tool_result"),
+      imageCount = countType("image"),
+      thinkingBlocks = countType("thinking"),
+      stream = stream,
     )
   }
 
@@ -205,27 +206,35 @@ object RequestAnatomy {
                 .flatMap(_.apply("text"))
                 .flatMap(_.asString)
             }
-          case _ => Vector.empty
+          case Some(_) | None => Vector.empty
         }
     }.toList
 
   private def systemBytesOf(systemJs: Option[Json]): Int =
     systemJs match {
       case Some(j) if j.isArray =>
-        j.asArray.getOrElse(Vector.empty).flatMap { b =>
-          b.asObject.flatMap(_.apply("text")).flatMap(_.asString)
-        }.map(byteLen).sum
+        j.asArray
+          .getOrElse(Vector.empty)
+          .flatMap { b =>
+            b.asObject.flatMap(_.apply("text")).flatMap(_.asString)
+          }
+          .map(byteLen)
+          .sum
       case Some(j) if j.isString => byteLen(j.asString.getOrElse(""))
-      case _                     => 0
+      case Some(_) | None => 0
     }
 
   private def thinkingSignatureBytes(messages: Vector[Json]): Int =
-    messages.flatMap(contentBlocks).flatMap { b =>
-      b.asObject
-        .filter(_.apply("type").flatMap(_.asString).contains("thinking"))
-        .flatMap(_.apply("signature"))
-        .flatMap(_.asString)
-    }.map(byteLen).sum
+    messages
+      .flatMap(contentBlocks)
+      .flatMap { b =>
+        b.asObject
+          .filter(_.apply("type").flatMap(_.asString).contains("thinking"))
+          .flatMap(_.apply("signature"))
+          .flatMap(_.asString)
+      }
+      .map(byteLen)
+      .sum
 
   private def matchingReminderBytes(texts: List[String], marker: String): Int =
     texts.filter(_.contains(marker)).map(byteLen).sum
@@ -235,10 +244,10 @@ object RequestAnatomy {
       case Some(msg) if msg.asObject.flatMap(_.apply("role")).flatMap(_.asString).contains("user") =>
         msg.asObject.flatMap(_.apply("content")) match {
           case Some(c) if c.isString => byteLen(c.asString.getOrElse(""))
-          case Some(c) if c.isArray  => jsonBytes(c)
-          case _                     => 0
+          case Some(c) if c.isArray => jsonBytes(c)
+          case Some(_) | None => 0
         }
-      case _ => 0
+      case Some(_) | None => 0
     }
 
   private def buildInventory(
@@ -281,8 +290,8 @@ object RequestAnatomy {
     val buf = scala.collection.mutable.ListBuffer.empty[Anomaly]
 
     /* Security */
-    val hasCredential  = msgTexts.exists(t => credentialPrefixes.exists(t.contains))
-    val hasEcho        = msgTexts.exists(t => echoInstructions.exists(p => t.toLowerCase.contains(p)))
+    val hasCredential = msgTexts.exists(t => credentialPrefixes.exists(t.contains))
+    val hasEcho       = msgTexts.exists(t => echoInstructions.exists(p => t.toLowerCase.contains(p)))
     if (hasCredential && hasEcho) buf += Anomaly(AnomalyKind.Security, AnomCredential)
 
     /* Warn */
@@ -295,7 +304,7 @@ object RequestAnatomy {
 
     val skillsAdvertised = msgTexts.exists(_.contains(SkillsListMarker))
     val skillInvoked     = mech.skills.nonEmpty
-    if (structure.toolsDefined > 0 && structure.toolUseCount == 0 && skillsAdvertised && !skillInvoked)
+    if (structure.toolsDefined > 0 && structure.toolUseCount === 0 && skillsAdvertised && !skillInvoked)
       buf += Anomaly(AnomalyKind.Info, AnomToolsUnused)
 
     buf.toList

@@ -19,7 +19,7 @@ object ClaudeMdParserSpec extends Properties {
     for {
       username <- Gen.string(Gen.alphaNum, Range.linear(3, 10)).log("username")
     } yield {
-      val input =
+      val input    =
         s"Contents of /Users/$username/.claude/CLAUDE.md (user's private global instructions for all projects):\n\n# Global Rules\ncontent here"
       val sections = ClaudeMdParser.parseClaudeMdSections(input)
 
@@ -56,7 +56,7 @@ object ClaudeMdParserSpec extends Properties {
     for {
       _ <- Gen.constant(()).forAll
     } yield {
-      val input =
+      val input    =
         "Contents of /project/CLAUDE.md (project instructions, checked into the codebase):\n\n# Project Rules\ncontent"
       val sections = ClaudeMdParser.parseClaudeMdSections(input)
 
@@ -83,59 +83,65 @@ object ClaudeMdParserSpec extends Properties {
     for {
       username <- Gen.string(Gen.alphaNum, Range.linear(3, 10)).log("username")
     } yield {
-      val input = List(
+      val input    = List(
         s"Contents of /Users/$username/.claude/CLAUDE.md (user's private global instructions for all projects):\n\n# Global Rules\nglobal content",
         "Contents of /project/CLAUDE.md (project instructions, checked into the codebase):\n\n# Local Rules\nlocal content",
       ).mkString("\n\n")
       val sections = ClaudeMdParser.parseClaudeMdSections(input)
-      Result.assert(sections.length == 2) and
-        Result.assert(sections(0).scope == "global") and
-        Result.assert(sections(1).scope == "local")
+      Result
+        .assert(sections.length == 2)
+        .and(Result.assert(sections(0).scope == "global"))
+        .and(Result.assert(sections(1).scope == "local"))
     }
 
   def testGlobalRule: Property =
     for {
       username <- Gen.string(Gen.alphaNum, Range.linear(3, 10)).log("username")
     } yield {
-      val input =
+      val input    =
         s"Contents of /Users/$username/.claude/rules/git-rules.md (user's private global instructions for all projects):\n\n# Git Rules\ncontent"
       val sections = ClaudeMdParser.parseClaudeMdSections(input)
-      Result.assert(sections.length == 1) and
-        Result.assert(
-          sections.head.label == "\uD83D\uDCDC Global Rule: git-rules.md"
-        ) and
-        Result.assert(sections.head.scope == "global")
+      Result
+        .assert(sections.length == 1)
+        .and(
+          Result.assert(
+            sections.head.label == "\uD83D\uDCDC Global Rule: git-rules.md"
+          )
+        )
+        .and(Result.assert(sections.head.scope == "global"))
     }
 
   def testMemoryFile: Property =
     for {
       username <- Gen.string(Gen.alphaNum, Range.linear(3, 10)).log("username")
     } yield {
-      val input =
+      val input    =
         s"Contents of /Users/$username/.claude/projects/foo/memory/MEMORY.md (user's auto-memory, persists across conversations):\n\n# Memory\ncontent"
       val sections = ClaudeMdParser.parseClaudeMdSections(input)
-      Result.assert(sections.length == 1) and
-        Result.assert(sections.head.label == "\uD83E\uDDE0 Memory: MEMORY.md")
+      Result.assert(sections.length == 1).and(Result.assert(sections.head.label == "\uD83E\uDDE0 Memory: MEMORY.md"))
     }
 
   def testFourSections: Property =
     for {
       username <- Gen.string(Gen.alphaNum, Range.linear(3, 10)).log("username")
     } yield {
-      val input = List(
+      val input    = List(
         s"Contents of /Users/$username/.claude/CLAUDE.md (user's private global instructions for all projects):\n\n# Global Rules\ncontent",
         s"Contents of /Users/$username/.claude/rules/git-rules.md (user's private global instructions for all projects):\n\n# Git Rules\ncontent",
         "Contents of /project/CLAUDE.md (project instructions, checked into the codebase):\n\n# Claude Proxymate\ncontent",
         s"Contents of /Users/$username/.claude/projects/foo/memory/MEMORY.md (user's auto-memory, persists across conversations):\n\n# Memory\ncontent",
       ).mkString("\n\n")
       val sections = ClaudeMdParser.parseClaudeMdSections(input)
-      Result.assert(sections.length == 4) and
-        Result.assert(sections(0).label == "\uD83D\uDCCB Global CLAUDE.md") and
-        Result.assert(
-          sections(1).label == "\uD83D\uDCDC Global Rule: git-rules.md"
-        ) and
-        Result.assert(sections(2).label == "\uD83D\uDCCB Local CLAUDE.md") and
-        Result.assert(sections(3).label == "\uD83E\uDDE0 Memory: MEMORY.md")
+      Result
+        .assert(sections.length == 4)
+        .and(Result.assert(sections(0).label == "\uD83D\uDCCB Global CLAUDE.md"))
+        .and(
+          Result.assert(
+            sections(1).label == "\uD83D\uDCDC Global Rule: git-rules.md"
+          )
+        )
+        .and(Result.assert(sections(2).label == "\uD83D\uDCCB Local CLAUDE.md"))
+        .and(Result.assert(sections(3).label == "\uD83E\uDDE0 Memory: MEMORY.md"))
     }
 
   def testEmptyInput: Result = {

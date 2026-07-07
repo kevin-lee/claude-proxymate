@@ -1,14 +1,16 @@
 package claudeproxymate.core
 
+import cats.syntax.all.*
+
 /** Reasons a URL might be refused by [[UrlScheme.validate]]. */
 enum UrlSchemeError {
   case Malformed(input: String)
   case Disallowed(scheme: String, allowed: List[String])
 
   def message: String = this match {
-    case UrlSchemeError.Malformed(input)             =>
+    case UrlSchemeError.Malformed(input) =>
       s"malformed URL: \"$input\""
-    case UrlSchemeError.Disallowed(scheme, allowed)  =>
+    case UrlSchemeError.Disallowed(scheme, allowed) =>
       s"scheme \"$scheme\" not allowed (allowed: ${allowed.mkString(", ")})"
   }
 }
@@ -27,11 +29,10 @@ object UrlScheme {
   def validate(url: String): Either[UrlSchemeError, String] = {
     val colon = url.indexOf(':')
     if (colon <= 0) {
-      Left(UrlSchemeError.Malformed(url))
+      UrlSchemeError.Malformed(url).asLeft[String]
     } else {
       val scheme = url.substring(0, colon).toLowerCase
-      if (AllowedSchemes.contains(scheme)) Right(url)
-      else Left(UrlSchemeError.Disallowed(scheme, AllowedSchemes))
+      Either.cond(AllowedSchemes.contains(scheme), url, UrlSchemeError.Disallowed(scheme, AllowedSchemes))
     }
   }
 }

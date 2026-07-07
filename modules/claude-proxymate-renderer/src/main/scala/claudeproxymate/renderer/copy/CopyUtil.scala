@@ -1,5 +1,6 @@
 package claudeproxymate.renderer.copy
 
+import cats.syntax.all.*
 import claudeproxymate.core.HtmlIds
 import claudeproxymate.renderer.i18n.I18n
 import claudeproxymate.renderer.state.AppState
@@ -61,8 +62,8 @@ object CopyUtil {
     val btn = dom.document.querySelector(s"#${HtmlIds.CopyDetailBtn}")
     if (btn != null) {
       val (text, durationMs) =
-        if (total == 0) ("✓", 1500.0)
-        else if (revealed == 0) (I18n.t("copy.flashMasked"), 1500.0)
+        if (total === 0) ("✓", 1500.0)
+        else if (revealed === 0) (I18n.t("copy.flashMasked"), 1500.0)
         else
           (
             I18n.t(
@@ -71,7 +72,7 @@ object CopyUtil {
             ),
             3000.0,
           )
-      val orig = btn.textContent
+      val orig               = btn.textContent
       btn.textContent = text
       locally { val _ = js.timers.setTimeout(durationMs) { btn.textContent = orig } }
     }
@@ -84,10 +85,16 @@ object CopyUtil {
   def copyProxyCmd(): Unit = {
     val el = dom.document.getElementById(HtmlIds.ProxyCmdText)
     if (el == null || !AppState.proxyRunning) return
-    locally { val _ = dom.window.navigator.clipboard.writeText(el.textContent)
-      .asInstanceOf[js.Dynamic]
-      .`then`(flashCopyButton(s"#${HtmlIds.ProxyCmdCopyBtn}"))
-      .`catch`(onCopyError) }
+    locally {
+      val _ = dom
+        .window
+        .navigator
+        .clipboard
+        .writeText(el.textContent)
+        .asInstanceOf[js.Dynamic]
+        .`then`(flashCopyButton(s"#${HtmlIds.ProxyCmdCopyBtn}"))
+        .`catch`(onCopyError)
+    }
   }
 
   /** Copy the active capture's detail to the clipboard, WYSIWYG
@@ -102,9 +109,9 @@ object CopyUtil {
   def copyProxyDetail(): Unit = {
     val entry = AppState.proxyCaptures.find(e => e.id == AppState.selectedProxyId.map(_.asInstanceOf[js.Any]).orNull)
     entry match {
-      case None    => ()
+      case None => ()
       case Some(e) =>
-        if (AppState.proxyDetailTab == "messages") copyMessagesDetail(e)
+        if (AppState.proxyDetailTab === "messages") copyMessagesDetail(e)
         else copyJsonDetail(e)
     }
   }
@@ -113,14 +120,20 @@ object CopyUtil {
     val cards = claudeproxymate.renderer.messages.MessageRenderer.buildVisibleCards(entry)
     val res   = claudeproxymate.renderer.messages.MessageCopy.toPlainText(cards, AppState.isRevealed)
     if (res.text.isEmpty) return
-    locally { val _ = dom.window.navigator.clipboard.writeText(res.text)
-      .asInstanceOf[js.Dynamic]
-      .`then`(flashDetailButton(res.revealed, res.total))
-      .`catch`(onCopyError) }
+    locally {
+      val _ = dom
+        .window
+        .navigator
+        .clipboard
+        .writeText(res.text)
+        .asInstanceOf[js.Dynamic]
+        .`then`(flashDetailButton(res.revealed, res.total))
+        .`catch`(onCopyError)
+    }
   }
 
   private def copyJsonDetail(entry: js.Dynamic): Unit = {
-    val data: js.Dynamic = if (AppState.proxyDetailTab == "request") {
+    val data: js.Dynamic = if (AppState.proxyDetailTab === "request") {
       entry.selectDynamic("body")
     } else {
       val resp = entry.selectDynamic("response")
@@ -133,14 +146,20 @@ object CopyUtil {
      * first; unparseable ones render as plain text with zero mask
      * spans, so they copy raw with a plain ✓ flash. */
     val parsed: js.Dynamic =
-      if (js.typeOf(data) == "string") {
+      if (js.typeOf(data) === "string") {
         try js.JSON.parse(data.asInstanceOf[String])
         catch {
           case _: Throwable =>
-            locally { val _ = dom.window.navigator.clipboard.writeText(data.asInstanceOf[String])
-              .asInstanceOf[js.Dynamic]
-              .`then`(flashDetailButton(0, 0))
-              .`catch`(onCopyError) }
+            locally {
+              val _ = dom
+                .window
+                .navigator
+                .clipboard
+                .writeText(data.asInstanceOf[String])
+                .asInstanceOf[js.Dynamic]
+                .`then`(flashDetailButton(0, 0))
+                .`catch`(onCopyError)
+            }
             return
         }
       } else data
@@ -148,9 +167,15 @@ object CopyUtil {
     val r    = MaskedCopy.maskBody(parsed, AppState.isRevealed)
     val text = js.JSON.stringify(r.body, null.asInstanceOf[js.Array[js.Any]], 2)
 
-    locally { val _ = dom.window.navigator.clipboard.writeText(text)
-      .asInstanceOf[js.Dynamic]
-      .`then`(flashDetailButton(r.revealed, r.total))
-      .`catch`(onCopyError) }
+    locally {
+      val _ = dom
+        .window
+        .navigator
+        .clipboard
+        .writeText(text)
+        .asInstanceOf[js.Dynamic]
+        .`then`(flashDetailButton(r.revealed, r.total))
+        .`catch`(onCopyError)
+    }
   }
 }

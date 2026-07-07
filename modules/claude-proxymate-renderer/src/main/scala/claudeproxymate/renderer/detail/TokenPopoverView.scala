@@ -82,7 +82,7 @@ object TokenPopoverView {
     val textForCopy = buildCopyText(data, labels)
 
     val rowFrags: List[Frag] = data.rows.flatMap { r =>
-      val rowFrag: Frag = div(cls := "token-popover-row")(
+      val rowFrag: Frag          = div(cls := "token-popover-row")(
         span(cls := "tp-label")(r.label),
         span(cls := "tp-formula")(s"${r.tokens} tok × $$${r.price}/MTok"),
         span(cls := "tp-result")(r.cost),
@@ -95,7 +95,7 @@ object TokenPopoverView {
 
     val noteCacheSavingFrag: Frag = labels.noteCacheSaving match {
       case Some(s) => frag(br, s)
-      case None    => frag()
+      case None => frag()
     }
 
     frag(
@@ -125,11 +125,11 @@ object TokenPopoverView {
           labels.noteModelPrice,
           " (",
           a(
-            href   := DocsHref,
-            cls    := TokenPopoverLinks.ExternalLinkClass,
+            href := DocsHref,
+            cls := TokenPopoverLinks.ExternalLinkClass,
             target := "_blank",
-            rel    := "noopener",
-            style  := "color:var(--blue);text-decoration:underline;cursor:pointer",
+            rel := "noopener",
+            style := "color:var(--blue);text-decoration:underline;cursor:pointer",
           )(labels.noteOfficialDoc),
           ")",
         ),

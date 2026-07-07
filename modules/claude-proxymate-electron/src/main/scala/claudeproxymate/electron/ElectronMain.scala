@@ -1,5 +1,6 @@
 package claudeproxymate.electron
 
+import cats.syntax.all.*
 import claudeproxymate.core.UrlScheme
 import claudeproxymate.electron.facades._
 
@@ -9,7 +10,7 @@ import scala.scalajs.js
 /** Electron main process entry point. */
 object ElectronMain {
 
-  private val mainWindow = new AtomicReference[Option[BrowserWindow]](None)
+  private val mainWindow = new AtomicReference[Option[BrowserWindow]](none[BrowserWindow])
 
   private val process  = js.Dynamic.global.process
   private val platform = process.platform.asInstanceOf[String]
@@ -22,7 +23,7 @@ object ElectronMain {
         Analytics.init(ElectronApp.getPath("userData"))
         Analytics.trackEvent("app_open")
 
-        if (platform == "darwin") {
+        if (platform === "darwin") {
           try {
             val _ = ElectronApp
               .asInstanceOf[js.Dynamic]
@@ -42,7 +43,7 @@ object ElectronMain {
       { () =>
         mainWindow.get() match {
           case Some(win) if !win.isDestroyed() => win.show()
-          case _ => createWindow()
+          case Some(_) | None => createWindow()
         }
       }
     )
@@ -50,7 +51,7 @@ object ElectronMain {
     ElectronApp.on(
       "window-all-closed",
       { () =>
-        if (platform != "darwin") ElectronApp.quit() else ()
+        if (platform =!= "darwin") ElectronApp.quit() else ()
       }
     )
 
@@ -65,7 +66,7 @@ object ElectronMain {
   }
 
   private def createWindow(): Unit = {
-    val isDarwin = platform == "darwin"
+    val isDarwin = platform === "darwin"
     val appPath  = ElectronApp.getAppPath()
 
     /* DevTools are enabled when:
@@ -83,7 +84,7 @@ object ElectronMain {
       val packaged = ElectronApp.isPackaged
       val envFlag  = {
         val v = process.selectDynamic("env").selectDynamic("CLAUDE_PROXYMATE_DEVTOOLS")
-        !js.isUndefined(v) && v != null && v.toString == "1"
+        !js.isUndefined(v) && v != null && v.toString === "1"
       }
       !packaged || envFlag
     }
@@ -105,7 +106,7 @@ object ElectronMain {
             sandbox = true,
             devTools = devToolsEnabled,
           ),
-        titleBarStyle = (if (isDarwin) "hiddenInset" else "default"),
+        titleBarStyle = if isDarwin then "hiddenInset" else "default",
         title = "Claude Proxymate",
         backgroundColor = "#1e1e1e",
         show = false,
@@ -173,7 +174,8 @@ object ElectronMain {
           case Left(err) =>
             val _ = js.Dynamic.global.console.warn("Blocked window.open:", err.message)
           case Right(validUrl) =>
-            val _ = Shell.openExternal(validUrl)
+            val _ = Shell
+              .openExternal(validUrl)
               .asInstanceOf[js.Dynamic]
               .`catch`({ (e: js.Any) =>
                 val _ = js.Dynamic.global.console.warn("openExternal failed:", e.toString)
@@ -196,6 +198,6 @@ object ElectronMain {
     win.webContents.on("will-redirect", blockNavigation)
     win.webContents.on("will-frame-navigate", blockNavigation)
 
-    mainWindow.set(Some(win))
+    mainWindow.set(win.some)
   }
 }

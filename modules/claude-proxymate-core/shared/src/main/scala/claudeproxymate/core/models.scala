@@ -1,5 +1,6 @@
 package claudeproxymate.core
 
+import cats.syntax.all.*
 import io.circe.Json
 
 /** Data sent to renderer on each intercepted request. */
@@ -76,8 +77,8 @@ final case class Mechanisms(
 
 object Mechanisms {
   val empty: Mechanisms = Mechanisms(
-    claudeMd = None,
-    outputStyle = None,
+    claudeMd = none[String],
+    outputStyle = none[List[String]],
     slashCommands = Nil,
     skills = Nil,
     subAgents = Nil,

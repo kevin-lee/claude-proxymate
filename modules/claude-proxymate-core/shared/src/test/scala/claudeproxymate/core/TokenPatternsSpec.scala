@@ -36,7 +36,10 @@ object TokenPatternsSpec extends Properties {
     example("fingerprint empty: ***", testFingerprintEmpty),
     // Property
     property("random alphanumeric of length 50 with no recognized prefix produces zero matches", testRandomNoMatch),
-    property("fixed-length tokens extended with charset chars are covered whole (no tail leak)", testOverlongTokenFullyCovered),
+    property(
+      "fixed-length tokens extended with charset chars are covered whole (no tail leak)",
+      testOverlongTokenFullyCovered
+    ),
   )
 
   // ---- helpers -----------------------------------------------------------
@@ -47,7 +50,8 @@ object TokenPatternsSpec extends Properties {
    * in copies). */
   private def coversWhole(s: String, name: String): Result = {
     val ms = TokenPatterns.scan(s)
-    Result.assert(ms.exists(m => m.name == name && m.start == 0 && m.end == s.length))
+    Result
+      .assert(ms.exists(m => m.name == name && m.start == 0 && m.end == s.length))
       .log(s"expected $name covering [0, ${s.length}) in: $s, got: $ms")
   }
 
@@ -109,23 +113,28 @@ object TokenPatternsSpec extends Properties {
   // ---- negative cases ----------------------------------------------------
 
   def testPlainModel: Result =
-    Result.assert(TokenPatterns.scan("model: claude-3-5-sonnet-20241022").isEmpty)
+    Result
+      .assert(TokenPatterns.scan("model: claude-3-5-sonnet-20241022").isEmpty)
       .log("plain model name should not match")
 
   def testCommitHash: Result =
-    Result.assert(TokenPatterns.scan("commit a3f9c7b1e2d4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0").isEmpty)
+    Result
+      .assert(TokenPatterns.scan("commit a3f9c7b1e2d4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0").isEmpty)
       .log("64-char hex should not match")
 
   def testBearerAlone: Result =
-    Result.assert(TokenPatterns.scan("Bearer").isEmpty)
+    Result
+      .assert(TokenPatterns.scan("Bearer").isEmpty)
       .log("'Bearer' alone should not match")
 
   def testAnthropicShort: Result =
-    Result.assert(TokenPatterns.scan("sk-ant-short").isEmpty)
+    Result
+      .assert(TokenPatterns.scan("sk-ant-short").isEmpty)
       .log("sk-ant- with < 20 chars should not match")
 
   def testJwtSingleSegment: Result =
-    Result.assert(TokenPatterns.scan("eyJabc").isEmpty)
+    Result
+      .assert(TokenPatterns.scan("eyJabc").isEmpty)
       .log("single-segment eyJ... should not match")
 
   // ---- ordering / overlap ------------------------------------------------
@@ -137,7 +146,8 @@ object TokenPatternsSpec extends Properties {
     Result.all(
       List(
         Result.assert(ms.size == 1).log(s"expected exactly 1 match, got: $ms"),
-        Result.assert(ms.headOption.exists(_.name == "anthropic-api-key"))
+        Result
+          .assert(ms.headOption.exists(_.name == "anthropic-api-key"))
           .log(s"expected anthropic-api-key, got: $ms"),
       )
     )
@@ -165,19 +175,23 @@ object TokenPatternsSpec extends Properties {
   // ---- fingerprint -------------------------------------------------------
 
   def testFingerprintLong: Result =
-    Result.assert(TokenPatterns.fingerprint("sk-ant-abcdefghijklmnopXYZ4") == "sk-a…XYZ4")
+    Result
+      .assert(TokenPatterns.fingerprint("sk-ant-abcdefghijklmnopXYZ4") == "sk-a…XYZ4")
       .log(s"fingerprint long failed: ${TokenPatterns.fingerprint("sk-ant-abcdefghijklmnopXYZ4")}")
 
   def testFingerprintEight: Result =
-    Result.assert(TokenPatterns.fingerprint("12345678") == "***")
+    Result
+      .assert(TokenPatterns.fingerprint("12345678") == "***")
       .log(s"8-char fingerprint should be ***: got ${TokenPatterns.fingerprint("12345678")}")
 
   def testFingerprintShort: Result =
-    Result.assert(TokenPatterns.fingerprint("abc") == "***")
+    Result
+      .assert(TokenPatterns.fingerprint("abc") == "***")
       .log("short fingerprint should be ***")
 
   def testFingerprintEmpty: Result =
-    Result.assert(TokenPatterns.fingerprint("") == "***")
+    Result
+      .assert(TokenPatterns.fingerprint("") == "***")
       .log("empty fingerprint should be ***")
 
   // ---- property ----------------------------------------------------------
@@ -187,7 +201,8 @@ object TokenPatternsSpec extends Properties {
       // Plain digits + space — can't form any recognized prefix.
       s <- Gen.string(Gen.frequency1(9 -> Gen.digit, 1 -> Gen.constant(' ')), Range.linear(0, 50)).log("s")
     } yield {
-      Result.assert(TokenPatterns.scan(s).isEmpty)
+      Result
+        .assert(TokenPatterns.scan(s).isEmpty)
         .log(s"random digit string should not match: $s")
     }
 

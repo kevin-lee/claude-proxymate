@@ -1,5 +1,6 @@
 package claudeproxymate.renderer.search
 
+import cats.syntax.all.*
 import claudeproxymate.core.HtmlIds
 import claudeproxymate.renderer.state.AppState
 import org.scalajs.dom
@@ -57,19 +58,19 @@ object ProxyDetailSearchListeners {
 
   private def handleInput(e: dom.Event): Unit = {
     val target = e.target.asInstanceOf[dom.Element]
-    if (target == null || target.id != HtmlIds.ProxyDetailSearchInput) return
+    if (target == null || target.id =!= HtmlIds.ProxyDetailSearchInput) return
     SearchNavigation.setProxyDetailSearch(target.asInstanceOf[dom.html.Input].value)
   }
 
   private def handleCompositionStart(e: dom.Event): Unit = {
     val target = e.target.asInstanceOf[dom.Element]
-    if (target == null || target.id != HtmlIds.ProxyDetailSearchInput) return
+    if (target == null || target.id =!= HtmlIds.ProxyDetailSearchInput) return
     AppState.imeComposing = true
   }
 
   private def handleCompositionEnd(e: dom.Event): Unit = {
     val target = e.target.asInstanceOf[dom.Element]
-    if (target == null || target.id != HtmlIds.ProxyDetailSearchInput) return
+    if (target == null || target.id =!= HtmlIds.ProxyDetailSearchInput) return
     AppState.imeComposing = false
     SearchNavigation.setProxyDetailSearch(target.asInstanceOf[dom.html.Input].value)
   }

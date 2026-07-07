@@ -25,14 +25,13 @@ object MechanismDetectorSpec extends Properties {
       val body = Json.obj(
         "messages" -> Json.arr(
           Json.obj(
-            "role"    -> "user".asJson,
+            "role" -> "user".asJson,
             "content" -> "<system-reminder>\nContents of /path/CLAUDE.md (desc):\n\ncontent\n</system-reminder>\nhello".asJson,
           )
         )
       )
-      val det = MechanismDetector.detectMechanisms(body)
-      Result.assert(det.claudeMd.isDefined) and
-        Result.assert(det.claudeMd.exists(_.contains("Contents of")))
+      val det  = MechanismDetector.detectMechanisms(body)
+      Result.assert(det.claudeMd.isDefined).and(Result.assert(det.claudeMd.exists(_.contains("Contents of"))))
     }
 
   def testOutputStyle: Property =
@@ -40,15 +39,14 @@ object MechanismDetectorSpec extends Properties {
       _ <- Gen.constant(()).forAll
     } yield {
       val body = Json.obj(
-        "system" -> Json.arr(
+        "system"   -> Json.arr(
           Json.obj("type" -> "text".asJson, "text" -> "base system".asJson),
           Json.obj("type" -> "text".asJson, "text" -> "output style".asJson),
         ),
         "messages" -> Json.arr(),
       )
-      val det = MechanismDetector.detectMechanisms(body)
-      Result.assert(det.outputStyle.isDefined) and
-        Result.assert(det.outputStyle.exists(_.length == 2))
+      val det  = MechanismDetector.detectMechanisms(body)
+      Result.assert(det.outputStyle.isDefined).and(Result.assert(det.outputStyle.exists(_.length == 2)))
     }
 
   def testSlashCommand: Property =
@@ -63,9 +61,8 @@ object MechanismDetectorSpec extends Properties {
           )
         )
       )
-      val det = MechanismDetector.detectMechanisms(body)
-      Result.assert(det.slashCommands.nonEmpty) and
-        Result.assert(det.slashCommands.head.tag.contains("commit"))
+      val det  = MechanismDetector.detectMechanisms(body)
+      Result.assert(det.slashCommands.nonEmpty).and(Result.assert(det.slashCommands.head.tag.contains("commit")))
     }
 
   def testSkillToolUse: Property =
@@ -75,7 +72,7 @@ object MechanismDetectorSpec extends Properties {
       val body = Json.obj(
         "messages" -> Json.arr(
           Json.obj(
-            "role" -> "assistant".asJson,
+            "role"    -> "assistant".asJson,
             "content" -> Json.arr(
               Json.obj(
                 "type"  -> "tool_use".asJson,
@@ -87,8 +84,8 @@ object MechanismDetectorSpec extends Properties {
           )
         )
       )
-      val det = MechanismDetector.detectMechanisms(body)
-      Result.assert(det.skills.length == 1) and {
+      val det  = MechanismDetector.detectMechanisms(body)
+      Result.assert(det.skills.length == 1).and {
         val skillInput = det.skills.head.input.hcursor.get[String]("skill").toOption
         Result.assert(skillInput.contains("e2e"))
       }
@@ -101,7 +98,7 @@ object MechanismDetectorSpec extends Properties {
       val body = Json.obj(
         "messages" -> Json.arr(
           Json.obj(
-            "role" -> "assistant".asJson,
+            "role"    -> "assistant".asJson,
             "content" -> Json.arr(
               Json.obj(
                 "type"  -> "tool_use".asJson,
@@ -113,9 +110,8 @@ object MechanismDetectorSpec extends Properties {
           )
         )
       )
-      val det = MechanismDetector.detectMechanisms(body)
-      Result.assert(det.subAgents.length == 1) and
-        Result.assert(det.subAgents.head.name == "Agent")
+      val det  = MechanismDetector.detectMechanisms(body)
+      Result.assert(det.subAgents.length == 1).and(Result.assert(det.subAgents.head.name == "Agent"))
     }
 
   def testMcpToolUse: Property =
@@ -125,7 +121,7 @@ object MechanismDetectorSpec extends Properties {
       val body = Json.obj(
         "messages" -> Json.arr(
           Json.obj(
-            "role" -> "assistant".asJson,
+            "role"    -> "assistant".asJson,
             "content" -> Json.arr(
               Json.obj(
                 "type"  -> "tool_use".asJson,
@@ -137,9 +133,8 @@ object MechanismDetectorSpec extends Properties {
           )
         )
       )
-      val det = MechanismDetector.detectMechanisms(body)
-      Result.assert(det.mcpTools.length == 1) and
-        Result.assert(det.mcpTools.head.name == "mcp__serena__find_symbol")
+      val det  = MechanismDetector.detectMechanisms(body)
+      Result.assert(det.mcpTools.length == 1).and(Result.assert(det.mcpTools.head.name == "mcp__serena__find_symbol"))
     }
 
   def testEmptyBody: Property =
@@ -147,12 +142,13 @@ object MechanismDetectorSpec extends Properties {
       _ <- Gen.constant(()).forAll
     } yield {
       val det = MechanismDetector.detectMechanisms(Json.obj())
-      Result.assert(det.claudeMd.isEmpty) and
-        Result.assert(det.outputStyle.isEmpty) and
-        Result.assert(det.slashCommands.isEmpty) and
-        Result.assert(det.skills.isEmpty) and
-        Result.assert(det.subAgents.isEmpty) and
-        Result.assert(det.mcpTools.isEmpty)
+      Result
+        .assert(det.claudeMd.isEmpty)
+        .and(Result.assert(det.outputStyle.isEmpty))
+        .and(Result.assert(det.slashCommands.isEmpty))
+        .and(Result.assert(det.skills.isEmpty))
+        .and(Result.assert(det.subAgents.isEmpty))
+        .and(Result.assert(det.mcpTools.isEmpty))
     }
 
   def testToolResultSkill: Property =
@@ -162,7 +158,7 @@ object MechanismDetectorSpec extends Properties {
       val body = Json.obj(
         "messages" -> Json.arr(
           Json.obj(
-            "role" -> "assistant".asJson,
+            "role"    -> "assistant".asJson,
             "content" -> Json.arr(
               Json.obj(
                 "type"  -> "tool_use".asJson,
@@ -173,7 +169,7 @@ object MechanismDetectorSpec extends Properties {
             ),
           ),
           Json.obj(
-            "role" -> "user".asJson,
+            "role"    -> "user".asJson,
             "content" -> Json.arr(
               Json.obj(
                 "type"        -> "tool_result".asJson,
@@ -184,8 +180,7 @@ object MechanismDetectorSpec extends Properties {
           ),
         )
       )
-      val det = MechanismDetector.detectMechanisms(body)
-      Result.assert(det.skills.length == 1) and
-        Result.assert(det.skills.head.result.contains("Skill result here"))
+      val det  = MechanismDetector.detectMechanisms(body)
+      Result.assert(det.skills.length == 1).and(Result.assert(det.skills.head.result.contains("Skill result here")))
     }
 }

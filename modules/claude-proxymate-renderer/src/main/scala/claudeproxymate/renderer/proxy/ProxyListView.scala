@@ -58,11 +58,11 @@ object ProxyListView {
 
     val modelFrag: Frag = e.model match {
       case Some(m) => div(cls := "prx-model")(m)
-      case None    => frag()
+      case None => frag()
     }
 
     div(
-      cls                   := entryCls,
+      cls := entryCls,
       attr(EntryDataIdAttr) := e.id.toString,
     )(
       div(style := "display:flex;align-items:center;overflow:hidden")(

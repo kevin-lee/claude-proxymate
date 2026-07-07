@@ -63,8 +63,8 @@ object HtmlUtilSpec extends Properties {
   def testEscNoLiteralSingleQuote: Property =
     for {
       s <- Gen
-        .string(Gen.frequency1(4 -> Gen.alpha, 1 -> Gen.constant('\'')), Range.linear(0, 50))
-        .log("s")
+             .string(Gen.frequency1(4 -> Gen.alpha, 1 -> Gen.constant('\'')), Range.linear(0, 50))
+             .log("s")
     } yield {
       val out = HtmlUtil.esc(s)
       Result.assert(!out.contains('\'')).log(s"out contained ': $out")
@@ -73,8 +73,8 @@ object HtmlUtilSpec extends Properties {
   def testEscNoLiteralDoubleQuote: Property =
     for {
       s <- Gen
-        .string(Gen.frequency1(4 -> Gen.alpha, 1 -> Gen.constant('"')), Range.linear(0, 50))
-        .log("s")
+             .string(Gen.frequency1(4 -> Gen.alpha, 1 -> Gen.constant('"')), Range.linear(0, 50))
+             .log("s")
     } yield {
       val out = HtmlUtil.esc(s)
       Result.assert(!out.contains('"')).log(s"out contained \": $out")
@@ -83,8 +83,8 @@ object HtmlUtilSpec extends Properties {
   def testEscNoLiteralLt: Property =
     for {
       s <- Gen
-        .string(Gen.frequency1(4 -> Gen.alpha, 1 -> Gen.constant('<')), Range.linear(0, 50))
-        .log("s")
+             .string(Gen.frequency1(4 -> Gen.alpha, 1 -> Gen.constant('<')), Range.linear(0, 50))
+             .log("s")
     } yield {
       val out = HtmlUtil.esc(s)
       Result.assert(!out.contains('<')).log(s"out contained <: $out")
@@ -117,11 +117,14 @@ object HtmlUtilSpec extends Properties {
     val result = HtmlUtil.highlightSearchFrag(text, "hello").render
     Result.all(
       List(
-        Result.assert(result.contains("""<mark class="search-hl">Hello</mark>"""))
+        Result
+          .assert(result.contains("""<mark class="search-hl">Hello</mark>"""))
           .log(s"should wrap Hello, got: $result"),
-        Result.assert(result.contains("""<mark class="search-hl">HELLO</mark>"""))
+        Result
+          .assert(result.contains("""<mark class="search-hl">HELLO</mark>"""))
           .log(s"should wrap HELLO, got: $result"),
-        Result.assert(result.contains("""<mark class="search-hl">hello</mark>"""))
+        Result
+          .assert(result.contains("""<mark class="search-hl">hello</mark>"""))
           .log(s"should wrap hello, got: $result"),
       )
     )
@@ -130,7 +133,8 @@ object HtmlUtilSpec extends Properties {
   def testHighlightRegexMeta: Result = {
     val text   = "price is $100.00 (USD)"
     val result = HtmlUtil.highlightSearchFrag(text, "$100.00").render
-    Result.assert(result.contains("""<mark class="search-hl">$100.00</mark>"""))
+    Result
+      .assert(result.contains("""<mark class="search-hl">$100.00</mark>"""))
       .log(s"should match literal $$100.00, got: $result")
   }
 }

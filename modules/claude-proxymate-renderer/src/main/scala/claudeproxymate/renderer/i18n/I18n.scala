@@ -1,5 +1,6 @@
 package claudeproxymate.renderer.i18n
 
+import cats.syntax.all.*
 import claudeproxymate.core.HtmlIds
 import org.scalajs.dom
 import scala.scalajs.js
@@ -25,9 +26,11 @@ object I18n {
 
   /** Load locale JSON files via fetch and populate `_translations`. */
   def loadLocales(): js.Promise[Unit] = {
-    val locales = List("en", "ko")
+    val locales  = List("en", "ko")
     val promises = locales.map { lang =>
-      dom.window.fetch(s"i18n/$lang.json")
+      dom
+        .window
+        .fetch(s"i18n/$lang.json")
         .`then`[js.Dynamic] { (r: dom.Response) => r.json().asInstanceOf[js.Promise[js.Dynamic]] }
         .`then`[Unit] { (obj: js.Dynamic) =>
           val dict = obj.asInstanceOf[js.Dictionary[String]]
@@ -60,7 +63,7 @@ object I18n {
   }
 
   def toggleLocale(): Unit =
-    setLocale(if (_locale == "ko") "en" else "ko")
+    setLocale(if (_locale === "ko") "en" else "ko")
 
   @JSExportTopLevel("i18n_setLocale")
   def setLocale(lang: String): Unit = {
@@ -99,7 +102,7 @@ object I18n {
 
     // lang toggle button text
     val btn = dom.document.getElementById(HtmlIds.LangToggleBtn)
-    if (btn != null) btn.textContent = if (_locale == "ko") "\ud55c" else "EN"
+    if (btn != null) btn.textContent = if (_locale === "ko") "\ud55c" else "EN"
 
     // re-render proxy content that depends on locale
     claudeproxymate.renderer.proxy.ProxyList.renderProxyList()

@@ -35,9 +35,9 @@ import scalatags.Text.all.*
   */
 object MessageTokenView {
 
-  private sealed trait Hit { def start: Int; def end: Int }
-  private final case class TokHit(start: Int, end: Int)              extends Hit
-  private final case class CorrHit(start: Int, end: Int, name: String) extends Hit
+  sealed private trait Hit { def start: Int; def end: Int }
+  final private case class TokHit(start: Int, end: Int) extends Hit
+  final private case class CorrHit(start: Int, end: Int, name: String) extends Hit
 
   private def collectHits(text: String): List[Hit] = {
     val tokens = TokenPatterns.scan(text).map(t => TokHit(t.start, t.end))
@@ -62,12 +62,12 @@ object MessageTokenView {
             val tid = s"$idPrefix#${h.start}"
             if (AppState.isRevealed(tid)) {
               parts += span(
-                cls                                  := JsonTreeView.TokenMaskRevealedClass,
+                cls := JsonTreeView.TokenMaskRevealedClass,
                 attr(JsonTreeView.TokenMaskDataAttr) := tid,
               )(HtmlUtil.highlightSearchFrag(raw, query))
             } else {
               parts += span(
-                cls                                  := JsonTreeView.TokenMaskClass,
+                cls := JsonTreeView.TokenMaskClass,
                 attr(JsonTreeView.TokenMaskDataAttr) := tid,
               )(TokenPatterns.fingerprint(raw))
             }
@@ -75,12 +75,12 @@ object MessageTokenView {
             val cid = s"corr:$idPrefix#${h.start}"
             if (AppState.isRevealed(cid)) {
               parts += span(
-                cls                                 := JsonTreeView.CorrMaskRevealedClass,
+                cls := JsonTreeView.CorrMaskRevealedClass,
                 attr(JsonTreeView.CorrMaskDataAttr) := cid,
               )(HtmlUtil.highlightSearchFrag(raw, query))
             } else {
               parts += span(
-                cls                                 := JsonTreeView.CorrMaskClass,
+                cls := JsonTreeView.CorrMaskClass,
                 attr(JsonTreeView.CorrMaskDataAttr) := cid,
               )(CorrelationIds.fingerprint(name, raw))
             }

@@ -1,5 +1,6 @@
 package claudeproxymate.core
 
+import cats.syntax.all.*
 import io.circe.{Json, JsonObject, Printer}
 
 import scala.util.matching.Regex
@@ -51,16 +52,16 @@ object MechanismDetector {
 
   private def extractOutputStyle(obj: JsonObject): Option[List[String]] =
     obj("system").flatMap(_.asArray).flatMap { arr =>
-      if (arr.size >= 2) {
+      Option.when(arr.size >= 2) {
         val texts = arr.flatMap { s =>
           for {
             o    <- s.asObject
-            typ  <- o("type").flatMap(_.asString) if typ == "text"
+            typ  <- o("type").flatMap(_.asString) if typ === "text"
             text <- o("text").flatMap(_.asString)
           } yield text
         }
-        Some(texts.toList)
-      } else None
+        texts.toList
+      }
     }
 
   private def extractContents(msg: Json): List[Json] =
@@ -92,19 +93,19 @@ object MechanismDetector {
 
       case "tool_use" =>
         cName match {
-          case Some(name) if name == "Skill" =>
+          case Some(name) if name === "Skill" =>
             val input = cObj("input").getOrElse(Json.Null)
-            acc.copy(skills = acc.skills :+ SkillUse(cId, input, None))
+            acc.copy(skills = acc.skills :+ SkillUse(cId, input, none[String]))
 
-          case Some(name) if name == "Task" || name == "Agent" =>
+          case Some(name) if name === "Task" || name === "Agent" =>
             val input = cObj("input").getOrElse(Json.Null)
             acc.copy(subAgents = acc.subAgents :+ SubAgent(cId, name, input))
 
           case Some(name) if name.startsWith("mcp__") =>
             val input = cObj("input").getOrElse(Json.Null)
-            acc.copy(mcpTools = acc.mcpTools :+ McpTool(cId, name, input, None))
+            acc.copy(mcpTools = acc.mcpTools :+ McpTool(cId, name, input, none[String]))
 
-          case _ => acc
+          case Some(_) | None => acc
         }
 
       case "tool_result" =>
@@ -114,10 +115,10 @@ object MechanismDetector {
         }
         acc.copy(
           skills = acc.skills.map { s =>
-            if (s.id == toolUseId) s.copy(result = resultContent) else s
+            if (s.id === toolUseId) s.copy(result = resultContent) else s
           },
           mcpTools = acc.mcpTools.map { m =>
-            if (m.id == toolUseId) m.copy(result = resultContent) else m
+            if (m.id === toolUseId) m.copy(result = resultContent) else m
           },
         )
 
@@ -136,8 +137,8 @@ object MechanismDetector {
       val inner = m.group(1).trim
       if (contentsOfPattern.findFirstIn(inner).isDefined) {
         val updated = a.claudeMd match {
-          case Some(existing) => Some(existing + "\n\n" + inner)
-          case None => Some(inner)
+          case Some(existing) => (existing + "\n\n" + inner).some
+          case None => inner.some
         }
         a.copy(claudeMd = updated)
       } else a

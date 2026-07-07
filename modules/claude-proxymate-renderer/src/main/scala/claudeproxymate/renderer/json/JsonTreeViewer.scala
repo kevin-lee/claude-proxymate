@@ -1,5 +1,6 @@
 package claudeproxymate.renderer.json
 
+import cats.syntax.all.*
 import claudeproxymate.renderer.detail.DetailView
 import claudeproxymate.renderer.i18n.I18n
 import claudeproxymate.renderer.state.AppState
@@ -95,16 +96,16 @@ object JsonTreeViewer {
     val container = dom.document.getElementById(claudeproxymate.core.HtmlIds.ProxyDetailCode)
     if (container == null) return false
 
-    val cssEscape   = js.Dynamic.global.CSS.applyDynamic("escape")(path).asInstanceOf[String]
-    val live        = container.querySelector(s"[${JsonTreeView.MaskDataAttr}=\"$cssEscape\"]")
+    val cssEscape = js.Dynamic.global.CSS.applyDynamic("escape")(path).asInstanceOf[String]
+    val live      = container.querySelector(s"[${JsonTreeView.MaskDataAttr}=\"$cssEscape\"]")
     if (live == null) return false
 
     // Resolve the value at `path` against the active capture body.
     val entry = AppState.proxyCaptures.find(e => e.id == AppState.selectedProxyId.map(_.asInstanceOf[js.Any]).orNull)
     val body: js.Dynamic = entry match {
-      case None    => null.asInstanceOf[js.Dynamic]
+      case None => null.asInstanceOf[js.Dynamic]
       case Some(e) =>
-        if (AppState.proxyDetailTab == "request") e.selectDynamic("body")
+        if (AppState.proxyDetailTab === "request") e.selectDynamic("body")
         else {
           val resp = e.selectDynamic("response")
           if (!js.isUndefined(resp) && resp != null) resp.selectDynamic("body")
@@ -114,7 +115,7 @@ object JsonTreeViewer {
     if (body == null || js.isUndefined(body)) return false
 
     val value = JsonTreeView.resolvePath(body, path)
-    if (value == null && path != "$") {
+    if (value == null && path =!= "$") {
       // Path didn't resolve. Bail out so the caller falls back to a
       // full re-render rather than drawing nonsense.
       return false
@@ -126,11 +127,11 @@ object JsonTreeViewer {
     // Parse the freshly-rendered HTML and replace the live element
     // with the new node. A throwaway <div> is fine as a parser
     // sandbox; the outer span we want is its firstChild.
-    val sandbox = dom.document.createElement("div").asInstanceOf[dom.html.Element]
+    val sandbox     = dom.document.createElement("div").asInstanceOf[dom.html.Element]
     sandbox.innerHTML = newFrag
     val replacement = sandbox.firstChild
     if (replacement == null) return false
-    val _ = live.asInstanceOf[js.Dynamic].replaceWith(replacement)
+    val _           = live.asInstanceOf[js.Dynamic].replaceWith(replacement)
     true
   }
 
@@ -170,9 +171,9 @@ object JsonTreeViewer {
 
     val entry = AppState.proxyCaptures.find(e => e.id == AppState.selectedProxyId.map(_.asInstanceOf[js.Any]).orNull)
     val body: js.Dynamic = entry match {
-      case None    => null.asInstanceOf[js.Dynamic]
+      case None => null.asInstanceOf[js.Dynamic]
       case Some(e) =>
-        if (AppState.proxyDetailTab == "request") e.selectDynamic("body")
+        if (AppState.proxyDetailTab === "request") e.selectDynamic("body")
         else {
           val resp = e.selectDynamic("response")
           if (!js.isUndefined(resp) && resp != null) resp.selectDynamic("body")
@@ -181,17 +182,17 @@ object JsonTreeViewer {
     }
     if (body == null || js.isUndefined(body)) return false
 
-    val parent = JsonTreeView.resolvePath(body, path)
-    if (parent == null || js.isUndefined(parent) || js.typeOf(parent) != "string") return false
+    val parent    = JsonTreeView.resolvePath(body, path)
+    if (parent == null || js.isUndefined(parent) || js.typeOf(parent) =!= "string") return false
     val parentStr = parent.asInstanceOf[String]
 
     val matches = claudeproxymate.core.TokenPatterns.scan(parentStr)
-    matches.find(_.start == offset) match {
+    matches.find(_.start === offset) match {
       case None => false
       case Some(m) =>
-        val raw     = parentStr.substring(m.start, m.end)
-        val newFrag = JsonTreeView.buildTokenMaskFrag(path, m.start, raw).render
-        val sandbox = dom.document.createElement("div").asInstanceOf[dom.html.Element]
+        val raw         = parentStr.substring(m.start, m.end)
+        val newFrag     = JsonTreeView.buildTokenMaskFrag(path, m.start, raw).render
+        val sandbox     = dom.document.createElement("div").asInstanceOf[dom.html.Element]
         sandbox.innerHTML = newFrag
         val replacement = sandbox.firstChild
         if (replacement == null) false
@@ -230,16 +231,16 @@ object JsonTreeViewer {
     val payload = corrId.substring("corr:".length)
     val hashAt  = payload.lastIndexOf('#')
     if (hashAt < 0) return false
-    val path   = payload.substring(0, hashAt)
-    val offset =
+    val path    = payload.substring(0, hashAt)
+    val offset  =
       try payload.substring(hashAt + 1).toInt
       catch { case _: NumberFormatException => return false }
 
     val entry = AppState.proxyCaptures.find(e => e.id == AppState.selectedProxyId.map(_.asInstanceOf[js.Any]).orNull)
     val body: js.Dynamic = entry match {
-      case None    => null.asInstanceOf[js.Dynamic]
+      case None => null.asInstanceOf[js.Dynamic]
       case Some(e) =>
-        if (AppState.proxyDetailTab == "request") e.selectDynamic("body")
+        if (AppState.proxyDetailTab === "request") e.selectDynamic("body")
         else {
           val resp = e.selectDynamic("response")
           if (!js.isUndefined(resp) && resp != null) resp.selectDynamic("body")
@@ -248,17 +249,17 @@ object JsonTreeViewer {
     }
     if (body == null || js.isUndefined(body)) return false
 
-    val parent = JsonTreeView.resolvePath(body, path)
-    if (parent == null || js.isUndefined(parent) || js.typeOf(parent) != "string") return false
+    val parent    = JsonTreeView.resolvePath(body, path)
+    if (parent == null || js.isUndefined(parent) || js.typeOf(parent) =!= "string") return false
     val parentStr = parent.asInstanceOf[String]
 
     val matches = claudeproxymate.core.CorrelationIds.scan(parentStr)
-    matches.find(_.start == offset) match {
-      case None    => false
+    matches.find(_.start === offset) match {
+      case None => false
       case Some(m) =>
-        val raw     = parentStr.substring(m.start, m.end)
-        val newFrag = JsonTreeView.buildCorrMaskFrag(path, m.start, raw, m.name).render
-        val sandbox = dom.document.createElement("div").asInstanceOf[dom.html.Element]
+        val raw         = parentStr.substring(m.start, m.end)
+        val newFrag     = JsonTreeView.buildCorrMaskFrag(path, m.start, raw, m.name).render
+        val sandbox     = dom.document.createElement("div").asInstanceOf[dom.html.Element]
         sandbox.innerHTML = newFrag
         val replacement = sandbox.firstChild
         if (replacement == null) false
@@ -284,7 +285,7 @@ object JsonTreeViewer {
     val btn     = dom.document.getElementById(s"$id-btn")
     if (body == null) return
 
-    val isOpen = body.asInstanceOf[dom.html.Element].style.display != "none"
+    val isOpen = body.asInstanceOf[dom.html.Element].style.display =!= "none"
     body.asInstanceOf[dom.html.Element].style.display = if (isOpen) "none" else ""
     if (summary != null) summary.asInstanceOf[dom.html.Element].style.display = if (isOpen) "" else "none"
     if (btn != null) btn.asInstanceOf[dom.html.Element].style.display = if (isOpen) "" else "none"
@@ -299,7 +300,7 @@ object JsonTreeViewer {
         val lined = bodyEl.closest(".jt-lined")
         if (lined != null) {
           val _ = dom.window.requestAnimationFrame { _ =>
-            splitLongExpLines(lined.asInstanceOf[dom.html.Element], Some(bodyEl))
+            splitLongExpLines(lined.asInstanceOf[dom.html.Element], bodyEl.some)
           }
         }
       }
@@ -315,7 +316,7 @@ object JsonTreeViewer {
     val btn     = dom.document.getElementById(s"$id-btn")
     if (body == null) return
 
-    val isOpen = body.asInstanceOf[dom.html.Element].style.display != "none"
+    val isOpen = body.asInstanceOf[dom.html.Element].style.display =!= "none"
     body.asInstanceOf[dom.html.Element].style.display = if (isOpen) "none" else ""
     if (summary != null) summary.asInstanceOf[dom.html.Element].style.display = if (isOpen) "" else "none"
     if (btn != null) btn.textContent = if (isOpen) "▶" else "▼"
@@ -324,7 +325,7 @@ object JsonTreeViewer {
   /** Render a JSON tree into a container element. */
   def renderJsonTree(container: dom.html.Element, data: js.Dynamic): Unit = {
     val obj: js.Dynamic =
-      if (js.typeOf(data) == "string") {
+      if (js.typeOf(data) === "string") {
         try js.JSON.parse(data.asInstanceOf[String])
         catch {
           case _: Throwable =>
@@ -335,20 +336,20 @@ object JsonTreeViewer {
 
     val totalBytes = utf8ByteLength(js.JSON.stringify(obj))
     AppState.jtLine = 0
-    val tree     = JsonTreeView.buildJsonFrag(obj, totalBytes, I18n.t("mask.hiddenLabel"))
-    val lineInfo = div(cls := "jt-line-info")(s"${AppState.jtLine} lines total")
+    val tree       = JsonTreeView.buildJsonFrag(obj, totalBytes, I18n.t("mask.hiddenLabel"))
+    val lineInfo   = div(cls := "jt-line-info")(s"${AppState.jtLine} lines total")
     ViewHelpers.setInnerHtml(container, frag(tree, lineInfo))
     container.classList.add("jt-lined")
-    splitLongExpLines(container)
+    splitLongExpLines(container, none[dom.html.Element])
   }
 
   /** Split long expanded string lines to fit the container width. */
-  def splitLongExpLines(container: dom.html.Element, targetBlock: Option[dom.html.Element] = None): Unit = {
-    val measure = dom.document.createElement("span").asInstanceOf[dom.html.Span]
+  def splitLongExpLines(container: dom.html.Element, targetBlock: Option[dom.html.Element]): Unit = {
+    val measure    = dom.document.createElement("span").asInstanceOf[dom.html.Span]
     measure.style.cssText = "visibility:hidden;position:absolute;white-space:nowrap;font:inherit"
     measure.textContent = "X" * 100
     locally { val _ = container.appendChild(measure) }
-    val charWidth = measure.offsetWidth / 100.0
+    val charWidth  = measure.offsetWidth / 100.0
     locally { val _ = container.removeChild(measure) }
     val availWidth = container.clientWidth - 60
     val maxChars   = Math.max(40, Math.floor(availWidth / charWidth).toInt)
@@ -361,24 +362,28 @@ object JsonTreeViewer {
     }
 
     for (block <- blocks) {
-      val lineNodes = block.querySelectorAll(".jt-exp-line")
-      val lines     = (0 until lineNodes.length).map(lineNodes(_))
+      val lineNodes    = block.querySelectorAll(".jt-exp-line")
+      val lines        = (0 until lineNodes.length).map(lineNodes(_))
       // Skip the wrap pass when any line contains a token-mask span.
       // The wrap rebuilds the block as plain `<div>`s with
       // `textContent`, which would flatten the span structure and
       // break click-to-reveal. Long lines with tokens overflow
       // horizontally instead — acceptable trade-off for correctness.
-      val hasTokenMask = block.querySelector(s".${JsonTreeView.TokenMaskClass},.${JsonTreeView.TokenMaskRevealedClass}") != null
+      val hasTokenMask =
+        block.querySelector(s".${JsonTreeView.TokenMaskClass},.${JsonTreeView.TokenMaskRevealedClass}") != null
       if (lines.nonEmpty && !hasTokenMask) {
         val needsSplit = lines.exists(_.textContent.length > maxChars)
         if (needsSplit) {
-          val baseLn = {
+          val baseLn  = {
             val attr = lines.head.getAttribute("data-ln")
-            if (attr != null) try attr.toInt catch { case _: Throwable => 1 } else 1
+            if (attr != null)
+              try attr.toInt
+              catch { case _: Throwable => 1 }
+            else 1
           }
           var lineNum = baseLn
 
-          case class Fragment(text: String, ln: Int, cssClass: String)
+          final case class Fragment(text: String, ln: Int, cssClass: String)
           val fragments = scala.collection.mutable.ArrayBuffer.empty[Fragment]
 
           for (line <- lines) {
@@ -405,7 +410,7 @@ object JsonTreeViewer {
             divEl.className = f.cssClass
             divEl.setAttribute("data-ln", f.ln.toString)
             divEl.textContent = f.text
-            val _ = block.appendChild(divEl)
+            val _     = block.appendChild(divEl)
           }
         }
       }

@@ -1,5 +1,7 @@
 package claudeproxymate.renderer.state
 
+import cats.syntax.all.*
+
 import scala.collection.mutable
 import scala.scalajs.js
 
@@ -10,18 +12,18 @@ import scala.scalajs.js
 object AppState {
 
   // Proxy captures
-  var proxyCaptures: List[js.Dynamic]   = Nil
-  var selectedProxyId: Option[Double]   = None
-  var proxyDetailTab: String            = "messages"
-  var msgFilter: String                 = "all"
-  var msgSearchQuery: String            = ""
-  var proxyDetailSearch: String         = ""
-  var proxyDetailMechFilter: Option[String] = None
-  var proxyRunning: Boolean             = false
-  var proxyActualPort: Int              = 8888
+  var proxyCaptures: List[js.Dynamic]       = Nil
+  var selectedProxyId: Option[Double]       = none[Double]
+  var proxyDetailTab: String                = "messages"
+  var msgFilter: String                     = "all"
+  var msgSearchQuery: String                = ""
+  var proxyDetailSearch: String             = ""
+  var proxyDetailMechFilter: Option[String] = none[String]
+  var proxyRunning: Boolean                 = false
+  var proxyActualPort: Int                  = 8888
 
   // Badge toggle
-  var activeBadgeUid: Option[String] = None
+  var activeBadgeUid: Option[String] = none[String]
 
   // Search
   var searchCurrentIdx: Int = -1
@@ -30,8 +32,8 @@ object AppState {
   var imeComposing: Boolean = false
 
   // Debounce / focus tracking
-  var msgSearchWasFocused: Boolean     = false
-  var detailSearchWasFocused: Boolean  = false
+  var msgSearchWasFocused: Boolean    = false
+  var detailSearchWasFocused: Boolean = false
 
   // JSON tree viewer counters
   var jtId: Int   = 0

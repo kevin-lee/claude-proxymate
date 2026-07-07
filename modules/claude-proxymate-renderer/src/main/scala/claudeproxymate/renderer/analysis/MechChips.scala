@@ -1,5 +1,6 @@
 package claudeproxymate.renderer.analysis
 
+import cats.syntax.all.*
 import claudeproxymate.core.{ClaudeMdParser, MechanismDetector, Mechanisms}
 import claudeproxymate.renderer.i18n.I18n
 import claudeproxymate.renderer.state.AppState
@@ -27,7 +28,7 @@ object MechChips {
     if (target == null) return
     val chipEl = target.closest(s".${MechChipsView.ChipClass}[${MechChipsView.ChipDataAttr}]")
     if (chipEl == null) return
-    val key = chipEl.asInstanceOf[dom.html.Element].getAttribute(MechChipsView.ChipDataAttr)
+    val key    = chipEl.asInstanceOf[dom.html.Element].getAttribute(MechChipsView.ChipDataAttr)
     if (key == null || key.isEmpty) return
     setProxyDetailMechFilter(key)
   }
@@ -50,8 +51,8 @@ object MechChips {
   /** Toggle the mechanism filter. Called by the click handler. */
   def setProxyDetailMechFilter(key: String): Unit = {
     AppState.proxyDetailMechFilter = AppState.proxyDetailMechFilter match {
-      case Some(k) if k == key => None
-      case _                   => Some(key)
+      case Some(k) if k === key => none[String]
+      case Some(_) | None => key.some
     }
     claudeproxymate.renderer.detail.DetailView.renderProxyDetail()
   }
@@ -62,12 +63,12 @@ object MechChips {
     * those panels migrate (A3g/A3h).
     */
   def buildMechFilterChips(body: js.Dynamic): String = {
-    val det   = detectMechanismsFromDynamic(body)
-    val chips = collectChips(det)
+    val det       = detectMechanismsFromDynamic(body)
+    val chips     = collectChips(det)
     if (chips.isEmpty) return ""
     val activeKey = AppState.proxyDetailMechFilter
     val descMeta  = activeKey
-      .flatMap(k => chips.find(_.key == k))
+      .flatMap(k => chips.find(_.key === k))
       .flatMap(c => getChipMeta().get(c.metaKey))
     MechChipsView.buildChipsFrag(chips, activeKey, descMeta).render
   }
@@ -79,7 +80,7 @@ object MechChips {
       val sections = ClaudeMdParser.parseClaudeMdSections(claudeMd)
       if (sections.nonEmpty) {
         for ((s, i) <- sections.zipWithIndex) {
-          val cls = if (s.cls == "cyan") "st" else "cm"
+          val cls = if (s.cls === "cyan") "st" else "cm"
           buf += Chip(s"cm_$i", s.label, cls, "cm")
         }
       } else {
@@ -92,7 +93,9 @@ object MechChips {
     }
 
     for ((sk, i) <- det.skills.zipWithIndex) {
-      val skName = sk.input.hcursor
+      val skName = sk
+        .input
+        .hcursor
         .downField("skill")
         .as[String]
         .orElse(sk.input.hcursor.downField("command").as[String])

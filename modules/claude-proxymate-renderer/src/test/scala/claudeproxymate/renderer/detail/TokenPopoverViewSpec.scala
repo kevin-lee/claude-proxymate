@@ -21,34 +21,34 @@ object TokenPopoverViewSpec extends Properties {
   )
 
   private val sampleRow = TokenPopoverRow(
-    label  = "Input",
+    label = "Input",
     tokens = "1.2K",
-    price  = "3.00",
-    cost   = "$0.0036",
+    price = "3.00",
+    cost = "$0.0036",
   )
 
   private def sampleData(model: String = "claude-opus-4-7"): TokenPopoverData =
     TokenPopoverData(
-      model       = model,
-      kb          = "2.5",
-      total       = "$0.0100",
-      cachePct    = 75,
+      model = model,
+      kb = "2.5",
+      total = "$0.0100",
+      cachePct = 75,
       pricingDate = "2026-04-22",
-      rows        = List(sampleRow),
+      rows = List(sampleRow),
     )
 
   private val sampleLabels = TokenPopoverLabels(
-    costTitle         = "Cost",
-    modelLabel        = "Model",
-    reqSizeLabel      = "Size",
-    copyBtn           = "Copy",
-    totalLabel        = "Total",
+    costTitle = "Cost",
+    modelLabel = "Model",
+    reqSizeLabel = "Size",
+    copyBtn = "Copy",
+    totalLabel = "Total",
     cacheHitRateLabel = "Cache hit rate",
-    notePricingDate   = "Pricing as of: 2026-04-22",
-    noteModelPrice    = "Pricing varies by model",
-    noteOfficialDoc   = "Official Docs",
-    noteMTok          = "MTok = million tokens",
-    noteCacheSaving   = Some("Cache 75%"),
+    notePricingDate = "Pricing as of: 2026-04-22",
+    noteModelPrice = "Pricing varies by model",
+    noteOfficialDoc = "Official Docs",
+    noteMTok = "MTok = million tokens",
+    noteCacheSaving = Some("Cache 75%"),
   )
 
   private val sampleDescriptions = Map(
@@ -110,7 +110,7 @@ object TokenPopoverViewSpec extends Properties {
   }
 
   def testCopyTextFormat: Result = {
-    val text = TokenPopoverView.buildCopyText(sampleData(), sampleLabels)
+    val text     = TokenPopoverView.buildCopyText(sampleData(), sampleLabels)
     val expected = List(
       "Model: claude-opus-4-7",
       "Size: 2.5 KB",
@@ -140,7 +140,8 @@ object TokenPopoverViewSpec extends Properties {
       evil <- Gen.string(Gen.alpha, Range.linear(0, 20)).log("evil")
     } yield {
       val html = render(data = sampleData(model = s"<script>alert('$evil')</script>"))
-      Result.assert(!html.contains("<script>"))
+      Result
+        .assert(!html.contains("<script>"))
         .log(s"raw <script> leaked for evil=$evil: $html")
     }
 }

@@ -39,11 +39,11 @@ object DetailHeaderView {
   ): Frag =
     div(cls := "msg-search-bar", style := "flex-shrink:0")(
       input(
-        tpe         := "text",
-        cls         := SearchInputClass,
-        id          := searchInputId,
+        tpe := "text",
+        cls := SearchInputClass,
+        id := searchInputId,
         placeholder := labels.placeholder,
-        value       := query,
+        value := query,
       ),
       if (query.nonEmpty)
         frag(
@@ -65,6 +65,6 @@ object DetailHeaderView {
   private def buildBadgeFrag(b: TokenBadge): Frag =
     b.color match {
       case Some(c) => span(cls := "tt-badge", style := s"color:$c")(b.text)
-      case None    => span(cls := "tt-badge")(b.text)
+      case None => span(cls := "tt-badge")(b.text)
     }
 }

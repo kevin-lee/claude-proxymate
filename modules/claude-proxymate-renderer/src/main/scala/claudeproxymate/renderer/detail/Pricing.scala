@@ -1,5 +1,7 @@
 package claudeproxymate.renderer.detail
 
+import scala.annotation.tailrec
+
 /** Pricing rates in $/MTok for a given model tier. */
 final case class Rates(
   input: Double,
@@ -9,31 +11,31 @@ final case class Rates(
 )
 
 /** Pricing tier for a Claude model. */
-sealed trait ModelTier {
-  def rates: Rates
+enum ModelTier {
+  case OpusPremium
+  case OpusLegacy
+  case Sonnet
+  case Haiku4_5
+  case Haiku3_5
+  case Haiku3
+  case Unknown
 }
 
 object ModelTier {
-  case object OpusPremium extends ModelTier {
-    val rates: Rates = Rates(5.0, 25.0, 0.5, 6.25)
-  }
-  case object OpusLegacy extends ModelTier {
-    val rates: Rates = Rates(15.0, 75.0, 1.5, 18.75)
-  }
-  case object Sonnet extends ModelTier {
-    val rates: Rates = Rates(3.0, 15.0, 0.3, 3.75)
-  }
-  case object Haiku4_5 extends ModelTier {
-    val rates: Rates = Rates(1.0, 5.0, 0.1, 1.25)
-  }
-  case object Haiku3_5 extends ModelTier {
-    val rates: Rates = Rates(0.8, 4.0, 0.08, 1.0)
-  }
-  case object Haiku3 extends ModelTier {
-    val rates: Rates = Rates(0.25, 1.25, 0.03, 0.3)
-  }
-  case object Unknown extends ModelTier {
-    val rates: Rates = Sonnet.rates
+
+  extension (tier: ModelTier) {
+
+    /** Pricing rates in $/MTok for this tier. */
+    @tailrec
+    def rates: Rates = tier match {
+      case OpusPremium => Rates(5.0, 25.0, 0.5, 6.25)
+      case OpusLegacy => Rates(15.0, 75.0, 1.5, 18.75)
+      case Sonnet => Rates(3.0, 15.0, 0.3, 3.75)
+      case Haiku4_5 => Rates(1.0, 5.0, 0.1, 1.25)
+      case Haiku3_5 => Rates(0.8, 4.0, 0.08, 1.0)
+      case Haiku3 => Rates(0.25, 1.25, 0.03, 0.3)
+      case Unknown => Sonnet.rates
+    }
   }
 
   /** Classify a model ID or alias into a pricing tier.

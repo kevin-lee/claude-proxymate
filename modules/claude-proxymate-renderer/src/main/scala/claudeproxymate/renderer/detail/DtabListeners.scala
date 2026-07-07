@@ -23,9 +23,9 @@ object DtabListeners {
   private def handleClick(e: dom.MouseEvent): Unit = {
     val target = e.target.asInstanceOf[dom.Element]
     if (target == null) return
-    val btn = target.closest(s".$DtabClass[$DtabDataAttr]")
+    val btn    = target.closest(s".$DtabClass[$DtabDataAttr]")
     if (btn == null) return
-    val tab = btn.asInstanceOf[dom.html.Element].getAttribute(DtabDataAttr)
+    val tab    = btn.asInstanceOf[dom.html.Element].getAttribute(DtabDataAttr)
     if (tab != null && tab.nonEmpty) DetailView.showDetailTab(tab)
   }
 }

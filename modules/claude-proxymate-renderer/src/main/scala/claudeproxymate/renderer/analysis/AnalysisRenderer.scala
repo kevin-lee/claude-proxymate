@@ -1,5 +1,6 @@
 package claudeproxymate.renderer.analysis
 
+import cats.syntax.all.*
 import claudeproxymate.core.{ClaudeMdParser, HtmlIds, RequestAnatomy, SegmentSize}
 import claudeproxymate.renderer.i18n.I18n
 import claudeproxymate.renderer.json.JsonTreeViewer
@@ -19,8 +20,8 @@ import scala.scalajs.js
 object AnalysisRenderer {
 
   def renderProxyAnalysis(entry: js.Dynamic, container: dom.html.Element): Unit = {
-    val body = entry.selectDynamic("body")
-    val det  = MechChips.detectMechanismsFromDynamic(body)
+    val body   = entry.selectDynamic("body")
+    val det    = MechChips.detectMechanismsFromDynamic(body)
     val hasAny = det.claudeMd.isDefined || det.outputStyle.isDefined ||
       det.slashCommands.nonEmpty || det.skills.nonEmpty ||
       det.subAgents.nonEmpty || det.mcpTools.nonEmpty
@@ -30,29 +31,27 @@ object AnalysisRenderer {
     val labels        = buildLabels(det.slashCommands.map(_.name))
 
     val data: Option[AnalysisData] =
-      if (!hasAny) None
-      else
-        Some(
-          AnalysisData(
-            modelName       = readModelName(body),
-            claudeMd        = readClaudeMd(det.claudeMd),
-            outputStyle     = det.outputStyle.map(_.drop(1).mkString("\n\n---\n\n")),
-            slashCommands   = det.slashCommands.map(c => SlashCommandView(c.name, c.full)),
-            skills          = det.skills.map(s => SkillView(s.id, s.input.noSpaces, s.result)),
-            slashSkillLinked = det.slashCommands.nonEmpty && det.skills.nonEmpty,
-            subAgents       = det.subAgents.map(buildSubAgent),
-            mcpTools        = det.mcpTools.map(buildMcpTool),
-          )
+      Option.when(hasAny)(
+        AnalysisData(
+          modelName = readModelName(body),
+          claudeMd = readClaudeMd(det.claudeMd),
+          outputStyle = det.outputStyle.map(_.drop(1).mkString("\n\n---\n\n")),
+          slashCommands = det.slashCommands.map(c => SlashCommandView(c.name, c.full)),
+          skills = det.skills.map(s => SkillView(s.id, s.input.noSpaces, s.result)),
+          slashSkillLinked = det.slashCommands.nonEmpty && det.skills.nonEmpty,
+          subAgents = det.subAgents.map(buildSubAgent),
+          mcpTools = det.mcpTools.map(buildMcpTool),
         )
+      )
 
     ViewHelpers.setInnerHtml(
       container,
       AnalysisView.buildFrag(
-        data           = data,
-        labels         = labels,
-        searchQuery    = aq,
-        searchInputId  = HtmlIds.ProxyDetailSearchInput,
-        mechChipsHtml  = mechChipsHtml,
+        data = data,
+        labels = labels,
+        searchQuery = aq,
+        searchInputId = HtmlIds.ProxyDetailSearchInput,
+        mechChipsHtml = mechChipsHtml,
       ),
     )
 
@@ -67,9 +66,9 @@ object AnalysisRenderer {
     // Post-render JSON-tree hydration. The view emits `jt-json-block` divs
     // with `data-json="<input>"`; render the live JSON tree into each.
     val jsonBlocks = container.querySelectorAll(s".${AnalysisView.JsonBlockClass}")
-    var idx = 0
+    var idx        = 0
     while (idx < jsonBlocks.length) {
-      val el = jsonBlocks(idx).asInstanceOf[dom.html.Element]
+      val el      = jsonBlocks(idx).asInstanceOf[dom.html.Element]
       val jsonStr = el.dataset.get("json").getOrElse("")
       if (jsonStr.nonEmpty) {
         try JsonTreeViewer.renderJsonTree(el, js.JSON.parse(jsonStr))
@@ -82,22 +81,22 @@ object AnalysisRenderer {
   private def buildLabels(slashCmdNames: List[String]): AnalysisLabels =
     AnalysisLabels(
       noMechanismsTitle = I18n.t("analysis.noMechanismsTitle"),
-      noMechanismsHint  = I18n.t("analysis.noMechanismsHint"),
-      claudeMdTitle     = I18n.t("analysis.claudeMdTitle"),
-      claudeMdDesc      = I18n.t("analysis.claudeMdDesc"),
-      outputStyleTitle  = I18n.t("analysis.outputStyleTitle"),
-      outputStyleDesc   = I18n.t("analysis.outputStyleDesc"),
-      slashCmdTitle     = I18n.t("analysis.slashCmdTitle"),
-      slashCmdDescs     = slashCmdNames.map(name => I18n.t("analysis.slashCmdDesc", Map("cmd" -> name))),
-      skillTitle        = I18n.t("analysis.skillTitle"),
-      skillLinkedTitle  = I18n.t("analysis.skillLinkedTitle"),
-      skillDesc         = I18n.t("analysis.skillDesc"),
-      skillLinkedDesc   = I18n.t("analysis.skillLinkedDesc"),
-      noToolResult      = I18n.t("analysis.noToolResult"),
-      subAgentDesc      = I18n.t("analysis.subAgentDesc"),
-      mcpDesc           = I18n.t("mechDesc.mc.what"),
+      noMechanismsHint = I18n.t("analysis.noMechanismsHint"),
+      claudeMdTitle = I18n.t("analysis.claudeMdTitle"),
+      claudeMdDesc = I18n.t("analysis.claudeMdDesc"),
+      outputStyleTitle = I18n.t("analysis.outputStyleTitle"),
+      outputStyleDesc = I18n.t("analysis.outputStyleDesc"),
+      slashCmdTitle = I18n.t("analysis.slashCmdTitle"),
+      slashCmdDescs = slashCmdNames.map(name => I18n.t("analysis.slashCmdDesc", Map("cmd" -> name))),
+      skillTitle = I18n.t("analysis.skillTitle"),
+      skillLinkedTitle = I18n.t("analysis.skillLinkedTitle"),
+      skillDesc = I18n.t("analysis.skillDesc"),
+      skillLinkedDesc = I18n.t("analysis.skillLinkedDesc"),
+      noToolResult = I18n.t("analysis.noToolResult"),
+      subAgentDesc = I18n.t("analysis.subAgentDesc"),
+      mcpDesc = I18n.t("mechDesc.mc.what"),
       searchPlaceholder = I18n.t("analysis.searchPlaceholder"),
-      searchClear       = I18n.t("messages.searchClear"),
+      searchClear = I18n.t("messages.searchClear"),
     )
 
   /** Build the Request Anatomy dashboard HTML for the given capture. Returns
@@ -119,17 +118,17 @@ object AnalysisRenderer {
       val encoder = js.Dynamic.newInstance(dom.window.asInstanceOf[js.Dynamic].TextEncoder)()
       encoder.encode(jsonStr).length.asInstanceOf[Int]
     }
-    val reqKb = f"${reqBytes / 1024.0}%.1f"
-    val model = anatomy.model.getOrElse("")
+    val reqKb    = f"${reqBytes / 1024.0}%.1f"
+    val model    = anatomy.model.getOrElse("")
 
     val cost =
       if (responseCaptured)
         AnatomyCost.fromUsage(
-          model        = model,
-          reqKb        = reqKb,
-          inputTokens  = usageInt(usage, "input_tokens"),
-          cacheRead    = usageInt(usage, "cache_read_input_tokens"),
-          cacheWrite   = usageInt(usage, "cache_creation_input_tokens"),
+          model = model,
+          reqKb = reqKb,
+          inputTokens = usageInt(usage, "input_tokens"),
+          cacheRead = usageInt(usage, "cache_read_input_tokens"),
+          cacheWrite = usageInt(usage, "cache_creation_input_tokens"),
           outputTokens = usageInt(usage, "output_tokens"),
         )
       else
@@ -161,62 +160,66 @@ object AnalysisRenderer {
   }
 
   private def readStopReason(respBody: js.Dynamic): Option[String] = {
-    if (respBody == null) None
+    if (respBody == null) none[String]
     else {
       val sr = respBody.selectDynamic("stop_reason")
-      if (js.isUndefined(sr) || sr == null) None else Some(sr.toString)
+      Option.unless(js.isUndefined(sr) || sr == null)(sr.toString)
     }
   }
 
   private def usageInt(usage: js.Dynamic, name: String): Int = {
     val v = usage.selectDynamic(name)
-    if (!js.isUndefined(v) && v != null) try v.asInstanceOf[Int]
-    catch { case _: Throwable => 0 }
+    if (!js.isUndefined(v) && v != null)
+      try v.asInstanceOf[Int]
+      catch { case _: Throwable => 0 }
     else 0
   }
 
   private def buildAnatomyLabels(): AnatomyLabels =
     AnatomyLabels(
-      costTitle        = I18n.t("anatomy.costTitle"),
+      costTitle = I18n.t("anatomy.costTitle"),
       attributionTitle = I18n.t("anatomy.attributionTitle"),
-      structureTitle   = I18n.t("anatomy.structureTitle"),
-      inventoryTitle   = I18n.t("anatomy.inventoryTitle"),
-      anomaliesTitle   = I18n.t("anatomy.anomaliesTitle"),
-      estimatedTag     = I18n.t("anatomy.estimatedTag"),
-      noResponseNote   = I18n.t("anatomy.noResponseNote"),
-      lblMessages      = I18n.t("anatomy.lblMessages"),
-      lblTurns         = I18n.t("anatomy.lblTurns"),
-      lblSystemBlocks  = I18n.t("anatomy.lblSystemBlocks"),
-      lblTools         = I18n.t("anatomy.lblTools"),
-      lblToolUse       = I18n.t("anatomy.lblToolUse"),
-      lblToolResult    = I18n.t("anatomy.lblToolResult"),
-      lblImages        = I18n.t("anatomy.lblImages"),
-      lblThinking      = I18n.t("anatomy.lblThinking"),
-      lblStream        = I18n.t("anatomy.lblStream"),
+      structureTitle = I18n.t("anatomy.structureTitle"),
+      inventoryTitle = I18n.t("anatomy.inventoryTitle"),
+      anomaliesTitle = I18n.t("anatomy.anomaliesTitle"),
+      estimatedTag = I18n.t("anatomy.estimatedTag"),
+      noResponseNote = I18n.t("anatomy.noResponseNote"),
+      lblMessages = I18n.t("anatomy.lblMessages"),
+      lblTurns = I18n.t("anatomy.lblTurns"),
+      lblSystemBlocks = I18n.t("anatomy.lblSystemBlocks"),
+      lblTools = I18n.t("anatomy.lblTools"),
+      lblToolUse = I18n.t("anatomy.lblToolUse"),
+      lblToolResult = I18n.t("anatomy.lblToolResult"),
+      lblImages = I18n.t("anatomy.lblImages"),
+      lblThinking = I18n.t("anatomy.lblThinking"),
+      lblStream = I18n.t("anatomy.lblStream"),
     )
 
   private def readModelName(body: js.Dynamic): Option[String] = {
-    if (js.isUndefined(body) || body == null) None
+    if (js.isUndefined(body) || body == null) none[String]
     else {
       val model = body.selectDynamic("model")
-      if (js.isUndefined(model) || model == null) None else Some(model.toString)
+      Option.unless(js.isUndefined(model) || model == null)(model.toString)
     }
   }
 
   private def readClaudeMd(claudeMd: Option[String]): Option[Either[String, List[CmSectionView]]] =
     claudeMd.map { raw =>
       val parsed = ClaudeMdParser.parseClaudeMdSections(raw)
-      if (parsed.isEmpty) Left(raw)
-      else Right(parsed.map(s => CmSectionView(s.label, s.path, s.content, s.scope)))
+      Either.cond(parsed.nonEmpty, parsed.map(s => CmSectionView(s.label, s.path, s.content, s.scope)), raw)
     }
 
   private def buildSubAgent(sa: claudeproxymate.core.SubAgent): SubAgentView = {
     val inputJson    = sa.input.noSpaces
     val isJson       = sa.input.isObject || sa.input.isArray
-    val subagentType = sa.input.hcursor.downField("subagent_type").as[String]
+    val subagentType = sa
+      .input
+      .hcursor
+      .downField("subagent_type")
+      .as[String]
       .orElse(sa.input.hcursor.downField("type").as[String])
       .getOrElse("?")
-    val prompt = sa.input.hcursor.downField("prompt").as[String].getOrElse("")
+    val prompt       = sa.input.hcursor.downField("prompt").as[String].getOrElse("")
     SubAgentView(sa.name, subagentType, inputJson, prompt, isJson)
   }
 

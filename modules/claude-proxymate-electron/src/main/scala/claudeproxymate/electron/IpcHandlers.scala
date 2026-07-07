@@ -1,5 +1,6 @@
 package claudeproxymate.electron
 
+import cats.syntax.all.*
 import claudeproxymate.core.{IpcChannels, JsonLineProtocol, ProxyEvent, UrlScheme}
 import claudeproxymate.electron.facades._
 
@@ -17,7 +18,7 @@ object IpcHandlers {
   )
 
   private object ProxyState {
-    val empty: ProxyState = ProxyState(None, None, "")
+    val empty: ProxyState = ProxyState(none[ChildProcess], none[Int], "")
   }
 
   private val state = new AtomicReference[ProxyState](ProxyState.empty)
@@ -63,11 +64,13 @@ object IpcHandlers {
 
     UrlScheme.validate(url) match {
       case Left(err) =>
-        js.Promise.resolve[js.Dynamic](
-          js.Dynamic.literal(ok = false, reason = err.message)
-        )
+        js.Promise
+          .resolve[js.Dynamic](
+            js.Dynamic.literal(ok = false, reason = err.message)
+          )
       case Right(validUrl) =>
-        Shell.openExternal(validUrl)
+        Shell
+          .openExternal(validUrl)
           .`then`[js.Dynamic]({ (_: Unit) =>
             js.Dynamic.literal(ok = true): js.Dynamic
           }: js.Function1[Unit, js.Dynamic])
@@ -119,7 +122,7 @@ object IpcHandlers {
               .asInstanceOf[js.Object],
           )
 
-          state.set(ProxyState(Some(child), Some(port), ""))
+          state.set(ProxyState(child.some, port.some, ""))
 
           child.stdout.setEncoding("utf8")
 
@@ -149,7 +152,7 @@ object IpcHandlers {
           child.on(
             "error",
             { (_: js.Any) =>
-              state.updateAndGet(s => s.copy(process = None, port = None)): Unit
+              state.updateAndGet(s => s.copy(process = none[ChildProcess], port = none[Int])): Unit
             }: js.Function1[js.Any, Unit]
           )
 
@@ -215,8 +218,8 @@ object IpcHandlers {
     current.process match {
       case Some(child) if !child.killed =>
         js.Dynamic.literal(running = true, port = current.port.getOrElse(0))
-      case _ =>
-        state.updateAndGet(s => s.copy(process = None, port = None)): Unit
+      case Some(_) | None =>
+        state.updateAndGet(s => s.copy(process = none[ChildProcess], port = none[Int])): Unit
         js.Dynamic.literal(running = false)
     }
   }

@@ -35,13 +35,17 @@ object UrlSchemeSpec extends Properties {
     UrlScheme.validate("http://example.com") ==== Left(UrlSchemeError.Disallowed("http", UrlScheme.AllowedSchemes))
 
   def testJavascriptRejected: Result =
-    UrlScheme.validate("javascript:alert(1)") ==== Left(UrlSchemeError.Disallowed("javascript", UrlScheme.AllowedSchemes))
+    UrlScheme.validate("javascript:alert(1)") ==== Left(
+      UrlSchemeError.Disallowed("javascript", UrlScheme.AllowedSchemes)
+    )
 
   def testFileRejected: Result =
     UrlScheme.validate("file:///etc/passwd") ==== Left(UrlSchemeError.Disallowed("file", UrlScheme.AllowedSchemes))
 
   def testDataRejected: Result =
-    UrlScheme.validate("data:text/html,<script>alert(1)</script>") ==== Left(UrlSchemeError.Disallowed("data", UrlScheme.AllowedSchemes))
+    UrlScheme.validate("data:text/html,<script>alert(1)</script>") ==== Left(
+      UrlSchemeError.Disallowed("data", UrlScheme.AllowedSchemes)
+    )
 
   def testEmptyMalformed: Result =
     UrlScheme.validate("") ==== Left(UrlSchemeError.Malformed(""))

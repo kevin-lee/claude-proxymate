@@ -1,5 +1,6 @@
 package claudeproxymate.renderer.analysis
 
+import cats.syntax.all.*
 import claudeproxymate.core.{AnomalyKind, RequestAnatomy, StructureFacts}
 import scalatags.Text.all.*
 
@@ -151,15 +152,15 @@ object AnatomyView {
         frag(anomalies.map { a =>
           val (kindCls, glyph) = a.kind match {
             case AnomalyKind.Security => ("anatomy-anomaly-security", "🛡 ")
-            case AnomalyKind.Warn     => ("anatomy-anomaly-warn", "⚠ ")
-            case AnomalyKind.Info     => ("anatomy-anomaly-info", "ℹ ")
+            case AnomalyKind.Warn => ("anatomy-anomaly-warn", "⚠ ")
+            case AnomalyKind.Info => ("anatomy-anomaly-info", "ℹ ")
           }
           div(cls := s"anatomy-anomaly $kindCls")(s"$glyph${a.message}")
         }),
       )
 
   private def fmtCost(c: Double): String =
-    if (c == 0.0) "$0" else f"$$$c%.4f"
+    if (c === 0.0) "$0" else f"$$$c%.4f"
 
   /** Group digits with commas: 35423 -> "35,423 tok". */
   private def fmtTok(n: Int): String = {

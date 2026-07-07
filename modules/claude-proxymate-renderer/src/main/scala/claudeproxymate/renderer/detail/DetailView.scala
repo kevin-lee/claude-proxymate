@@ -1,5 +1,6 @@
 package claudeproxymate.renderer.detail
 
+import cats.syntax.all.*
 import claudeproxymate.core.HtmlIds
 import claudeproxymate.renderer.analysis.{AnalysisRenderer, MechChips, MechHighlight}
 import claudeproxymate.renderer.i18n.I18n
@@ -26,7 +27,7 @@ object DetailView {
   private val PricingDate = "2026-04-20"
 
   def renderProxyDetail(): Unit = {
-    val entry = AppState.proxyCaptures.find(e => e.id == AppState.selectedProxyId.map(_.asInstanceOf[js.Any]).orNull)
+    val entry  = AppState.proxyCaptures.find(e => e.id == AppState.selectedProxyId.map(_.asInstanceOf[js.Any]).orNull)
     val detail = dom.document.getElementById(HtmlIds.ProxyDetailView)
     if (detail == null) return
 
@@ -35,7 +36,7 @@ object DetailView {
     detailEl.style.cssText = "flex:1;overflow:hidden;display:flex;flex-direction:column"
 
     entry match {
-      case None    => renderEmpty(detailEl)
+      case None => renderEmpty(detailEl)
       case Some(e) => renderEntry(e, detailEl)
     }
   }
@@ -43,24 +44,24 @@ object DetailView {
   private def renderEmpty(detail: dom.html.Element): Unit = {
     val labels = DetailEmptyLabels(
       selectRequestTitle = I18n.t("proxy.selectRequestTitle"),
-      selectRequestHint  = I18n.t("proxy.selectRequestHint"),
+      selectRequestHint = I18n.t("proxy.selectRequestHint"),
     )
     ViewHelpers.setInnerHtml(detail, DetailEmptyView.buildFrag(labels))
   }
 
   private def renderEntry(entry: js.Dynamic, detail: dom.html.Element): Unit = {
-    if (AppState.proxyDetailTab == "messages") {
+    if (AppState.proxyDetailTab === "messages") {
       MessageRenderer.renderProxyMessages(entry, detail)
       return
     }
 
-    if (AppState.proxyDetailTab == "analysis") {
+    if (AppState.proxyDetailTab === "analysis") {
       renderAnalysisTab(entry, detail)
       return
     }
 
     // Request or Response tab
-    val data: js.Dynamic = if (AppState.proxyDetailTab == "request") {
+    val data: js.Dynamic = if (AppState.proxyDetailTab === "request") {
       entry.selectDynamic("body")
     } else {
       val resp = entry.selectDynamic("response")
@@ -70,10 +71,11 @@ object DetailView {
 
     val q             = AppState.proxyDetailSearch
     val searchBarFrag = buildSearchBarFrag(q)
-    val mechChipsHtml = if (AppState.proxyDetailTab == "request") MechChips.buildMechFilterChips(entry.selectDynamic("body")) else ""
+    val mechChipsHtml =
+      if (AppState.proxyDetailTab === "request") MechChips.buildMechFilterChips(entry.selectDynamic("body")) else ""
 
     if (js.isUndefined(data) || data == null) {
-      val msg = if (AppState.proxyDetailTab == "response") I18n.t("proxy.waitingResponse") else I18n.t("proxy.noBody")
+      val msg = if (AppState.proxyDetailTab === "response") I18n.t("proxy.waitingResponse") else I18n.t("proxy.noBody")
       val emptyBodyFrag = frag(
         div(style := "flex-shrink:0")(searchBarFrag, raw(mechChipsHtml)),
         div(style := "color:var(--dim);padding:16px;font-size:12px")(msg),
@@ -83,7 +85,7 @@ object DetailView {
     }
 
     val tokenPill: Option[TokenPill] =
-      if (AppState.proxyDetailTab == "request") buildTokenPill(entry, data) else None
+      if (AppState.proxyDetailTab === "request") buildTokenPill(entry, data) else none[TokenPill]
 
     val prevScrollTop = {
       val el = dom.document.getElementById(HtmlIds.ProxyDetailCode)
@@ -92,15 +94,15 @@ object DetailView {
 
     val tokenPillFrag: Frag = tokenPill match {
       case Some(p) => DetailHeaderView.buildTokenPillFrag(p)
-      case None    => frag()
+      case None => frag()
     }
 
     val full = frag(
       div(style := "flex-shrink:0")(searchBarFrag, raw(mechChipsHtml)),
       tokenPillFrag,
       div(
-        cls   := "json-tree-view",
-        id    := HtmlIds.ProxyDetailCode,
+        cls := "json-tree-view",
+        id := HtmlIds.ProxyDetailCode,
         style := "flex:1;overflow:auto",
       ),
     )
@@ -122,9 +124,11 @@ object DetailView {
         if (AppState.searchCurrentIdx >= marks.length) AppState.searchCurrentIdx = 0
         locally { val _ = marks(AppState.searchCurrentIdx).classList.add("current") }
         locally {
-          val _ = marks(AppState.searchCurrentIdx).asInstanceOf[js.Dynamic].scrollIntoView(
-            js.Dynamic.literal("behavior" -> "smooth", "block" -> "center"),
-          )
+          val _ = marks(AppState.searchCurrentIdx)
+            .asInstanceOf[js.Dynamic]
+            .scrollIntoView(
+              js.Dynamic.literal("behavior" -> "smooth", "block" -> "center"),
+            )
         }
         SearchNavigation.updateSearchCounter(marks.length)
       }
@@ -135,7 +139,7 @@ object DetailView {
       if (inp != null) {
         val inputEl = inp.asInstanceOf[dom.html.Input]
         inputEl.focus()
-        val len = inputEl.value.length
+        val len     = inputEl.value.length
         inputEl.setSelectionRange(len, len)
       }
     }
@@ -150,26 +154,32 @@ object DetailView {
     AnalysisRenderer.renderProxyAnalysis(entry, detail)
 
     AppState.proxyDetailMechFilter.foreach { mechFilter =>
-      locally { val _ = dom.window.requestAnimationFrame { _ =>
-        val scrollEl = detail.querySelector("[style*=\"overflow:auto\"]")
-        if (scrollEl != null) scrollEl.asInstanceOf[dom.html.Element].scrollTop = prevAnalysisScroll
-        /* `mechFilter` is currently drawn from a closed alphabet
-         * (`cm`, `sc_<i>`, `sk_<i>`, `sa`, `st`, `mc_<i>` — `<i>` an
-         * integer), none of which contain CSS metacharacters. Escape
-         * defensively anyway so a future mechanism key carrying a
-         * `"`, `\`, or other special char can't break the selector
-         * (which would silently fail to scroll/highlight). Mirrors the
-         * CSS.escape usage already in `JsonTreeViewer`.
-         */
-        val escapedKey    = js.Dynamic.global.CSS.applyDynamic("escape")(mechFilter).asInstanceOf[String]
-        val activeSection = detail.querySelector(s"""[data-mech-key="$escapedKey"]""")
-        if (activeSection != null) {
-          locally { val _ = activeSection.classList.add("mech-section-active") }
-          locally { val _ = activeSection.asInstanceOf[js.Dynamic].scrollIntoView(
-            js.Dynamic.literal("block" -> "start", "behavior" -> "smooth")
-          ) }
+      locally {
+        val _ = dom.window.requestAnimationFrame { _ =>
+          val scrollEl      = detail.querySelector("[style*=\"overflow:auto\"]")
+          if (scrollEl != null) scrollEl.asInstanceOf[dom.html.Element].scrollTop = prevAnalysisScroll
+          /* `mechFilter` is currently drawn from a closed alphabet
+           * (`cm`, `sc_<i>`, `sk_<i>`, `sa`, `st`, `mc_<i>` — `<i>` an
+           * integer), none of which contain CSS metacharacters. Escape
+           * defensively anyway so a future mechanism key carrying a
+           * `"`, `\`, or other special char can't break the selector
+           * (which would silently fail to scroll/highlight). Mirrors the
+           * CSS.escape usage already in `JsonTreeViewer`.
+           */
+          val escapedKey    = js.Dynamic.global.CSS.applyDynamic("escape")(mechFilter).asInstanceOf[String]
+          val activeSection = detail.querySelector(s"""[data-mech-key="$escapedKey"]""")
+          if (activeSection != null) {
+            locally { val _ = activeSection.classList.add("mech-section-active") }
+            locally {
+              val _ = activeSection
+                .asInstanceOf[js.Dynamic]
+                .scrollIntoView(
+                  js.Dynamic.literal("block" -> "start", "behavior" -> "smooth")
+                )
+            }
+          }
         }
-      }}
+      }
     }
 
     if (AppState.proxyDetailSearch.nonEmpty) {
@@ -188,7 +198,7 @@ object DetailView {
       if (inp != null) {
         val inputEl = inp.asInstanceOf[dom.html.Input]
         inputEl.focus()
-        val len = inputEl.value.length
+        val len     = inputEl.value.length
         inputEl.setSelectionRange(len, len)
       }
     }
@@ -197,15 +207,15 @@ object DetailView {
   private def buildSearchBarFrag(q: String): Frag = {
     val labels = SearchBarLabels(
       placeholder = I18n.t("analysis.searchPlaceholder"),
-      clear       = I18n.t("messages.searchClear"),
-      searchPrev  = I18n.t("search.prev"),
-      searchNext  = I18n.t("search.next"),
+      clear = I18n.t("messages.searchClear"),
+      searchPrev = I18n.t("search.prev"),
+      searchNext = I18n.t("search.next"),
     )
     DetailHeaderView.buildSearchBarFrag(
-      searchInputId   = HtmlIds.ProxyDetailSearchInput,
+      searchInputId = HtmlIds.ProxyDetailSearchInput,
       searchCounterId = HtmlIds.SearchCounter,
-      query           = q,
-      labels          = labels,
+      query = q,
+      labels = labels,
     )
   }
 
@@ -224,35 +234,38 @@ object DetailView {
     */
   private def buildTokenPill(entry: js.Dynamic, data: js.Dynamic): Option[TokenPill] = {
     val jsonStr = js.JSON.stringify(data)
-    val bytes = {
+    val bytes   = {
       val encoder = js.Dynamic.newInstance(dom.window.asInstanceOf[js.Dynamic].TextEncoder)()
       encoder.encode(jsonStr).length.asInstanceOf[Int]
     }
-    val kb = f"${bytes / 1024.0}%.1f"
+    val kb      = f"${bytes / 1024.0}%.1f"
 
-    val resp = entry.selectDynamic("response")
+    val resp     = entry.selectDynamic("response")
     val respBody = if (!js.isUndefined(resp) && resp != null) resp.selectDynamic("body") else null
-    val usage = if (respBody != null && !js.isUndefined(respBody)) respBody.selectDynamic("usage") else null
+    val usage    = if (respBody != null && !js.isUndefined(respBody)) respBody.selectDynamic("usage") else null
 
     if (!js.isUndefined(usage) && usage != null) {
-      Some(buildUsageTokenPill(entry, kb, usage))
+      buildUsageTokenPill(entry, kb, usage).some
     } else {
       val tokens = Math.ceil(bytes.toDouble / 3.5).toInt
       val tokStr = fmtTok(tokens)
       val badges = List(
-        TokenBadge(s"$kb KB", None),
-        TokenBadge(s"~$tokStr tok (${I18n.t("token.estimated")})", None),
+        TokenBadge(s"$kb KB", none[String]),
+        TokenBadge(s"~$tokStr tok (${I18n.t("token.estimated")})", none[String]),
       )
       // No usage → no popover data needed, but we still need a data-cost
       // attribute so the click handler doesn't miss; emit empty JSON.
-      Some(TokenPill(badges = badges, dataCost = "{}"))
+      TokenPill(badges = badges, dataCost = "{}").some
     }
   }
 
   private def buildUsageTokenPill(entry: js.Dynamic, kb: String, usage: js.Dynamic): TokenPill = {
     def intField(name: String): Int = {
       val v = usage.selectDynamic(name)
-      if (!js.isUndefined(v) && v != null) try v.asInstanceOf[Int] catch { case _: Throwable => 0 } else 0
+      if (!js.isUndefined(v) && v != null)
+        try v.asInstanceOf[Int]
+        catch { case _: Throwable => 0 }
+      else 0
     }
 
     val inputTokens = intField("input_tokens")
@@ -267,7 +280,8 @@ object DetailView {
       val reqModel      = if (!js.isUndefined(reqBody) && reqBody != null) reqBody.selectDynamic("model") else null
       val respBody      = entry.selectDynamic("response")
       val respBodyInner = if (!js.isUndefined(respBody) && respBody != null) respBody.selectDynamic("body") else null
-      val respModel     = if (respBodyInner != null && !js.isUndefined(respBodyInner)) respBodyInner.selectDynamic("model") else null
+      val respModel     =
+        if (respBodyInner != null && !js.isUndefined(respBodyInner)) respBodyInner.selectDynamic("model") else null
       if (!js.isUndefined(reqModel) && reqModel != null) reqModel.toString
       else if (!js.isUndefined(respModel) && respModel != null) respModel.toString
       else ""
@@ -282,26 +296,55 @@ object DetailView {
     val cost    = (inputTokens * inP + cacheRead * crP + cacheWrite * cwP + outTok * outP) / 1000000.0
     val costStr = fmtCost(cost)
 
-    val popData = js.JSON.stringify(js.Dynamic.literal(
-      "model"       -> (if (model.nonEmpty) model else I18n.t("token.unknown")),
-      "kb"          -> kb,
-      "pricingDate" -> PricingDate,
-      "rows" -> js.Array(
-        js.Dynamic.literal("label" -> I18n.t("token.cacheRead"),     "tokens" -> fmtTok(cacheRead),   "price" -> crP, "cost" -> fmtCost(cacheRead * crP / 1000000.0)),
-        js.Dynamic.literal("label" -> I18n.t("token.cacheWrite"),    "tokens" -> fmtTok(cacheWrite),  "price" -> cwP, "cost" -> fmtCost(cacheWrite * cwP / 1000000.0)),
-        js.Dynamic.literal("label" -> I18n.t("token.uncachedInput"), "tokens" -> fmtTok(inputTokens), "price" -> inP, "cost" -> fmtCost(inputTokens * inP / 1000000.0)),
-        js.Dynamic.literal("label" -> I18n.t("token.output"),        "tokens" -> fmtTok(outTok),      "price" -> outP, "cost" -> fmtCost(outTok * outP / 1000000.0)),
-      ),
-      "total"    -> costStr,
-      "cachePct" -> cachePct,
-    ))
+    val popData = js
+      .JSON
+      .stringify(
+        js.Dynamic
+          .literal(
+            "model"       -> (if (model.nonEmpty) model else I18n.t("token.unknown")),
+            "kb"          -> kb,
+            "pricingDate" -> PricingDate,
+            "rows"        -> js.Array(
+              js.Dynamic
+                .literal(
+                  "label"  -> I18n.t("token.cacheRead"),
+                  "tokens" -> fmtTok(cacheRead),
+                  "price"  -> crP,
+                  "cost"   -> fmtCost(cacheRead * crP / 1000000.0)
+                ),
+              js.Dynamic
+                .literal(
+                  "label"  -> I18n.t("token.cacheWrite"),
+                  "tokens" -> fmtTok(cacheWrite),
+                  "price"  -> cwP,
+                  "cost"   -> fmtCost(cacheWrite * cwP / 1000000.0)
+                ),
+              js.Dynamic
+                .literal(
+                  "label"  -> I18n.t("token.uncachedInput"),
+                  "tokens" -> fmtTok(inputTokens),
+                  "price"  -> inP,
+                  "cost"   -> fmtCost(inputTokens * inP / 1000000.0)
+                ),
+              js.Dynamic
+                .literal(
+                  "label"  -> I18n.t("token.output"),
+                  "tokens" -> fmtTok(outTok),
+                  "price"  -> outP,
+                  "cost"   -> fmtCost(outTok * outP / 1000000.0)
+                ),
+            ),
+            "total"       -> costStr,
+            "cachePct"    -> cachePct,
+          )
+      )
 
     val badges = scala.collection.mutable.ListBuffer.empty[TokenBadge]
-    badges += TokenBadge(s"$kb KB", None)
-    badges += TokenBadge(s"${I18n.t("token.input")} ${fmtTok(totalIn)}", None)
-    badges += TokenBadge(s"${I18n.t("token.output")} ${fmtTok(outTok)}", None)
-    if (cachePct > 0) badges += TokenBadge(s"${I18n.t("token.cache")} $cachePct%", Some("var(--green)"))
-    badges += TokenBadge(costStr, Some("var(--yellow)"))
+    badges += TokenBadge(s"$kb KB", none[String])
+    badges += TokenBadge(s"${I18n.t("token.input")} ${fmtTok(totalIn)}", none[String])
+    badges += TokenBadge(s"${I18n.t("token.output")} ${fmtTok(outTok)}", none[String])
+    if (cachePct > 0) badges += TokenBadge(s"${I18n.t("token.cache")} $cachePct%", "var(--green)".some)
+    badges += TokenBadge(costStr, "var(--yellow)".some)
 
     TokenPill(badges = badges.toList, dataCost = popData)
   }
@@ -309,14 +352,14 @@ object DetailView {
   def showDetailTab(tab: String): Unit = {
     AppState.proxyDetailTab = tab
     AppState.proxyDetailSearch = ""
-    AppState.proxyDetailMechFilter = None
+    AppState.proxyDetailMechFilter = none[String]
 
     val tabs = dom.document.querySelectorAll(".dtab")
-    var i = 0
+    var i    = 0
     while (i < tabs.length) {
       val btn  = tabs(i).asInstanceOf[dom.html.Element]
       val dtab = btn.dataset.get("dtab").getOrElse("")
-      locally { val _ = btn.classList.toggle("active", dtab == tab) }
+      locally { val _ = btn.classList.toggle("active", dtab === tab) }
       i += 1
     }
 
@@ -326,7 +369,7 @@ object DetailView {
     val copyBtn = dom.document.getElementById(HtmlIds.CopyDetailBtn)
     if (copyBtn != null) {
       copyBtn.asInstanceOf[dom.html.Element].style.display =
-        if (tab == "analysis") "none" else ""
+        if (tab === "analysis") "none" else ""
     }
 
     renderProxyDetail()

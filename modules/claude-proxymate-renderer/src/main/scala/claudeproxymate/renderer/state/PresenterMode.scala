@@ -48,7 +48,7 @@ object PresenterMode {
       val el          = container.asInstanceOf[dom.html.Element]
       val savedScroll = el.scrollTop
       DetailView.renderProxyDetail()
-      val _ = dom.window.requestAnimationFrame { _ =>
+      val _           = dom.window.requestAnimationFrame { _ =>
         el.scrollTop = savedScroll
       }
     }
@@ -61,9 +61,9 @@ object PresenterMode {
     * "reveal all"; when `false` the next action is "mask all."
     */
   def renderButton(): Unit = {
-    val btn = dom.document.getElementById(HtmlIds.MaskToggleBtn)
+    val btn  = dom.document.getElementById(HtmlIds.MaskToggleBtn)
     if (btn == null) return
-    val key = if (AppState.presenterMaskAll) "mask.toggleRevealAll" else "mask.toggleMaskAll"
+    val key  = if (AppState.presenterMaskAll) "mask.toggleRevealAll" else "mask.toggleMaskAll"
     val text = I18n.t(key)
     btn.textContent = text
     btn.asInstanceOf[dom.html.Element].setAttribute("aria-label", text)

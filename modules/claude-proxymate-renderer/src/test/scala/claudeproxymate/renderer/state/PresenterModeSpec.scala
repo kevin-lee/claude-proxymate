@@ -48,7 +48,8 @@ object PresenterModeSpec extends Properties {
     reset()
     AppState.presenterMaskAll = true
     togglePure()
-    Result.assert(!AppState.presenterMaskAll)
+    Result
+      .assert(!AppState.presenterMaskAll)
       .log(s"expected false after toggle from true, got ${AppState.presenterMaskAll}")
   }
 
@@ -84,7 +85,8 @@ object PresenterModeSpec extends Properties {
     val start = AppState.presenterMaskAll
     togglePure()
     togglePure()
-    Result.assert(AppState.presenterMaskAll == start)
+    Result
+      .assert(AppState.presenterMaskAll == start)
       .log(s"double-toggle should return to start; was $start, ended ${AppState.presenterMaskAll}")
   }
 
@@ -94,7 +96,8 @@ object PresenterModeSpec extends Properties {
     togglePure()
     locally { val _ = AppState.maskOverrides.add("b") }
     togglePure()
-    Result.assert(AppState.maskOverrides.isEmpty)
+    Result
+      .assert(AppState.maskOverrides.isEmpty)
       .log(s"after double-toggle, overrides should be empty: ${AppState.maskOverrides}")
   }
 
@@ -110,9 +113,9 @@ object PresenterModeSpec extends Properties {
     //   click button: (true, {})    — all masked (decisive flip + clear)
     reset()
     AppState.presenterMaskAll = false
-    val _ = AppState.maskOverrides.add("X")
-    val midX  = AppState.isRevealed("X")  // expect false (masked)
-    val midY  = AppState.isRevealed("Y")  // expect true  (revealed)
+    val _    = AppState.maskOverrides.add("X")
+    val midX = AppState.isRevealed("X") // expect false (masked)
+    val midY = AppState.isRevealed("Y") // expect true  (revealed)
     togglePure()
     Result.all(
       List(

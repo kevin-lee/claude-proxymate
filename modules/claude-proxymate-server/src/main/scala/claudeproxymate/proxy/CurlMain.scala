@@ -21,7 +21,7 @@ object CurlMain extends IOApp.Simple {
       case "--port" :: portStr :: _ =>
         portStr.toIntOption.filter(p => p >= 1024 && p <= 65535).getOrElse(8888)
       case _ :: rest => parsePort(rest)
-      case Nil       => 8888
+      case Nil => 8888
     }
   }
 
@@ -29,7 +29,7 @@ object CurlMain extends IOApp.Simple {
     val portNum = parsePort(
       sys.props.get("sun.java.command").map(_.split("\\s+").toList).getOrElse(Nil)
     )
-    val port = Port.fromInt(portNum).getOrElse(port"8888")
+    val port    = Port.fromInt(portNum).getOrElse(port"8888")
 
     EmberServerBuilder
       .default[IO]

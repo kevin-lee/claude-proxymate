@@ -10,7 +10,7 @@ import scala.jdk.CollectionConverters.*
 object I18nPropertiesLoader {
 
   def load(path: Path): Map[String, String] = {
-    val props = new Properties()
+    val props  = new Properties()
     val reader = new BufferedReader(new InputStreamReader(Files.newInputStream(path), StandardCharsets.UTF_8))
     try props.load(reader)
     finally reader.close()

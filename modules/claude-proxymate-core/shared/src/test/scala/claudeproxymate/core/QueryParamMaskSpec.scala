@@ -36,24 +36,26 @@ object QueryParamMaskSpec extends Properties {
   )
 
   private def must(s: String, expected: Boolean): Result =
-    Result.assert(QueryParamMask.isSensitive(s) == expected)
+    Result
+      .assert(QueryParamMask.isSensitive(s) == expected)
       .log(s"isSensitive(\"$s\") expected $expected")
 
   // ── isSensitive ────────────────────────────────────────────────────────
 
-  def testIsSensitiveToken: Result      = must("token", true)
-  def testIsSensitiveCode: Result       = must("code", true)
-  def testIsSensitiveState: Result      = must("state", true)
-  def testIsSensitiveSignature: Result  = must("signature", true)
-  def testIsSensitiveApiKey: Result     = must("api_key", true)
-  def testIsSensitiveUppercase: Result  = must("STATE", true)
-  def testIsSensitiveModel: Result      = must("model", false)
-  def testIsSensitiveEmpty: Result      = must("", false)
+  def testIsSensitiveToken: Result     = must("token", true)
+  def testIsSensitiveCode: Result      = must("code", true)
+  def testIsSensitiveState: Result     = must("state", true)
+  def testIsSensitiveSignature: Result = must("signature", true)
+  def testIsSensitiveApiKey: Result    = must("api_key", true)
+  def testIsSensitiveUppercase: Result = must("STATE", true)
+  def testIsSensitiveModel: Result     = must("model", false)
+  def testIsSensitiveEmpty: Result     = must("", false)
 
   // ── maskPath ───────────────────────────────────────────────────────────
 
   private def equal(actual: String, expected: String): Result =
-    Result.assert(actual == expected)
+    Result
+      .assert(actual == expected)
       .log(s"expected `$expected`, got `$actual`")
 
   def testNoQuery: Result =
@@ -108,12 +110,13 @@ object QueryParamMaskSpec extends Properties {
       name  <- Gen.string(Gen.alpha, Range.linear(1, 12)).log("name")
       value <- Gen.string(Gen.alphaNum, Range.linear(1, 20)).log("value")
     } yield {
-      val path = s"/x?$name=$value"
-      val out  = QueryParamMask.maskPath(path)
+      val path     = s"/x?$name=$value"
+      val out      = QueryParamMask.maskPath(path)
       val expected =
         if (QueryParamMask.isSensitive(name)) s"/x?$name=***"
         else s"/x?$name=$value"
-      Result.assert(out == expected)
+      Result
+        .assert(out == expected)
         .log(s"input=$path got=$out expected=$expected")
     }
 }

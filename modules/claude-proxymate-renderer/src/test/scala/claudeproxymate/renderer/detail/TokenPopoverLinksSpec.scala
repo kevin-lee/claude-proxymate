@@ -55,12 +55,12 @@ object TokenPopoverLinksSpec extends Properties {
   def testNonMatchingClasses: Property =
     for {
       classes <- Gen
-        .list(
-          Gen.string(Gen.alpha, Range.linear(1, 15)),
-          Range.linear(0, 5),
-        )
-        .map(_.filterNot(_ == TokenPopoverLinks.ExternalLinkClass))
-        .log("classes")
+                   .list(
+                     Gen.string(Gen.alpha, Range.linear(1, 15)),
+                     Range.linear(0, 5),
+                   )
+                   .map(_.filterNot(_ == TokenPopoverLinks.ExternalLinkClass))
+                   .log("classes")
     } yield {
       val result = TokenPopoverLinks.extractExternalLinkHref(classes, "https://x")
       (result ==== None).log(s"classes=$classes")

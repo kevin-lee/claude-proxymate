@@ -25,7 +25,8 @@ object AppStateSpec extends Properties {
   def testMaskAllNoOverride: Result = {
     reset()
     AppState.presenterMaskAll = true
-    Result.assert(!AppState.isRevealed("x"))
+    Result
+      .assert(!AppState.isRevealed("x"))
       .log(s"expected masked, got revealed; state=${AppState.presenterMaskAll}, overrides=${AppState.maskOverrides}")
   }
 
@@ -33,14 +34,16 @@ object AppStateSpec extends Properties {
     reset()
     AppState.presenterMaskAll = true
     val _ = AppState.maskOverrides.add("x")
-    Result.assert(AppState.isRevealed("x"))
+    Result
+      .assert(AppState.isRevealed("x"))
       .log(s"expected revealed, got masked")
   }
 
   def testRevealAllNoOverride: Result = {
     reset()
     AppState.presenterMaskAll = false
-    Result.assert(AppState.isRevealed("x"))
+    Result
+      .assert(AppState.isRevealed("x"))
       .log(s"expected revealed, got masked")
   }
 
@@ -48,7 +51,8 @@ object AppStateSpec extends Properties {
     reset()
     AppState.presenterMaskAll = false
     val _ = AppState.maskOverrides.add("x")
-    Result.assert(!AppState.isRevealed("x"))
+    Result
+      .assert(!AppState.isRevealed("x"))
       .log(s"expected masked, got revealed")
   }
 
@@ -58,7 +62,8 @@ object AppStateSpec extends Properties {
     //  state at test entry, which prior tests may have mutated.
     //  So we reset, then re-check.)
     reset()
-    Result.assert(AppState.presenterMaskAll)
+    Result
+      .assert(AppState.presenterMaskAll)
       .log(s"expected default presenterMaskAll=true after reset")
   }
 
@@ -67,7 +72,8 @@ object AppStateSpec extends Properties {
     AppState.presenterMaskAll = false
     val _ = AppState.maskOverrides.add("x")
     AppState.maskOverrides.clear()
-    Result.assert(!AppState.presenterMaskAll)
+    Result
+      .assert(!AppState.presenterMaskAll)
       .log(s"clear should not have touched the flag")
   }
 }

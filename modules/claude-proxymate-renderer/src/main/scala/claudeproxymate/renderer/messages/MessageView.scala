@@ -1,5 +1,6 @@
 package claudeproxymate.renderer.messages
 
+import cats.syntax.all.*
 import scalatags.Text.all.*
 
 /** A parsed user-text part, ready for rendering. Mirrors
@@ -11,16 +12,18 @@ import scalatags.Text.all.*
   * deterministic `partIdx` so reveal state survives re-parses and the
   * Copy path can reconstruct the same ids.
   */
-sealed trait MsgPart
-final case class TextMsgPart(content: String) extends MsgPart
-final case class InjectedMsgPart(uid: String, label: String, content: String, badgeCls: String) extends MsgPart
+enum MsgPart {
+  case TextMsgPart(content: String)
+  case InjectedMsgPart(uid: String, label: String, content: String, badgeCls: String)
+}
 
 /** A typed message-content block. */
-sealed trait MsgContent
-final case class TextContent(text: String) extends MsgContent
-final case class ToolUseContent(name: String) extends MsgContent
-final case class ToolResultContent(preview: String, truncated: Boolean) extends MsgContent
-final case class OtherContent(typeName: String) extends MsgContent
+enum MsgContent {
+  case TextContent(text: String)
+  case ToolUseContent(name: String)
+  case ToolResultContent(preview: String, truncated: Boolean)
+  case OtherContent(typeName: String)
+}
 
 /** One message card: role, the raw content blocks, and (only when role is
   * "user") the parsed user-text parts the orchestrator already produced.
@@ -37,7 +40,7 @@ final case class MsgCard(
   role: String,
   contents: List[MsgContent],
   userParts: List[MsgPart],
-  rawIdx: Int = 0,
+  rawIdx: Int,
 )
 
 final case class FilterLabels(user: String, typed: String, assistant: String, all: String)
@@ -45,6 +48,9 @@ final case class SearchLabels(placeholder: String, clear: String)
 
 /** Pure view for the messages tab. */
 object MessageView {
+
+  import MsgContent.*
+  import MsgPart.*
 
   val FilterButtonClass: String = "mf-btn"
   val FilterDataAttr: String    = "data-msg-filter"
@@ -70,9 +76,9 @@ object MessageView {
     query: String,
   ): Frag = {
     def filterBtn(key: String, label: String): Frag = {
-      val activeSuffix = if (activeFilter == key) " active" else ""
+      val activeSuffix = if (activeFilter === key) " active" else ""
       button(
-        cls                := s"$FilterButtonClass$activeSuffix",
+        cls := s"$FilterButtonClass$activeSuffix",
         attr(FilterDataAttr) := key,
       )(label)
     }
@@ -86,15 +92,15 @@ object MessageView {
       ),
       div(cls := "msg-search-bar")(
         input(
-          tpe         := "text",
-          id          := searchInputId,
-          cls         := SearchInputClass,
+          tpe := "text",
+          id := searchInputId,
+          cls := SearchInputClass,
           placeholder := searchLabels.placeholder,
-          value       := query,
+          value := query,
         ),
         if (query.nonEmpty)
           button(
-            cls           := SearchClearClass,
+            cls := SearchClearClass,
             attr("title") := searchLabels.clear,
           )("✕")
         else frag(),
@@ -112,10 +118,12 @@ object MessageView {
     )
 
   private def buildBodyFrag(card: MsgCard, isUserFilter: Boolean, query: String): Frag = {
-    if (card.role == "user" && card.userParts.nonEmpty) {
+    if (card.role === "user" && card.userParts.nonEmpty) {
       frag(card.userParts.zipWithIndex.map { case (p, idx) => buildUserPartFrag(p, query, card.rawIdx, idx) })
     } else {
-      frag(card.contents.zipWithIndex.map { case (c, idx) => buildContentFrag(c, isUserFilter, query, card.rawIdx, idx) })
+      frag(
+        card.contents.zipWithIndex.map { case (c, idx) => buildContentFrag(c, isUserFilter, query, card.rawIdx, idx) }
+      )
     }
   }
 
@@ -129,26 +137,26 @@ object MessageView {
       // collapsed content. Without this, search hits inside system-reminders /
       // skills / etc. are wrapped in <mark> but invisible to the user because
       // the parent is display:none.
-      val matched      = query.nonEmpty && content.toLowerCase.contains(query.toLowerCase)
-      val badgeClasses =
+      val matched        = query.nonEmpty && content.toLowerCase.contains(query.toLowerCase)
+      val badgeClasses   =
         if (matched) s"$BadgeClass $badgeCls expandable open hl-active"
         else s"$BadgeClass $badgeCls expandable"
-      val contentStyle =
+      val contentStyle   =
         if (matched) "display:block"
         else "display:none"
       val contentClasses =
         if (matched) "badge-expand-content badge-section-hl"
         else "badge-expand-content"
-      val idPrefix = s"m.$cardIdx.inj.$partIdx"
+      val idPrefix       = s"m.$cardIdx.inj.$partIdx"
       div(cls := "msg-injected-row")(
         span(
-          id                  := s"bb_$uid",
-          cls                 := badgeClasses,
+          id := s"bb_$uid",
+          cls := badgeClasses,
           attr(BadgeDataAttr) := uid,
         )(label),
         div(
-          id    := s"bc_$uid",
-          cls   := contentClasses,
+          id := s"bc_$uid",
+          cls := contentClasses,
           style := contentStyle,
         )(MessageTokenView.buildTextFrag(content, query, idPrefix)),
       )

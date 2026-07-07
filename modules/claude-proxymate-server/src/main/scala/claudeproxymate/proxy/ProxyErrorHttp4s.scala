@@ -13,12 +13,12 @@ import org.http4s.circe.CirceEntityEncoder.circeEntityEncoder
 object ProxyErrorHttp4s {
 
   def status(pe: ProxyError): Status = pe match {
-    case ProxyError.Upstream(_)                => Status.BadGateway
-    case ProxyError.CurlInitFailed             => Status.BadGateway
-    case ProxyError.CurlPerformFailed(_)       => Status.BadGateway
-    case ProxyError.TmpFileFailed              => Status.BadGateway
-    case ProxyError.MalformedUpstreamResponse  => Status.BadGateway
-    case ProxyError.CurlException(_)           => Status.BadGateway
+    case ProxyError.Upstream(_) => Status.BadGateway
+    case ProxyError.CurlInitFailed => Status.BadGateway
+    case ProxyError.CurlPerformFailed(_) => Status.BadGateway
+    case ProxyError.TmpFileFailed => Status.BadGateway
+    case ProxyError.MalformedUpstreamResponse => Status.BadGateway
+    case ProxyError.CurlException(_) => Status.BadGateway
   }
 
   given EntityEncoder[IO, ProxyError] = circeEntityEncoder[IO, ProxyError]

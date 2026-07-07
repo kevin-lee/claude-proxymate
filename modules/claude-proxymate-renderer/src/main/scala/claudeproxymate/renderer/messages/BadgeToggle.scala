@@ -1,5 +1,6 @@
 package claudeproxymate.renderer.messages
 
+import cats.syntax.all.*
 import claudeproxymate.renderer.state.AppState
 import org.scalajs.dom
 
@@ -16,7 +17,7 @@ object BadgeToggle {
 
     // Deactivate previous badge if different
     AppState.activeBadgeUid.foreach { prevUid =>
-      if (prevUid != uid) {
+      if (prevUid =!= uid) {
         val prevContent = dom.document.getElementById(s"bc_$prevUid")
         val prevBtn     = dom.document.getElementById(s"bb_$prevUid")
         if (prevContent != null) {
@@ -31,7 +32,7 @@ object BadgeToggle {
     }
 
     val contentEl = content.asInstanceOf[dom.html.Element]
-    val isOpen    = contentEl.style.display != "none"
+    val isOpen    = contentEl.style.display =!= "none"
     contentEl.style.display = if (isOpen) "none" else "block"
     locally { val _ = contentEl.classList.toggle("badge-section-hl", !isOpen) }
 
@@ -40,6 +41,6 @@ object BadgeToggle {
       locally { val _ = btn.classList.toggle("hl-active", !isOpen) }
     }
 
-    AppState.activeBadgeUid = if (isOpen) None else Some(uid)
+    AppState.activeBadgeUid = Option.unless(isOpen)(uid)
   }
 }

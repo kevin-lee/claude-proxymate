@@ -32,8 +32,8 @@ object CorrelationIds {
     */
   val Patterns: List[Pattern] = List(
     Pattern("srvtoolu", raw"srvtoolu_[a-zA-Z0-9_]{16,}".r),
-    Pattern("toolu",    raw"toolu_[a-zA-Z0-9_]{16,}".r),
-    Pattern("msg",      raw"msg_[a-zA-Z0-9_]{16,}".r),
+    Pattern("toolu", raw"toolu_[a-zA-Z0-9_]{16,}".r),
+    Pattern("msg", raw"msg_[a-zA-Z0-9_]{16,}".r),
   )
 
   /** Scan `s` for correlation-id matches, returning a non-overlapping
@@ -42,15 +42,15 @@ object CorrelationIds {
     */
   def scan(s: String): List[CorrMatch] = {
     if (s == null || s.isEmpty) return Nil
-    val candidates = scala.collection.mutable.ListBuffer.empty[CorrMatch]
+    val candidates   = scala.collection.mutable.ListBuffer.empty[CorrMatch]
     Patterns.foreach { p =>
       p.regex.findAllMatchIn(s).foreach { m =>
         candidates += CorrMatch(m.start, m.end, p.name)
       }
     }
     if (candidates.isEmpty) return Nil
-    val sorted = candidates.toList.sortBy(m => (m.start, -m.length))
-    val out = scala.collection.mutable.ListBuffer.empty[CorrMatch]
+    val sorted       = candidates.toList.sortBy(m => (m.start, -m.length))
+    val out          = scala.collection.mutable.ListBuffer.empty[CorrMatch]
     var lastEnd: Int = 0
     sorted.foreach { m =>
       if (m.start >= lastEnd) {
