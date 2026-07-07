@@ -24,28 +24,28 @@ object IndexHtmlGeneratorSpec extends Properties {
   )
 
   private val sampleLocale: Map[String, String] = Map(
-    "onboard.title"          -> "title",
-    "onboard.sub"            -> "sub",
-    "onboard.s3.title"       -> "s3title",
-    "onboard.s3.body"        -> "s3body",
-    "onboard.s3.after"       -> "s3after",
-    "onboard.imgAlt1"        -> "imgAlt1",
-    "onboard.imgAlt2"        -> "imgAlt2",
-    "onboard.prev"           -> "prev",
-    "onboard.next"           -> "next",
-    "onboard.note"           -> "note",
-    "onboard.btn"            -> "btn",
-    "header.logoSub"         -> "Proxy",
-    "proxy.port"             -> "port",
-    "proxy.stopped"          -> "stopped",
-    "proxy.startFirst"       -> "startFirst",
-    "proxy.startProxy"       -> "startProxy",
-    "proxy.clear"            -> "clear",
-    "proxy.interceptTitle"   -> "intercept",
-    "proxy.capturedRequests" -> "captured",
-    "proxy.noCapturesTitle"  -> "noCapturesTitle",
+    "onboard.title"            -> "title",
+    "onboard.sub"              -> "sub",
+    "onboard.s3.title"         -> "s3title",
+    "onboard.s3.body"          -> "s3body",
+    "onboard.s3.after"         -> "s3after",
+    "onboard.imgAlt1"          -> "imgAlt1",
+    "onboard.imgAlt2"          -> "imgAlt2",
+    "onboard.prev"             -> "prev",
+    "onboard.next"             -> "next",
+    "onboard.note"             -> "note",
+    "onboard.btn"              -> "btn",
+    "header.logoSub"           -> "Proxy",
+    "proxy.port"               -> "port",
+    "proxy.stopped"            -> "stopped",
+    "proxy.startFirst"         -> "startFirst",
+    "proxy.startProxy"         -> "startProxy",
+    "proxy.clear"              -> "clear",
+    "proxy.interceptTitle"     -> "intercept",
+    "proxy.capturedRequests"   -> "captured",
+    "proxy.noCapturesTitle"    -> "noCapturesTitle",
     "proxy.selectRequestTitle" -> "selectRequestTitle",
-    "copy.copy"              -> "copy",
+    "copy.copy"                -> "copy",
   )
 
   private lazy val rendered: String = IndexHtmlGenerator.generate(sampleLocale)
@@ -74,18 +74,21 @@ object IndexHtmlGeneratorSpec extends Properties {
 
   def testNoInlineEventHandlers: Result =
     Result.all(InlineEventHandlerAttrs.map { attr =>
-      Result.assert(!rendered.contains(attr))
+      Result
+        .assert(!rendered.contains(attr))
         .log(s"unexpected inline handler attribute `$attr` in generated HTML")
     })
 
   def testOnboardCloseBtnId: Result =
-    Result.assert(rendered.contains(s"""id="${HtmlIds.OnboardCloseBtn}""""))
+    Result
+      .assert(rendered.contains(s"""id="${HtmlIds.OnboardCloseBtn}""""))
       .log(s"`id=\"${HtmlIds.OnboardCloseBtn}\"` missing from generated HTML")
 
   def testOnboardCarouselElements: Result =
     Result.all(
       List(HtmlIds.OnboardTrack, HtmlIds.OnboardDots, HtmlIds.OnboardPrev, HtmlIds.OnboardNext).map { id =>
-        Result.assert(rendered.contains(s"""id="$id""""))
+        Result
+          .assert(rendered.contains(s"""id="$id""""))
           .log(s"`id=\"$id\"` missing from generated HTML")
       }
     )
@@ -93,7 +96,8 @@ object IndexHtmlGeneratorSpec extends Properties {
   def testOnboardSlideImages: Result =
     Result.all(
       List("getting-started-01.png", "getting-started-02.png").map { img =>
-        Result.assert(rendered.contains(img))
+        Result
+          .assert(rendered.contains(img))
           .log(s"`$img` missing from generated HTML")
       }
     )
@@ -101,21 +105,25 @@ object IndexHtmlGeneratorSpec extends Properties {
   def testOnboardDotsDataAttr: Result =
     Result.all(
       List("0", "1", "2").map { n =>
-        Result.assert(rendered.contains(s"""data-onboard-slide="$n""""))
+        Result
+          .assert(rendered.contains(s"""data-onboard-slide="$n""""))
           .log(s"`data-onboard-slide=\"$n\"` missing from generated HTML")
       }
     )
 
   def testProxyCmdCopyBtnId: Result =
-    Result.assert(rendered.contains(s"""id="${HtmlIds.ProxyCmdCopyBtn}""""))
+    Result
+      .assert(rendered.contains(s"""id="${HtmlIds.ProxyCmdCopyBtn}""""))
       .log(s"`id=\"${HtmlIds.ProxyCmdCopyBtn}\"` missing from generated HTML")
 
   def testProxyClearBtnId: Result =
-    Result.assert(rendered.contains(s"""id="${HtmlIds.ProxyClearBtn}""""))
+    Result
+      .assert(rendered.contains(s"""id="${HtmlIds.ProxyClearBtn}""""))
       .log(s"`id=\"${HtmlIds.ProxyClearBtn}\"` missing from generated HTML")
 
   def testCopyDetailBtnId: Result =
-    Result.assert(rendered.contains(s"""id="${HtmlIds.CopyDetailBtn}""""))
+    Result
+      .assert(rendered.contains(s"""id="${HtmlIds.CopyDetailBtn}""""))
       .log(s"`id=\"${HtmlIds.CopyDetailBtn}\"` missing from generated HTML")
 
   def testExistingButtonIdsPreserved: Result = {
@@ -126,39 +134,47 @@ object IndexHtmlGeneratorSpec extends Properties {
       HtmlIds.ProxyPort,
     )
     Result.all(expected.map { id =>
-      Result.assert(rendered.contains(s"""id="$id""""))
+      Result
+        .assert(rendered.contains(s"""id="$id""""))
         .log(s"`id=\"$id\"` missing from generated HTML")
     })
   }
 
   def testDtabDataAttrs: Result =
     Result.all(List("messages", "request", "response", "analysis").map { tab =>
-      Result.assert(rendered.contains(s"""data-dtab="$tab""""))
+      Result
+        .assert(rendered.contains(s"""data-dtab="$tab""""))
         .log(s"`data-dtab=\"$tab\"` missing from generated HTML")
     })
 
   def testCspMetaPresent: Result =
-    Result.assert(rendered.contains("""http-equiv="Content-Security-Policy""""))
+    Result
+      .assert(rendered.contains("""http-equiv="Content-Security-Policy""""))
       .log(s"CSP meta tag missing from generated HTML")
 
   def testCspScriptSrcStrict: Result =
     Result.all(
       List(
-        Result.assert(rendered.contains("script-src 'self'"))
+        Result
+          .assert(rendered.contains("script-src 'self'"))
           .log("`script-src 'self'` missing"),
-        Result.assert(!rendered.contains("script-src 'self' 'unsafe-inline'"))
+        Result
+          .assert(!rendered.contains("script-src 'self' 'unsafe-inline'"))
           .log("`script-src` must not include `'unsafe-inline'`"),
-        Result.assert(!rendered.contains("'unsafe-eval'"))
+        Result
+          .assert(!rendered.contains("'unsafe-eval'"))
           .log("`'unsafe-eval'` must never appear in the CSP"),
       )
     )
 
   def testCspObjectSrcNone: Result =
-    Result.assert(rendered.contains("object-src 'none'"))
+    Result
+      .assert(rendered.contains("object-src 'none'"))
       .log("`object-src 'none'` missing from CSP")
 
   def testCspGitHubApiAllowed: Result =
-    Result.assert(rendered.contains("https://api.github.com"))
+    Result
+      .assert(rendered.contains("https://api.github.com"))
       .log("`https://api.github.com` missing from CSP connect-src")
 
   def testCspDefenceInDepth: Result =

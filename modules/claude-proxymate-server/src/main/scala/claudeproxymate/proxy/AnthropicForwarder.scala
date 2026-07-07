@@ -1,6 +1,7 @@
 package claudeproxymate.proxy
 
 import cats.effect.IO
+import cats.syntax.all.*
 import org.http4s.*
 import org.http4s.client.Client
 import org.http4s.headers.Host
@@ -15,12 +16,12 @@ object AnthropicForwarder {
   def forward(client: Client[IO], req: Request[IO], bodyBytes: Array[Byte]): IO[Response[IO]] = {
     // Build upstream request with modified headers
     val upstreamHeaders = Headers(
-      req.headers.headers.filterNot(_.name == ci"Accept-Encoding")
-    ).put(Host(anthropicHost, Some(anthropicPort)))
+      req.headers.headers.filterNot(_.name === ci"Accept-Encoding")
+    ).put(Host(anthropicHost, anthropicPort.some))
 
     val upstreamUri = Uri(
-      scheme = Some(Uri.Scheme.https),
-      authority = Some(Uri.Authority(host = Uri.RegName(anthropicHost), port = Some(anthropicPort))),
+      scheme = Uri.Scheme.https.some,
+      authority = Uri.Authority(host = Uri.RegName(anthropicHost), port = anthropicPort.some).some,
       path = req.uri.path,
       query = req.uri.query,
     )

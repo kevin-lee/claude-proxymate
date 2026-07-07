@@ -1,5 +1,6 @@
 package claudeproxymate.renderer.proxy
 
+import cats.syntax.all.*
 import claudeproxymate.core.HtmlIds
 import claudeproxymate.renderer.facades.ElectronApi
 import claudeproxymate.renderer.i18n.I18n
@@ -38,7 +39,7 @@ object ProxyControl {
 
   private def handleInput(e: dom.Event): Unit = {
     val target = e.target.asInstanceOf[dom.Element]
-    if (target == null || target.id != HtmlIds.ProxyPort) return
+    if (target == null || target.id =!= HtmlIds.ProxyPort) return
     updateProxyCmd()
   }
 
@@ -49,7 +50,7 @@ object ProxyControl {
 
     val port = portEl.asInstanceOf[dom.html.Input].value match {
       case s if s.nonEmpty => s
-      case _               => "8888"
+      case _ => "8888"
     }
     cmdEl.asInstanceOf[dom.html.Element].style.color = "var(--green)"
     cmdEl.textContent = s"ANTHROPIC_BASE_URL=http://localhost:$port claude"
@@ -68,7 +69,8 @@ object ProxyControl {
 
     if (AppState.proxyRunning) {
       locally { val _ = statusEl.classList.add("running") }
-      if (statusTx != null) statusTx.textContent = I18n.t("proxy.running", Map("port" -> AppState.proxyActualPort.toString))
+      if (statusTx != null)
+        statusTx.textContent = I18n.t("proxy.running", Map("port" -> AppState.proxyActualPort.toString))
       btnEl.textContent = I18n.t("proxy.stopProxy")
       btnEl.style.background = "var(--red)"
       if (cmdEl != null) {
@@ -89,7 +91,7 @@ object ProxyControl {
 
   def toggleProxy(): Unit = {
     ElectronApi.get match {
-      case None      => ()
+      case None => ()
       case Some(api) => doToggleProxy(api)
     }
   }
@@ -143,7 +145,7 @@ object ProxyControl {
               }
               debouncedRenderList(() => ProxyList.renderProxyList())
               AppState.selectedProxyId.foreach { selId =>
-                if (selId == id.asInstanceOf[Double]) {
+                if (selId === id.asInstanceOf[Double]) {
                   debouncedRenderDetail(() => callRenderProxyDetail())
                 }
               }
@@ -152,7 +154,7 @@ object ProxyControl {
         }
       }
 
-    val onSuccess: js.Function1[Unit, Unit] = { (_: Unit) =>
+    val onSuccess: js.Function1[Unit, Unit]    = { (_: Unit) =>
       if (btn != null) btn.asInstanceOf[dom.html.Button].disabled = false
       renderProxyStatus()
     }

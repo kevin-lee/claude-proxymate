@@ -30,7 +30,7 @@ object ProxyListViewSpec extends Properties {
 
   private val sampleLabels = ProxyListLabels(
     noCapturesTitle = "no captures yet",
-    noCapturesHint  = "Start the proxy and{{br}}run Claude Code",
+    noCapturesHint = "Start the proxy and{{br}}run Claude Code",
   )
 
   private def sampleEntry(
@@ -161,17 +161,18 @@ object ProxyListViewSpec extends Properties {
       evil <- Gen.string(Gen.alpha, Range.linear(0, 12)).log("evil")
     } yield {
       val payload = s"<script>alert('$evil')</script>"
-      val html = render(
+      val html    = render(
         List(
           sampleEntry(
             method = payload,
-            path   = payload,
-            ts     = payload,
-            model  = Some(payload),
+            path = payload,
+            ts = payload,
+            model = Some(payload),
           )
         )
       )
-      Result.assert(!html.contains("<script>"))
+      Result
+        .assert(!html.contains("<script>"))
         .log(s"raw <script> leaked for evil=$evil: $html")
     }
 
@@ -179,10 +180,11 @@ object ProxyListViewSpec extends Properties {
     for {
       n <- Gen.int(Range.linear(0, 1000000)).log("n")
     } yield {
-      val id = n.toDouble
-      val html = render(List(sampleEntry(id = id)))
+      val id      = n.toDouble
+      val html    = render(List(sampleEntry(id = id)))
       val pattern = s"""${ProxyListView.EntryDataIdAttr}="${id.toString}""""
-      Result.assert(html.contains(pattern))
+      Result
+        .assert(html.contains(pattern))
         .log(s"data-id round-trip failed for id=$id html=$html")
     }
 

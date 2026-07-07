@@ -18,11 +18,13 @@ object DetailEmptyViewSpec extends Properties {
     DetailEmptyView.buildFrag(DetailEmptyLabels(title, hint)).render
 
   def testProxyEmptyClass: Result =
-    Result.assert(render("t", "h").contains("class=\"proxy-empty\""))
+    Result
+      .assert(render("t", "h").contains("class=\"proxy-empty\""))
       .log(render("t", "h"))
 
   def testTitleText: Result =
-    Result.assert(render("Select a request", "h").contains("Select a request"))
+    Result
+      .assert(render("Select a request", "h").contains("Select a request"))
       .log(render("Select a request", "h"))
 
   def testHintBrToken: Result = {
@@ -52,8 +54,9 @@ object DetailEmptyViewSpec extends Properties {
       chunk <- Gen.string(Gen.alpha, Range.linear(0, 12)).log("chunk")
     } yield {
       val payload = s"<script>alert('$chunk')</script>"
-      val out = render(payload, "h")
-      Result.assert(!out.contains("<script>"))
+      val out     = render(payload, "h")
+      Result
+        .assert(!out.contains("<script>"))
         .log(s"raw <script> leaked for chunk=$chunk: $out")
     }
 
@@ -62,8 +65,9 @@ object DetailEmptyViewSpec extends Properties {
       chunk <- Gen.string(Gen.alpha, Range.linear(0, 12)).log("chunk")
     } yield {
       val payload = s"<script>alert('$chunk')</script>"
-      val out = render("t", payload)
-      Result.assert(!out.contains("<script>"))
+      val out     = render("t", payload)
+      Result
+        .assert(!out.contains("<script>"))
         .log(s"raw <script> leaked for chunk=$chunk: $out")
     }
 }

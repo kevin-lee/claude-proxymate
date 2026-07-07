@@ -28,7 +28,7 @@ object TokenPopover {
       for (i <- 0 until target.classList.length) buf += target.classList.item(i)
       buf.toList
     }
-    val href = {
+    val href       = {
       val raw = target.getAttribute("href")
       if (raw == null) "" else raw
     }
@@ -45,10 +45,12 @@ object TokenPopover {
                 if (!js.isUndefined(ok) && ok.asInstanceOf[Boolean]) ()
                 else {
                   val reason = result.selectDynamic("reason")
-                  dom.console.warn(
-                    "openExternal refused:",
-                    if (js.isUndefined(reason) || reason == null) "(no reason)" else reason.toString,
-                  )
+                  dom
+                    .console
+                    .warn(
+                      "openExternal refused:",
+                      if (js.isUndefined(reason) || reason == null) "(no reason)" else reason.toString,
+                    )
                 }
               }
             }: js.Function1[js.Dynamic, Unit])
@@ -83,20 +85,20 @@ object TokenPopover {
 
     val rows = d.selectDynamic("rows").asInstanceOf[js.Array[js.Dynamic]].toList.map { r =>
       TokenPopoverRow(
-        label  = r.label.asInstanceOf[String],
+        label = r.label.asInstanceOf[String],
         tokens = r.tokens.asInstanceOf[String],
-        price  = r.price.toString,
-        cost   = r.cost.asInstanceOf[String],
+        price = r.price.toString,
+        cost = r.cost.asInstanceOf[String],
       )
     }
 
     val data = TokenPopoverData(
-      model       = d.model.asInstanceOf[String],
-      kb          = d.kb.asInstanceOf[String],
-      total       = d.total.asInstanceOf[String],
-      cachePct    = d.cachePct.asInstanceOf[Int],
+      model = d.model.asInstanceOf[String],
+      kb = d.kb.asInstanceOf[String],
+      total = d.total.asInstanceOf[String],
+      cachePct = d.cachePct.asInstanceOf[Int],
       pricingDate = d.pricingDate.asInstanceOf[String],
-      rows        = rows,
+      rows = rows,
     )
 
     val descriptions = Map(
@@ -107,19 +109,18 @@ object TokenPopover {
     )
 
     val labels = TokenPopoverLabels(
-      costTitle         = I18n.t("token.costTitle"),
-      modelLabel        = I18n.t("token.model"),
-      reqSizeLabel      = I18n.t("token.reqSize"),
-      copyBtn           = I18n.t("token.copyBtn"),
-      totalLabel        = I18n.t("token.total"),
+      costTitle = I18n.t("token.costTitle"),
+      modelLabel = I18n.t("token.model"),
+      reqSizeLabel = I18n.t("token.reqSize"),
+      copyBtn = I18n.t("token.copyBtn"),
+      totalLabel = I18n.t("token.total"),
       cacheHitRateLabel = I18n.t("token.cacheHitRate"),
-      notePricingDate   = I18n.t("token.notePricingDate", Map("date" -> data.pricingDate)),
-      noteModelPrice    = I18n.t("token.noteModelPrice"),
-      noteOfficialDoc   = I18n.t("token.noteOfficialDoc"),
-      noteMTok          = I18n.t("token.noteMTok"),
-      noteCacheSaving   =
-        if (data.cachePct >= 50) Some(I18n.t("token.noteCacheSaving", Map("pct" -> data.cachePct.toString)))
-        else None,
+      notePricingDate = I18n.t("token.notePricingDate", Map("date" -> data.pricingDate)),
+      noteModelPrice = I18n.t("token.noteModelPrice"),
+      noteOfficialDoc = I18n.t("token.noteOfficialDoc"),
+      noteMTok = I18n.t("token.noteMTok"),
+      noteCacheSaving =
+        Option.when(data.cachePct >= 50)(I18n.t("token.noteCacheSaving", Map("pct" -> data.cachePct.toString))),
     )
 
     val pop = dom.document.createElement("div").asInstanceOf[dom.html.Div]

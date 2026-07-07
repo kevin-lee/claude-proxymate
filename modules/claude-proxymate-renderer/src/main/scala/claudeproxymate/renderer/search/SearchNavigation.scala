@@ -1,5 +1,6 @@
 package claudeproxymate.renderer.search
 
+import cats.syntax.all.*
 import claudeproxymate.core.HtmlIds
 import claudeproxymate.renderer.state.AppState
 import claudeproxymate.renderer.util.Debounce
@@ -24,11 +25,11 @@ object SearchNavigation {
 
     detailSearchDebounce { () =>
       AppState.detailSearchWasFocused = dom.document.activeElement match {
-        case el: dom.html.Element => el.id == HtmlIds.ProxyDetailSearchInput
-        case _                    => false
+        case el: dom.html.Element => el.id === HtmlIds.ProxyDetailSearchInput
+        case _ => false
       }
       AppState.searchCurrentIdx = -1
-      if (q.isEmpty) AppState.proxyDetailMechFilter = None
+      if (q.isEmpty) AppState.proxyDetailMechFilter = none[String]
 
       claudeproxymate.renderer.detail.DetailView.renderProxyDetail()
 
@@ -42,7 +43,7 @@ object SearchNavigation {
       // Messages tab: the cards live directly in the proxy detail container.
       // Other tabs: marks live inside #proxyDetailCode (json-tree-view) or
       // inside .analysis-view.
-      if (AppState.proxyDetailTab == "messages")
+      if (AppState.proxyDetailTab === "messages")
         dom.document.getElementById(HtmlIds.ProxyDetailView)
       else {
         val el = dom.document.getElementById(HtmlIds.ProxyDetailCode)
@@ -53,14 +54,14 @@ object SearchNavigation {
     if (container == null) return
 
     val marks = container.querySelectorAll("mark.search-hl")
-    if (marks.length == 0) return
+    if (marks.length === 0) return
 
     // Remove current highlight
     val prev = container.querySelector("mark.search-hl.current")
     if (prev != null) { locally { val _ = prev.classList.remove("current") } }
 
     // Calculate new index
-    if (delta == 0) AppState.searchCurrentIdx = 0
+    if (delta === 0) AppState.searchCurrentIdx = 0
     else {
       val len = marks.length
       AppState.searchCurrentIdx = ((AppState.searchCurrentIdx + delta) % len + len) % len
@@ -73,7 +74,10 @@ object SearchNavigation {
     // (`*-b[display:none]`). `scrollIntoView` is a no-op on hidden elements,
     // so expand any collapsed ancestors first.
     claudeproxymate.renderer.analysis.MechHighlight.expandAncestors(mark)
-    locally { val _ = mark.asInstanceOf[js.Dynamic].scrollIntoView(js.Dynamic.literal("behavior" -> "smooth", "block" -> "center")) }
+    locally {
+      val _ =
+        mark.asInstanceOf[js.Dynamic].scrollIntoView(js.Dynamic.literal("behavior" -> "smooth", "block" -> "center"))
+    }
     updateSearchCounter(marks.length)
   }
 

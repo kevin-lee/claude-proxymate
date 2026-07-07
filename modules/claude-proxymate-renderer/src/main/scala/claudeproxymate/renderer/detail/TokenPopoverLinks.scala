@@ -16,8 +16,6 @@ object TokenPopoverLinks {
     * Otherwise return `None` and the caller should fall through to other
     * click-handling branches.
     */
-  def extractExternalLinkHref(classNames: List[String], href: String): Option[String] = {
-    if (classNames.contains(ExternalLinkClass) && href.nonEmpty) Some(href)
-    else None
-  }
+  def extractExternalLinkHref(classNames: List[String], href: String): Option[String] =
+    Option.when(classNames.contains(ExternalLinkClass) && href.nonEmpty)(href)
 }

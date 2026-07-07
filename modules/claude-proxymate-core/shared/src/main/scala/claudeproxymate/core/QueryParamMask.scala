@@ -58,8 +58,8 @@ object QueryParamMask {
     val q = path.indexOf('?')
     if (q < 0) return path
 
-    val prefix    = path.substring(0, q + 1) // includes the `?`
-    val rest      = path.substring(q + 1)
+    val prefix               = path.substring(0, q + 1) // includes the `?`
+    val rest                 = path.substring(q + 1)
     val (queryStr, fragment) = {
       val h = rest.indexOf('#')
       if (h < 0) (rest, "") else (rest.substring(0, h), rest.substring(h))
@@ -73,7 +73,7 @@ object QueryParamMask {
   }
 
   private def maskSegment(segment: String): String = {
-    val eq = segment.indexOf('=')
+    val eq   = segment.indexOf('=')
     if (eq < 0) return segment
     val name = segment.substring(0, eq)
     if (isSensitive(decodeNameSafely(name))) s"$name=$Sentinel"

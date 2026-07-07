@@ -44,22 +44,22 @@ object AnalysisViewSpec extends Properties {
 
   private val sampleLabels = AnalysisLabels(
     noMechanismsTitle = "No mechs",
-    noMechanismsHint  = "Plain request",
-    claudeMdTitle     = "CMD title",
-    claudeMdDesc      = "CMD desc",
-    outputStyleTitle  = "OS title",
-    outputStyleDesc   = "OS desc",
-    slashCmdTitle     = "Slash title",
-    slashCmdDescs     = List("desc-0", "desc-1", "desc-2"),
-    skillTitle        = "Skill title",
-    skillLinkedTitle  = "Linked skill title",
-    skillDesc         = "Skill desc",
-    skillLinkedDesc   = "Linked skill desc",
-    noToolResult      = "no tool result",
-    subAgentDesc      = "Sub agent desc",
-    mcpDesc           = "MCP desc",
+    noMechanismsHint = "Plain request",
+    claudeMdTitle = "CMD title",
+    claudeMdDesc = "CMD desc",
+    outputStyleTitle = "OS title",
+    outputStyleDesc = "OS desc",
+    slashCmdTitle = "Slash title",
+    slashCmdDescs = List("desc-0", "desc-1", "desc-2"),
+    skillTitle = "Skill title",
+    skillLinkedTitle = "Linked skill title",
+    skillDesc = "Skill desc",
+    skillLinkedDesc = "Linked skill desc",
+    noToolResult = "no tool result",
+    subAgentDesc = "Sub agent desc",
+    mcpDesc = "MCP desc",
     searchPlaceholder = "search…",
-    searchClear       = "clear",
+    searchClear = "clear",
   )
 
   private def render(
@@ -67,33 +67,36 @@ object AnalysisViewSpec extends Properties {
     query: String = "",
     mechChipsHtml: String = "",
   ): String =
-    AnalysisView.buildFrag(
-      data           = data,
-      labels         = sampleLabels,
-      searchQuery    = query,
-      searchInputId  = "proxyDetailSearchInput",
-      mechChipsHtml  = mechChipsHtml,
-    ).render
+    AnalysisView
+      .buildFrag(
+        data = data,
+        labels = sampleLabels,
+        searchQuery = query,
+        searchInputId = "proxyDetailSearchInput",
+        mechChipsHtml = mechChipsHtml,
+      )
+      .render
 
   private def renderSearchBar(query: String): String =
     AnalysisView.buildSearchBarFrag("proxyDetailSearchInput", query, sampleLabels).render
 
   private def emptyData: AnalysisData =
     AnalysisData(
-      modelName        = None,
-      claudeMd         = None,
-      outputStyle      = None,
-      slashCommands    = Nil,
-      skills           = Nil,
+      modelName = None,
+      claudeMd = None,
+      outputStyle = None,
+      slashCommands = Nil,
+      skills = Nil,
       slashSkillLinked = false,
-      subAgents        = Nil,
-      mcpTools         = Nil,
+      subAgents = Nil,
+      mcpTools = Nil,
     )
 
   // ── Empty / no-mechanisms ────────────────────────────────────────────
 
   def testEmptyClass: Result =
-    Result.assert(AnalysisView.buildEmptyFrag(sampleLabels).render.contains("class=\"analysis-none\""))
+    Result
+      .assert(AnalysisView.buildEmptyFrag(sampleLabels).render.contains("class=\"analysis-none\""))
       .log(AnalysisView.buildEmptyFrag(sampleLabels).render)
 
   def testEmptyTitleAndHint: Result = {
@@ -170,8 +173,8 @@ object AnalysisViewSpec extends Properties {
       CmSectionView("L1", "/p1", "c1", "global"),
       CmSectionView("L2", "/p2", "c2", "project"),
     )
-    val data = emptyData.copy(claudeMd = Some(Right(sections)))
-    val out  = render(Some(data))
+    val data     = emptyData.copy(claudeMd = Some(Right(sections)))
+    val out      = render(Some(data))
     Result.all(
       List(
         Result.assert(out.contains("data-mech-key=\"cm\"")).log("cm key missing"),
@@ -214,7 +217,8 @@ object AnalysisViewSpec extends Properties {
     Result.all(
       List(
         Result.assert(out.contains("data-mech-key=\"sk_0\"")).log("sk_0 key missing"),
-        Result.assert(out.contains(s"class=\"analysis-block highlight-purple ${AnalysisView.JsonBlockClass}\""))
+        Result
+          .assert(out.contains(s"class=\"analysis-block highlight-purple ${AnalysisView.JsonBlockClass}\""))
           .log("jt-json-block class missing"),
         Result.assert(out.contains("data-json=")).log("data-json attr missing"),
       )
@@ -222,10 +226,10 @@ object AnalysisViewSpec extends Properties {
   }
 
   def testSkillResult: Result = {
-    val withResult = emptyData.copy(skills = List(SkillView("toolu_X", "{}", Some("RESULT-TEXT"))))
+    val withResult    = emptyData.copy(skills = List(SkillView("toolu_X", "{}", Some("RESULT-TEXT"))))
     val withoutResult = emptyData.copy(skills = List(SkillView("toolu_X", "{}", None)))
-    val outWith    = render(Some(withResult))
-    val outWithout = render(Some(withoutResult))
+    val outWith       = render(Some(withResult))
+    val outWithout    = render(Some(withoutResult))
     Result.all(
       List(
         Result.assert(outWith.contains("RESULT-TEXT")).log(s"result missing: $outWith"),
@@ -263,10 +267,10 @@ object AnalysisViewSpec extends Properties {
   }
 
   def testMcpJsonBranching: Result = {
-    val mcJson    = McpToolView("a", "s", "t", """{"k":1}""", isJson = true, None)
-    val mcPlain   = McpToolView("b", "s", "t", "plain text", isJson = false, None)
-    val outJson   = render(Some(emptyData.copy(mcpTools = List(mcJson))))
-    val outPlain  = render(Some(emptyData.copy(mcpTools = List(mcPlain))))
+    val mcJson   = McpToolView("a", "s", "t", """{"k":1}""", isJson = true, None)
+    val mcPlain  = McpToolView("b", "s", "t", "plain text", isJson = false, None)
+    val outJson  = render(Some(emptyData.copy(mcpTools = List(mcJson))))
+    val outPlain = render(Some(emptyData.copy(mcpTools = List(mcPlain))))
     Result.all(
       List(
         Result.assert(outJson.contains(AnalysisView.JsonBlockClass)).log(s"jt-json-block missing: $outJson"),
@@ -285,7 +289,8 @@ object AnalysisViewSpec extends Properties {
       val payload = s"<script>alert('$chunk')</script>"
       val data    = emptyData.copy(modelName = Some(payload))
       val out     = render(Some(data))
-      Result.assert(!out.contains("<script>"))
+      Result
+        .assert(!out.contains("<script>"))
         .log(s"raw <script> leaked for chunk=$chunk: $out")
     }
 
@@ -294,12 +299,13 @@ object AnalysisViewSpec extends Properties {
       chunk <- Gen.string(Gen.alpha, Range.linear(0, 12)).log("chunk")
     } yield {
       val payload = s"<script>alert('$chunk')</script>"
-      val data = emptyData.copy(
+      val data    = emptyData.copy(
         slashCommands = List(SlashCommandView(payload, payload)),
-        skills        = List(SkillView(payload, payload, Some(payload))),
+        skills = List(SkillView(payload, payload, Some(payload))),
       )
-      val out = render(Some(data))
-      Result.assert(!out.contains("<script>"))
+      val out     = render(Some(data))
+      Result
+        .assert(!out.contains("<script>"))
         .log(s"raw <script> leaked for chunk=$chunk: $out")
     }
 
@@ -308,10 +314,11 @@ object AnalysisViewSpec extends Properties {
       chunk <- Gen.string(Gen.alpha, Range.linear(0, 12)).log("chunk")
     } yield {
       val payload = s"<script>alert('$chunk')</script>"
-      val mc = McpToolView(payload, payload, payload, payload, isJson = false, Some(payload))
-      val data = emptyData.copy(mcpTools = List(mc))
-      val out  = render(Some(data))
-      Result.assert(!out.contains("<script>"))
+      val mc      = McpToolView(payload, payload, payload, payload, isJson = false, Some(payload))
+      val data    = emptyData.copy(mcpTools = List(mc))
+      val out     = render(Some(data))
+      Result
+        .assert(!out.contains("<script>"))
         .log(s"raw <script> leaked for chunk=$chunk: $out")
     }
 
@@ -319,11 +326,11 @@ object AnalysisViewSpec extends Properties {
 
   def testNoInlineHandlers: Result = {
     val data = emptyData.copy(
-      modelName     = Some("m"),
+      modelName = Some("m"),
       slashCommands = List(SlashCommandView("foo", "/foo")),
-      skills        = List(SkillView("id", "{}", Some("r"))),
+      skills = List(SkillView("id", "{}", Some("r"))),
     )
-    val out = render(Some(data), query = "q")
+    val out  = render(Some(data), query = "q")
     Result.all(
       List(
         Result.assert(!out.contains("onclick=")).log(s"unexpected onclick: $out"),
@@ -338,14 +345,14 @@ object AnalysisViewSpec extends Properties {
 
   def testAllDataMechKeys: Result = {
     val data = emptyData.copy(
-      claudeMd      = Some(Left("md")),
-      outputStyle   = Some("style content"),
+      claudeMd = Some(Left("md")),
+      outputStyle = Some("style content"),
       slashCommands = List(SlashCommandView("foo", "/foo")),
-      skills        = List(SkillView("id", "{}", None)),
-      subAgents     = List(SubAgentView("Agent", "type", "{}", "p", isJson = true)),
-      mcpTools      = List(McpToolView("id", "srv", "tool", "{}", isJson = true, None)),
+      skills = List(SkillView("id", "{}", None)),
+      subAgents = List(SubAgentView("Agent", "type", "{}", "p", isJson = true)),
+      mcpTools = List(McpToolView("id", "srv", "tool", "{}", isJson = true, None)),
     )
-    val out = render(Some(data))
+    val out  = render(Some(data))
     Result.all(
       List(
         Result.assert(out.contains("data-mech-key=\"cm\"")).log("cm missing"),

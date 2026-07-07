@@ -11,8 +11,7 @@ object Config {
 
   def env(name: String): Option[String] = {
     val value = process.env.selectDynamic(name)
-    if (js.isUndefined(value) || value == null) None
-    else Some(value.asInstanceOf[String])
+    Option.unless(js.isUndefined(value) || value == null)(value.asInstanceOf[String])
   }
 
   /** Path to the native proxy binary.

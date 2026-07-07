@@ -1,5 +1,6 @@
 package claudeproxymate.renderer.util
 
+import cats.syntax.all.*
 import io.circe.Json
 import io.circe.parser.parse
 
@@ -13,7 +14,7 @@ import scala.scalajs.js
 object JsJsonBridge {
 
   def toCirceJson(dyn: js.Dynamic): Either[String, Json] = {
-    if (js.isUndefined(dyn) || dyn == null) Right(Json.Null)
+    if (js.isUndefined(dyn) || dyn == null) Json.Null.asRight[String]
     else {
       val str = js.JSON.stringify(dyn)
       parse(str).left.map(_.getMessage)

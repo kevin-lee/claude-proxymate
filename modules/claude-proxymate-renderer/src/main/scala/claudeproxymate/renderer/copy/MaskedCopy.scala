@@ -1,5 +1,6 @@
 package claudeproxymate.renderer.copy
 
+import cats.syntax.all.*
 import claudeproxymate.core.{CorrelationIds, SensitiveKeys, TokenPatterns}
 
 import scala.scalajs.js
@@ -47,9 +48,9 @@ object MaskedCopy {
   /** Sentinel that replaces masked spans in the copied output. */
   val Sentinel: String = "***"
 
-  private sealed trait Hit { def start: Int; def end: Int }
-  private final case class TokHit(start: Int, end: Int)  extends Hit
-  private final case class CorrHit(start: Int, end: Int) extends Hit
+  sealed private trait Hit { def start: Int; def end: Int }
+  final private case class TokHit(start: Int, end: Int) extends Hit
+  final private case class CorrHit(start: Int, end: Int) extends Hit
 
   /* Mirrors JsonTreeView.collectHits / MessageTokenView.collectHits:
    * token and correlation matches merged and ordered by start offset. */
@@ -76,7 +77,7 @@ object MaskedCopy {
       hits.foreach { h =>
         if (h.start > cursor) sb.append(s.substring(cursor, h.start))
         val id = h match {
-          case TokHit(_, _)  => s"$idPrefix#${h.start}"
+          case TokHit(_, _) => s"$idPrefix#${h.start}"
           case CorrHit(_, _) => s"corr:$idPrefix#${h.start}"
         }
         if (isRevealed(id)) {
@@ -113,7 +114,7 @@ object MaskedCopy {
           i += 1
         }
         out.asInstanceOf[js.Dynamic]
-      } else if (js.typeOf(v) == "object") {
+      } else if (js.typeOf(v) === "object") {
         val keys   = js.Object.keys(v.asInstanceOf[js.Object])
         val out    = js.Dictionary.empty[js.Any]
         var i: Int = 0
@@ -135,11 +136,11 @@ object MaskedCopy {
           i += 1
         }
         out.asInstanceOf[js.Dynamic]
-      } else if (js.typeOf(v) == "string") {
+      } else if (js.typeOf(v) === "string") {
         val r = maskString(v.asInstanceOf[String], path, isRevealed)
         revealed += r.revealed
         total += r.total
-        if (r.total == 0) v else r.text.asInstanceOf[js.Dynamic]
+        if (r.total === 0) v else r.text.asInstanceOf[js.Dynamic]
       } else {
         /* number / boolean — no spans, no recursion */
         v

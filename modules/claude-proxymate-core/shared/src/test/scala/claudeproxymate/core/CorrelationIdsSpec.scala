@@ -33,29 +33,35 @@ object CorrelationIdsSpec extends Properties {
   // ── Positive ────────────────────────────────────────────────────────────
 
   def testMsgMatch: Result =
-    Result.assert(hasMatch("msg_01ABCDEFGHIJKLMNOP", "msg"))
+    Result
+      .assert(hasMatch("msg_01ABCDEFGHIJKLMNOP", "msg"))
       .log("expected msg match")
 
   def testTooluMatch: Result =
-    Result.assert(hasMatch("toolu_abcdefghijklmnopqrst", "toolu"))
+    Result
+      .assert(hasMatch("toolu_abcdefghijklmnopqrst", "toolu"))
       .log("expected toolu match")
 
   def testSrvtooluMatch: Result =
-    Result.assert(hasMatch("srvtoolu_abcdefghijklmnopqrst", "srvtoolu"))
+    Result
+      .assert(hasMatch("srvtoolu_abcdefghijklmnopqrst", "srvtoolu"))
       .log("expected srvtoolu match")
 
   // ── Negative ────────────────────────────────────────────────────────────
 
   def testMsgShortNoMatch: Result =
-    Result.assert(CorrelationIds.scan("msg_short").isEmpty)
+    Result
+      .assert(CorrelationIds.scan("msg_short").isEmpty)
       .log("msg_ below 16-char floor should not match")
 
   def testMsgBareNoMatch: Result =
-    Result.assert(CorrelationIds.scan("msg").isEmpty)
+    Result
+      .assert(CorrelationIds.scan("msg").isEmpty)
       .log("bare 'msg' should not match")
 
   def testIntegerNoMatch: Result =
-    Result.assert(CorrelationIds.scan("42").isEmpty)
+    Result
+      .assert(CorrelationIds.scan("42").isEmpty)
       .log("plain integer should not match")
 
   // ── Overlap ─────────────────────────────────────────────────────────────
@@ -66,7 +72,8 @@ object CorrelationIdsSpec extends Properties {
     Result.all(
       List(
         Result.assert(ms.size == 1).log(s"expected 1 match, got $ms"),
-        Result.assert(ms.headOption.exists(_.name == "srvtoolu"))
+        Result
+          .assert(ms.headOption.exists(_.name == "srvtoolu"))
           .log(s"expected srvtoolu, got $ms"),
       )
     )
@@ -102,7 +109,8 @@ object CorrelationIdsSpec extends Properties {
   def testFingerprintMsg: Result = {
     val raw = "msg_01ABCDEFGHIJKLMNOPQRSTUVWXYZ4"
     val fp  = CorrelationIds.fingerprint("msg", raw)
-    Result.assert(fp == "msg_…WXYZ4".take(fp.length) || fp.startsWith("msg_…") && fp.endsWith("XYZ4"))
+    Result
+      .assert(fp == "msg_…WXYZ4".take(fp.length) || fp.startsWith("msg_…") && fp.endsWith("XYZ4"))
       .log(s"unexpected fingerprint: $fp")
   }
 
@@ -133,7 +141,8 @@ object CorrelationIdsSpec extends Properties {
     // "msg_…test" (length 9), longer than the input. Return raw.
     val raw = "msg_test"
     val fp  = CorrelationIds.fingerprint("msg", raw)
-    Result.assert(fp == raw)
+    Result
+      .assert(fp == raw)
       .log(s"expected raw, got $fp")
   }
 }

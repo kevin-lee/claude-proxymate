@@ -12,7 +12,7 @@ object ClaudeMdParser {
   private val sectionPattern: Regex =
     """(?s)Contents of (.+?) \((.+?)\):\n\n(.*?)(?=\n\nContents of |\s*$)""".r
 
-  private val globalPattern: Regex  = "(?i)global|private global".r
+  private val globalPattern: Regex     = "(?i)global|private global".r
   private val memoryDescPattern: Regex = "(?i)memory".r
   private val memoryPathPattern: Regex = "/memory/".r
   private val rulesPathPattern: Regex  = "/rules/".r

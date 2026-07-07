@@ -1,5 +1,6 @@
 package claudeproxymate.renderer.onboarding
 
+import cats.syntax.all.*
 import claudeproxymate.core.HtmlIds
 import org.scalajs.dom
 
@@ -56,13 +57,13 @@ object Onboarding {
 
   private def isModalVisible: Boolean = {
     val modal = dom.document.getElementById(HtmlIds.OnboardModal)
-    modal != null && modal.asInstanceOf[dom.html.Element].style.display != "none"
+    modal != null && modal.asInstanceOf[dom.html.Element].style.display =!= "none"
   }
 
   /** Move to slide `n` (clamped, non-wrapping) and re-render the carousel. */
   private def goTo(n: Int): Unit = {
     val clamped = math.max(0, math.min(SlideCount - 1, n))
-    if (clamped == currentSlide) return
+    if (clamped === currentSlide) return
     currentSlide = clamped
     render()
   }
@@ -78,14 +79,14 @@ object Onboarding {
     dom.document.querySelectorAll(".onboard-dot").foreach { node =>
       val el  = node.asInstanceOf[dom.html.Element]
       val idx = el.dataset.get("onboardSlide").getOrElse("")
-      if (idx == currentSlide.toString) el.classList.add("active")
+      if (idx === currentSlide.toString) el.classList.add("active")
       else el.classList.remove("active")
     }
 
-    setHidden(HtmlIds.OnboardPrev, currentSlide == 0)
-    setHidden(HtmlIds.OnboardNext, currentSlide == SlideCount - 1)
+    setHidden(HtmlIds.OnboardPrev, currentSlide === 0)
+    setHidden(HtmlIds.OnboardNext, currentSlide === SlideCount - 1)
     // "Get Started →" pill replaces the › arrow on the last slide only.
-    setHidden(HtmlIds.OnboardCloseBtn, currentSlide != SlideCount - 1)
+    setHidden(HtmlIds.OnboardCloseBtn, currentSlide =!= SlideCount - 1)
   }
 
   private def setHidden(id: String, hidden: Boolean): Unit = {

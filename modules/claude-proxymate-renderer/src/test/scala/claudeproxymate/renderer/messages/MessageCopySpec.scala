@@ -1,6 +1,8 @@
 package claudeproxymate.renderer.messages
 
 import claudeproxymate.renderer.copy.MaskedCopy
+import claudeproxymate.renderer.messages.MsgContent.*
+import claudeproxymate.renderer.messages.MsgPart.*
 import claudeproxymate.renderer.state.AppState
 import hedgehog.*
 import hedgehog.runner.*
@@ -34,10 +36,10 @@ object MessageCopySpec extends Properties {
   )
 
   private def textCard(role: String, text: String): MsgCard =
-    MsgCard(role, contents = List(TextContent(text)), userParts = Nil)
+    MsgCard(role, contents = List(TextContent(text)), userParts = Nil, rawIdx = 0)
 
   private def userCard(parts: List[MsgPart]): MsgCard =
-    MsgCard("user", contents = Nil, userParts = parts)
+    MsgCard("user", contents = Nil, userParts = parts, rawIdx = 0)
 
   private val FakeAnthropic = "sk-ant-abcdefghijklmnopqrstuvwxyz12345"
   private val FakeMsgId     = "msg_01ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -47,13 +49,15 @@ object MessageCopySpec extends Properties {
   private val revealAll: String => Boolean = _ => true
 
   def testEmpty: Result =
-    Result.assert(MessageCopy.toPlainText(Nil, maskAll).text.isEmpty)
+    Result
+      .assert(MessageCopy.toPlainText(Nil, maskAll).text.isEmpty)
       .log("empty input should produce empty string")
 
   def testSingleUserText: Result = {
     val card = userCard(List(TextMsgPart("hello world")))
     val out  = MessageCopy.toPlainText(List(card), revealAll).text
-    Result.assert(out == "# user\n\nhello world\n\n")
+    Result
+      .assert(out == "# user\n\nhello world\n\n")
       .log(s"unexpected output: ${out.replace("\n", "\\n")}")
   }
 
@@ -71,19 +75,21 @@ object MessageCopySpec extends Properties {
 
   def testAssistantText: Result = {
     val out = MessageCopy.toPlainText(List(textCard("assistant", "hi from claude")), revealAll).text
-    Result.assert(out == "# assistant\n\nhi from claude\n\n")
+    Result
+      .assert(out == "# assistant\n\nhi from claude\n\n")
       .log(s"unexpected: ${out.replace("\n", "\\n")}")
   }
 
   def testToolUse: Result = {
-    val card = MsgCard("assistant", List(ToolUseContent("Read")), Nil)
+    val card = MsgCard("assistant", List(ToolUseContent("Read")), Nil, rawIdx = 0)
     val out  = MessageCopy.toPlainText(List(card), revealAll).text
-    Result.assert(out.contains("[tool: Read]"))
+    Result
+      .assert(out.contains("[tool: Read]"))
       .log(s"tool-use line missing: $out")
   }
 
   def testToolResultTruncated: Result = {
-    val card = MsgCard("assistant", List(ToolResultContent("preview", truncated = true)), Nil)
+    val card = MsgCard("assistant", List(ToolResultContent("preview", truncated = true)), Nil, rawIdx = 0)
     val out  = MessageCopy.toPlainText(List(card), revealAll).text
     Result.all(
       List(
@@ -94,7 +100,7 @@ object MessageCopySpec extends Properties {
   }
 
   def testToolResultNotTruncated: Result = {
-    val card = MsgCard("assistant", List(ToolResultContent("done", truncated = false)), Nil)
+    val card = MsgCard("assistant", List(ToolResultContent("done", truncated = false)), Nil, rawIdx = 0)
     val out  = MessageCopy.toPlainText(List(card), revealAll).text
     Result.all(
       List(
@@ -105,9 +111,10 @@ object MessageCopySpec extends Properties {
   }
 
   def testOtherContent: Result = {
-    val card = MsgCard("assistant", List(OtherContent("image")), Nil)
+    val card = MsgCard("assistant", List(OtherContent("image")), Nil, rawIdx = 0)
     val out  = MessageCopy.toPlainText(List(card), revealAll).text
-    Result.assert(out.contains("[image]"))
+    Result
+      .assert(out.contains("[image]"))
       .log(s"other-type label missing: $out")
   }
 
@@ -132,7 +139,8 @@ object MessageCopySpec extends Properties {
         Result.assert(out.contains(MaskedCopy.Sentinel)).log(s"sentinel missing: $out"),
         Result.assert(out.contains("prefix ")).log(s"surrounding text lost: $out"),
         Result.assert(out.contains(" suffix")).log(s"surrounding text lost: $out"),
-        Result.assert(res.revealed == 0 && res.total == 1)
+        Result
+          .assert(res.revealed == 0 && res.total == 1)
           .log(s"counts wrong: revealed=${res.revealed} total=${res.total}"),
       )
     )
@@ -141,7 +149,8 @@ object MessageCopySpec extends Properties {
   def testRevealedPreserves: Result = {
     val card = textCard("user", FakeAnthropic)
     val out  = MessageCopy.toPlainText(List(card), revealAll).text
-    Result.assert(out.contains(FakeAnthropic))
+    Result
+      .assert(out.contains(FakeAnthropic))
       .log(s"raw token missing under reveal-all: $out")
   }
 
@@ -149,9 +158,10 @@ object MessageCopySpec extends Properties {
     /* Even all-masked, tool names are emitted verbatim
      * (they're not secrets per PR 2 scope).
      */
-    val card = MsgCard("assistant", List(ToolUseContent("Read")), Nil)
+    val card = MsgCard("assistant", List(ToolUseContent("Read")), Nil, rawIdx = 0)
     val out  = MessageCopy.toPlainText(List(card), maskAll).text
-    Result.assert(out.contains("[tool: Read]"))
+    Result
+      .assert(out.contains("[tool: Read]"))
       .log(s"tool name missing: $out")
   }
 
@@ -164,7 +174,8 @@ object MessageCopySpec extends Properties {
       List(
         Result.assert(!res.text.contains(FakeMsgId)).log(s"masked correlation id leaked: ${res.text}"),
         Result.assert(res.text.contains(MaskedCopy.Sentinel)).log(s"sentinel missing: ${res.text}"),
-        Result.assert(res.revealed == 0 && res.total == 1)
+        Result
+          .assert(res.revealed == 0 && res.total == 1)
           .log(s"counts wrong: revealed=${res.revealed} total=${res.total}"),
       )
     )
@@ -177,7 +188,8 @@ object MessageCopySpec extends Properties {
     Result.all(
       List(
         Result.assert(res.text.contains(FakeMsgId)).log(s"revealed correlation id missing: ${res.text}"),
-        Result.assert(res.revealed == 1 && res.total == 1)
+        Result
+          .assert(res.revealed == 1 && res.total == 1)
           .log(s"counts wrong: revealed=${res.revealed} total=${res.total}"),
       )
     )
@@ -193,7 +205,8 @@ object MessageCopySpec extends Properties {
     Result.all(
       List(
         Result.assert(res.text.contains(FakeAnthropic)).log(s"revealed token missing: ${res.text}"),
-        Result.assert(res.revealed == 1 && res.total == 1)
+        Result
+          .assert(res.revealed == 1 && res.total == 1)
           .log(s"counts wrong: revealed=${res.revealed} total=${res.total}"),
       )
     )
@@ -202,7 +215,8 @@ object MessageCopySpec extends Properties {
   def testUserPartId: Result = {
     val card = MsgCard("user", contents = Nil, userParts = List(TextMsgPart(FakeAnthropic)), rawIdx = 2)
     val res  = MessageCopy.toPlainText(List(card), Set("m.2.user.0#0"))
-    Result.assert(res.text.contains(FakeAnthropic) && res.revealed == 1)
+    Result
+      .assert(res.text.contains(FakeAnthropic) && res.revealed == 1)
       .log(s"user-part id mismatch: ${res.text} revealed=${res.revealed}")
   }
 
@@ -211,12 +225,13 @@ object MessageCopySpec extends Properties {
     // derive from partIdx (deterministic) and ignore the badge uid.
     val card = MsgCard(
       "user",
-      contents  = Nil,
+      contents = Nil,
       userParts = List(TextMsgPart("x"), InjectedMsgPart("u999", "L", FakeAnthropic, "badge-x")),
-      rawIdx    = 3,
+      rawIdx = 3,
     )
-    val res = MessageCopy.toPlainText(List(card), Set("m.3.inj.1#0"))
-    Result.assert(res.text.contains(FakeAnthropic) && res.revealed == 1)
+    val res  = MessageCopy.toPlainText(List(card), Set("m.3.inj.1#0"))
+    Result
+      .assert(res.text.contains(FakeAnthropic) && res.revealed == 1)
       .log(s"injected-part id mismatch: ${res.text} revealed=${res.revealed}")
   }
 
@@ -224,7 +239,8 @@ object MessageCopySpec extends Properties {
     // "key " is 4 chars, so the token span starts at offset 4.
     val card = MsgCard("assistant", List(ToolResultContent(s"key $FakeAnthropic", truncated = false)), Nil, rawIdx = 4)
     val res  = MessageCopy.toPlainText(List(card), Set("m.4.tr.0#4"))
-    Result.assert(res.text.contains(FakeAnthropic) && res.revealed == 1)
+    Result
+      .assert(res.text.contains(FakeAnthropic) && res.revealed == 1)
       .log(s"tool-result id mismatch: ${res.text} revealed=${res.revealed}")
   }
 
@@ -237,16 +253,18 @@ object MessageCopySpec extends Properties {
       List(
         Result.assert(res.text.contains(k1)).log(s"revealed token missing: ${res.text}"),
         Result.assert(!res.text.contains(k2)).log(s"masked token leaked: ${res.text}"),
-        Result.assert(res.revealed == 1 && res.total == 2)
+        Result
+          .assert(res.revealed == 1 && res.total == 2)
           .log(s"counts wrong: revealed=${res.revealed} total=${res.total}"),
       )
     )
   }
 
   def testCountsSpanFree: Result = {
-    val cards = List(textCard("user", "hi"), MsgCard("assistant", List(ToolUseContent("Read")), Nil))
+    val cards = List(textCard("user", "hi"), MsgCard("assistant", List(ToolUseContent("Read")), Nil, rawIdx = 0))
     val res   = MessageCopy.toPlainText(cards, maskAll)
-    Result.assert(res.total == 0 && res.revealed == 0)
+    Result
+      .assert(res.total == 0 && res.revealed == 0)
       .log(s"span-free cards should have 0 counts: revealed=${res.revealed} total=${res.total}")
   }
 
@@ -257,7 +275,7 @@ object MessageCopySpec extends Properties {
     val cards = List(
       MsgCard(
         "user",
-        contents  = Nil,
+        contents = Nil,
         userParts = List(
           TextMsgPart(s"typed $FakeAnthropic"),
           InjectedMsgPart("u42", "system-reminder", s"injected $FakeAnthropic", "badge-x"),
@@ -272,20 +290,21 @@ object MessageCopySpec extends Properties {
           ToolResultContent(s"result $FakeAnthropic", truncated = false),
         ),
         userParts = Nil,
-        rawIdx    = 2,
+        rawIdx = 2,
       ),
     )
 
     AppState.maskOverrides.clear()
     AppState.presenterMaskAll = true
-    val html   = MessageView.buildCardsFrag(cards, isUserFilter = false, query = "").render
-    val attrRe = ("data-(?:token|corr)-id=\"([^\"]+)\"").r
+    val html        = MessageView.buildCardsFrag(cards, isUserFilter = false, query = "").render
+    val attrRe      = "data-(?:token|corr)-id=\"([^\"]+)\"".r
     val renderedIds = attrRe.findAllMatchIn(html).map(_.group(1)).toSet
 
     val queried = scala.collection.mutable.Set.empty[String]
     val _       = MessageCopy.toPlainText(cards, { id => queried += id; false })
 
-    Result.assert(queried.toSet == renderedIds)
+    Result
+      .assert(queried.toSet == renderedIds)
       .log(s"render ids: $renderedIds\ncopy ids: ${queried.toSet}")
   }
 }

@@ -20,12 +20,12 @@ enum ProxyError {
   case CurlException(msg: String)
 
   def message: String = this match {
-    case ProxyError.Upstream(m)               => m
-    case ProxyError.CurlInitFailed            => "curl_easy_init() returned null"
-    case ProxyError.CurlPerformFailed(code)   => s"curl_easy_perform failed with code $code"
-    case ProxyError.TmpFileFailed             => "tmpfile() returned null"
+    case ProxyError.Upstream(m) => m
+    case ProxyError.CurlInitFailed => "curl_easy_init() returned null"
+    case ProxyError.CurlPerformFailed(code) => s"curl_easy_perform failed with code $code"
+    case ProxyError.TmpFileFailed => "tmpfile() returned null"
     case ProxyError.MalformedUpstreamResponse => "malformed response from upstream"
-    case ProxyError.CurlException(m)          => m
+    case ProxyError.CurlException(m) => m
   }
 }
 

@@ -37,11 +37,11 @@ object I18nTemplateSpec extends Properties {
   def testAllPaired: Result = {
     Result.all(
       List(
-        r("{{b}}x{{/b}}")           ==== "<b>x</b>",
+        r("{{b}}x{{/b}}") ==== "<b>x</b>",
         r("{{strong}}x{{/strong}}") ==== "<strong>x</strong>",
-        r("{{i}}x{{/i}}")           ==== "<i>x</i>",
-        r("{{small}}x{{/small}}")   ==== "<small>x</small>",
-        r("{{code}}x{{/code}}")     ==== "<code>x</code>",
+        r("{{i}}x{{/i}}") ==== "<i>x</i>",
+        r("{{small}}x{{/small}}") ==== "<small>x</small>",
+        r("{{code}}x{{/code}}") ==== "<code>x</code>",
       )
     )
   }
@@ -124,7 +124,8 @@ object I18nTemplateSpec extends Properties {
     } yield {
       val payload = s"<script>alert('$chunk')</script>"
       val out     = r(s"{{b}}$payload{{/b}}{{br}}$payload")
-      Result.assert(!out.contains("<script>"))
+      Result
+        .assert(!out.contains("<script>"))
         .log(s"leaked for chunk=$chunk out=$out")
     }
 

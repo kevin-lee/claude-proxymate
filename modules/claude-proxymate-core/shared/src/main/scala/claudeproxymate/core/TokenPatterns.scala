@@ -75,8 +75,8 @@ object TokenPatterns {
     val sorted = candidates.toList.sortBy(m => (m.start, -m.length))
 
     // Greedy non-overlap selection.
-    val out                = scala.collection.mutable.ListBuffer.empty[TokenMatch]
-    var lastEnd: Int       = 0
+    val out          = scala.collection.mutable.ListBuffer.empty[TokenMatch]
+    var lastEnd: Int = 0
     sorted.foreach { m =>
       if (m.start >= lastEnd) {
         out += m

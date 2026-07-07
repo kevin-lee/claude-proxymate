@@ -56,6 +56,7 @@ lazy val core =
     )
     .settings(
       libraryDependencies ++= List(
+        libs.catsCore.value,
         libs.circeCore.value,
         libs.circeParser.value,
         libs.circeGeneric.value,
@@ -107,7 +108,7 @@ lazy val electron = (project in file("modules/claude-proxymate-electron"))
     name := prefixedProjectName("electron"),
     scalaVersion := props.ScalaVersion,
     scalacOptions ++= List("-no-indent", "-explain"),
-    libraryDependencies ++= List(libs.scalaJsDom.value),
+    libraryDependencies ++= List(libs.catsCore.value, libs.scalaJsDom.value),
     scalaJSUseMainModuleInitializer := true,
   )
   .settings(jsSettingsForFuture)
@@ -133,6 +134,7 @@ lazy val renderer = (project in file("modules/claude-proxymate-renderer"))
     scalaVersion := props.ScalaVersion,
     scalacOptions ++= List("-no-indent", "-explain"),
     libraryDependencies ++= List(
+      libs.catsCore.value,
       libs.scalaJsDom.value,
       libs.scalatags.value,
     ) ++ libs.tests.hedgehog.value,
@@ -356,7 +358,7 @@ lazy val props = new {
   /* Note: Scala Native 0.4.17 required because http4s 0.23.33 does not yet publish for Scala Native 0.5 */
   val CirceVersion = "0.14.8"
 
-  val CatsVersion = "2.12.0"
+  val CatsVersion = "2.11.0"
 
   val CatsEffectVersion = "3.5.7"
 
@@ -385,6 +387,9 @@ lazy val libs = new {
     Def.setting("io.circe" %%% "circe-parser" % props.CirceVersion)
   lazy val circeGeneric =
     Def.setting("io.circe" %%% "circe-generic" % props.CirceVersion)
+
+  lazy val catsCore =
+    Def.setting("org.typelevel" %%% "cats-core" % props.CatsVersion)
 
   lazy val catsEffect =
     Def.setting("org.typelevel" %%% "cats-effect" % props.CatsEffectVersion)

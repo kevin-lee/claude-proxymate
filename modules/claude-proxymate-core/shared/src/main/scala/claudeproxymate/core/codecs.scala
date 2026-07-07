@@ -1,5 +1,6 @@
 package claudeproxymate.core
 
+import cats.syntax.all.*
 import io.circe.*
 import io.circe.syntax.*
 import io.circe.generic.semiauto.*
@@ -13,8 +14,8 @@ object codecs {
   // ----- ProxyResponse -----
   // body is Either[String, Json]: Left = raw truncated string, Right = parsed JSON
   given Encoder[ProxyResponse] = Encoder.instance { r =>
-    val bodyJson = r.body match {
-      case Right(json)  => json
+    val bodyJson     = r.body match {
+      case Right(json) => json
       case Left(rawStr) => Json.fromString(rawStr)
     }
     Json.obj(
@@ -32,9 +33,7 @@ object codecs {
       bodyJson <- c.get[Json]("body")
       error    <- c.get[Option[String]]("error")
     } yield {
-      val body =
-        if (bodyJson.isString) Left(bodyJson.asString.getOrElse(""))
-        else Right(bodyJson)
+      val body = bodyJson.asString.toLeft(bodyJson)
       ProxyResponse(id, status, body, error)
     }
   }
@@ -56,12 +55,12 @@ object codecs {
 
   given Decoder[ProxyEvent] = Decoder.instance { c =>
     c.get[String]("type").flatMap {
-      case "request_captured"  => c.get[ProxyRequest]("request").map(ProxyEvent.RequestCaptured(_))
+      case "request_captured" => c.get[ProxyRequest]("request").map(ProxyEvent.RequestCaptured(_))
       case "response_captured" => c.get[ProxyResponse]("response").map(ProxyEvent.ResponseCaptured(_))
-      case "proxy_started"     => c.get[Int]("port").map(ProxyEvent.ProxyStarted(_))
-      case "proxy_stopped"     => Right(ProxyEvent.ProxyStopped)
-      case "proxy_error"       => c.get[String]("message").map(ProxyEvent.ProxyError(_))
-      case other               => Left(DecodingFailure(s"Unknown ProxyEvent type: $other", c.history))
+      case "proxy_started" => c.get[Int]("port").map(ProxyEvent.ProxyStarted(_))
+      case "proxy_stopped" => ProxyEvent.ProxyStopped.asRight[DecodingFailure]
+      case "proxy_error" => c.get[String]("message").map(ProxyEvent.ProxyError(_))
+      case other => DecodingFailure(s"Unknown ProxyEvent type: $other", c.history).asLeft[ProxyEvent]
     }
   }
 

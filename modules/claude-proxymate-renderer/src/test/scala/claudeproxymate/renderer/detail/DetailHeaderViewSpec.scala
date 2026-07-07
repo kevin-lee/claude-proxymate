@@ -27,9 +27,9 @@ object DetailHeaderViewSpec extends Properties {
 
   private val sampleSearchLabels = SearchBarLabels(
     placeholder = "search…",
-    clear       = "clear",
-    searchPrev  = "prev",
-    searchNext  = "next",
+    clear = "clear",
+    searchPrev = "prev",
+    searchNext = "next",
   )
 
   private def renderSearchBar(query: String, labels: SearchBarLabels = sampleSearchLabels): String =
@@ -104,22 +104,24 @@ object DetailHeaderViewSpec extends Properties {
   }
 
   def testPillMultiOrder: Result = {
-    val pill = TokenPill(
-      badges   = List(TokenBadge("first", None), TokenBadge("second", None), TokenBadge("third", None)),
+    val pill      = TokenPill(
+      badges = List(TokenBadge("first", None), TokenBadge("second", None), TokenBadge("third", None)),
       dataCost = "{}",
     )
-    val out = renderPill(pill)
+    val out       = renderPill(pill)
     val firstIdx  = out.indexOf("first")
     val secondIdx = out.indexOf("second")
     val thirdIdx  = out.indexOf("third")
-    Result.assert(firstIdx >= 0 && secondIdx > firstIdx && thirdIdx > secondIdx)
+    Result
+      .assert(firstIdx >= 0 && secondIdx > firstIdx && thirdIdx > secondIdx)
       .log(s"order violated: first=$firstIdx second=$secondIdx third=$thirdIdx out=$out")
   }
 
   def testPillBadgeColor: Result = {
     val pill = TokenPill(badges = List(TokenBadge("colored", Some("var(--green)"))), dataCost = "{}")
     val out  = renderPill(pill)
-    Result.assert(out.contains("style=\"color:var(--green)\""))
+    Result
+      .assert(out.contains("style=\"color:var(--green)\""))
       .log(s"color style missing: $out")
   }
 
@@ -139,7 +141,8 @@ object DetailHeaderViewSpec extends Properties {
     val pill = TokenPill(badges = Nil, dataCost = cost)
     val out  = renderPill(pill)
     // Scalatags will escape " as &quot; inside attribute values.
-    Result.assert(out.contains("data-cost=") && out.contains("claude"))
+    Result
+      .assert(out.contains("data-cost=") && out.contains("claude"))
       .log(s"data-cost not present or model missing: $out")
   }
 
@@ -151,7 +154,8 @@ object DetailHeaderViewSpec extends Properties {
     // literal ' inside is safe and round-trips verbatim. The original
     // implementation manually escaped ' → &#39; because it used a
     // single-quoted attribute delimiter; that workaround is unnecessary here.
-    Result.assert(out.contains("data-cost=\"x'y\""))
+    Result
+      .assert(out.contains("data-cost=\"x'y\""))
       .log(s"' should round-trip verbatim inside a \"-quoted attr: $out")
   }
 
@@ -164,7 +168,8 @@ object DetailHeaderViewSpec extends Properties {
       val payload = s"<script>alert('$chunk')</script>"
       val pill    = TokenPill(badges = List(TokenBadge(payload, None)), dataCost = "{}")
       val out     = renderPill(pill)
-      Result.assert(!out.contains("<script>"))
+      Result
+        .assert(!out.contains("<script>"))
         .log(s"raw <script> leaked for chunk=$chunk: $out")
     }
 
@@ -175,7 +180,8 @@ object DetailHeaderViewSpec extends Properties {
       val payload = s"<script>alert('$chunk')</script>"
       val pill    = TokenPill(badges = Nil, dataCost = payload)
       val out     = renderPill(pill)
-      Result.assert(!out.contains("<script>"))
+      Result
+        .assert(!out.contains("<script>"))
         .log(s"raw <script> leaked for chunk=$chunk: $out")
     }
 
@@ -184,9 +190,11 @@ object DetailHeaderViewSpec extends Properties {
       chunk <- Gen.string(Gen.alpha, Range.linear(0, 12)).log("chunk")
     } yield {
       val payload = s"<script>alert('$chunk')</script>"
-      val labels  = sampleSearchLabels.copy(placeholder = payload, clear = payload, searchPrev = payload, searchNext = payload)
+      val labels  =
+        sampleSearchLabels.copy(placeholder = payload, clear = payload, searchPrev = payload, searchNext = payload)
       val out     = renderSearchBar("hello", labels)
-      Result.assert(!out.contains("<script>"))
+      Result
+        .assert(!out.contains("<script>"))
         .log(s"raw <script> leaked for chunk=$chunk: $out")
     }
 }

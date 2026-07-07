@@ -1,5 +1,6 @@
 package claudeproxymate.core
 
+import cats.syntax.all.*
 import io.circe.{Json, JsonObject}
 import io.circe.parser.{parse => parseJson}
 
@@ -15,7 +16,7 @@ object SseParser {
   final private case class State(currentData: Option[String], msg: Option[JsonObject])
 
   private object State {
-    val empty: State = State(None, None)
+    val empty: State = State(none[String], none[JsonObject])
   }
 
   def parseSseStream(text: String): Option[Json] = {
@@ -27,12 +28,12 @@ object SseParser {
           case linePattern(key, value) =>
             val trimmed = value.replaceAll("\\s+$", "")
             key match {
-              case "data" => state.copy(currentData = Some(trimmed))
+              case "data" => state.copy(currentData = trimmed.some)
               case _ => state
             }
           case "" =>
             state.currentData match {
-              case Some(data) => State(currentData = None, msg = processEvent(data, state.msg))
+              case Some(data) => State(currentData = none[String], msg = processEvent(data, state.msg))
               case None => state
             }
           case _ => state
@@ -47,7 +48,7 @@ object SseParser {
 
       finalState.msg.map(Json.fromJsonObject)
     } catch {
-      case _: Throwable => None
+      case _: Throwable => none[Json]
     }
   }
 

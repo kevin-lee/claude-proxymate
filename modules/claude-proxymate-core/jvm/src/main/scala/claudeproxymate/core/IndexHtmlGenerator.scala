@@ -1,7 +1,8 @@
 package claudeproxymate.core
 
+import cats.syntax.all.*
 import scalatags.Text.all.*
-import scalatags.Text.tags2.{title as titleTag}
+import scalatags.Text.tags2.title as titleTag
 
 /** Generates the `index.html` shell for the Electron renderer process using ScalaTags.
   *
@@ -82,19 +83,19 @@ object IndexHtmlGenerator {
               // Slide 0 — Start Proxy screenshot (image-only)
               div(cls := "onboard-slide")(
                 img(
-                  cls     := "onboard-img",
-                  src     := "../assets/getting-started/getting-started-01.png",
+                  cls := "onboard-img",
+                  src := "../assets/getting-started/getting-started-01.png",
                   i18nAlt := "onboard.imgAlt1",
-                  alt     := tx(m, "onboard.imgAlt1"),
+                  alt := tx(m, "onboard.imgAlt1"),
                 ),
               ),
               // Slide 1 — Copy command screenshot (image-only)
               div(cls := "onboard-slide")(
                 img(
-                  cls     := "onboard-img",
-                  src     := "../assets/getting-started/getting-started-02.png",
+                  cls := "onboard-img",
+                  src := "../assets/getting-started/getting-started-02.png",
                   i18nAlt := "onboard.imgAlt2",
-                  alt     := tx(m, "onboard.imgAlt2"),
+                  alt := tx(m, "onboard.imgAlt2"),
                 ),
               ),
               // Slide 2 — instructions (text)
@@ -110,32 +111,32 @@ object IndexHtmlGenerator {
           ),
           div(cls := "onboard-nav")(
             button(
-              id        := HtmlIds.OnboardPrev,
-              cls       := "onboard-arrow",
+              id := HtmlIds.OnboardPrev,
+              cls := "onboard-arrow",
               attr("aria-label") := tx(m, "onboard.prev"),
               i18nTitle := "onboard.prev",
-              attr("title")      := tx(m, "onboard.prev"),
+              attr("title") := tx(m, "onboard.prev"),
             )("‹"),
             div(id := HtmlIds.OnboardDots, cls := "onboard-dots")(
               (0 until 3).map { i =>
                 span(
-                  cls              := (if (i == 0) "onboard-dot active" else "onboard-dot"),
+                  cls := (if (i === 0) "onboard-dot active" else "onboard-dot"),
                   dataOnboardSlide := i.toString,
                 )
               },
             ),
             div(cls := "onboard-nav-right")(
               button(
-                id        := HtmlIds.OnboardNext,
-                cls       := "onboard-arrow",
+                id := HtmlIds.OnboardNext,
+                cls := "onboard-arrow",
                 attr("aria-label") := tx(m, "onboard.next"),
                 i18nTitle := "onboard.next",
-                attr("title")      := tx(m, "onboard.next"),
+                attr("title") := tx(m, "onboard.next"),
               )("›"),
               // Shown only on the last slide (toggled by Onboarding.render); replaces the › arrow there.
               button(
-                id   := HtmlIds.OnboardCloseBtn,
-                cls  := "onboard-btn-pill is-hidden",
+                id := HtmlIds.OnboardCloseBtn,
+                cls := "onboard-btn-pill is-hidden",
                 i18n := "onboard.btn",
               )(tx(m, "onboard.btn")),
             ),
@@ -235,8 +236,8 @@ object IndexHtmlGenerator {
           span(id := HtmlIds.ProxyStatusText, i18n := "proxy.stopped")(tx(m, "proxy.stopped")),
         ),
         span(
-          id   := HtmlIds.MaskStateChip,
-          cls  := "mask-state-chip",
+          id := HtmlIds.MaskStateChip,
+          cls := "mask-state-chip",
           i18n := "mask.chipMaskAll",
         )(tx(m, "mask.chipMaskAll")),
       ),
@@ -263,9 +264,9 @@ object IndexHtmlGenerator {
           i18n := "proxy.clear",
         )(tx(m, "proxy.clear")),
         button(
-          id    := HtmlIds.MaskToggleBtn,
-          cls   := "btn btn-copy proxy-bar-btn-mask",
-          i18n  := "mask.toggleRevealAll",
+          id := HtmlIds.MaskToggleBtn,
+          cls := "btn btn-copy proxy-bar-btn-mask",
+          i18n := "mask.toggleRevealAll",
           attr("title") := tx(m, "mask.toggleRevealAll"),
           attr("aria-label") := tx(m, "mask.toggleRevealAll"),
         )(tx(m, "mask.toggleRevealAll")),
@@ -304,17 +305,17 @@ object IndexHtmlGenerator {
           button(cls := "dtab", dataDtab := "request")("Request"),
           button(cls := "dtab", dataDtab := "response")("Response"),
           button(
-            cls      := "dtab",
+            cls := "dtab",
             dataDtab := "analysis",
-            style    := "color:var(--purple)",
+            style := "color:var(--purple)",
           )("Analysis"),
           button(
-            id                := HtmlIds.CopyDetailBtn,
-            cls               := "copy-small",
-            style             := "margin-left:auto",
-            i18n              := "copy.copy",
+            id := HtmlIds.CopyDetailBtn,
+            cls := "copy-small",
+            style := "margin-left:auto",
+            i18n := "copy.copy",
             attr("data-i18n-title") := "copy.detailTitle",
-            attr("title")     := tx(m, "copy.detailTitle"),
+            attr("title") := tx(m, "copy.detailTitle"),
           )(
             tx(m, "copy.copy"),
           ),

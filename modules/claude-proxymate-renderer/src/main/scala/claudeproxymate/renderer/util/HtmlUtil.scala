@@ -54,10 +54,14 @@ object HtmlUtil {
   def highlightSearchFrag(text: String, query: String): Frag = {
     if (query.isEmpty) stringFrag(text)
     else {
-      val pattern = java.util.regex.Pattern.compile(
-        escapeRegex(query),
-        java.util.regex.Pattern.CASE_INSENSITIVE,
-      )
+      val pattern = java
+        .util
+        .regex
+        .Pattern
+        .compile(
+          escapeRegex(query),
+          java.util.regex.Pattern.CASE_INSENSITIVE,
+        )
       val matcher = pattern.matcher(text)
       val parts   = scala.collection.mutable.ListBuffer.empty[Frag]
       var last    = 0

@@ -1,5 +1,6 @@
 package claudeproxymate.renderer.proxy
 
+import cats.syntax.all.*
 import claudeproxymate.core.HtmlIds
 import claudeproxymate.renderer.i18n.I18n
 import claudeproxymate.renderer.state.{AppState, PresenterMode}
@@ -33,9 +34,9 @@ object ProxyList {
       return
     }
 
-    val entry  = target.closest(s".${ProxyListView.EntryClass}[${ProxyListView.EntryDataIdAttr}]")
+    val entry = target.closest(s".${ProxyListView.EntryClass}[${ProxyListView.EntryDataIdAttr}]")
     if (entry == null) return
-    val raw = entry.asInstanceOf[dom.html.Element].getAttribute(ProxyListView.EntryDataIdAttr)
+    val raw   = entry.asInstanceOf[dom.html.Element].getAttribute(ProxyListView.EntryDataIdAttr)
     if (raw == null) return
     try {
       val id = raw.toDouble
@@ -55,19 +56,19 @@ object ProxyList {
     val entries = AppState.proxyCaptures.map { e =>
       val id = e.id.asInstanceOf[Double]
       ProxyListEntry(
-        id       = id,
-        method   = readString(e, "method"),
-        path     = readString(e, "path"),
-        ts       = readString(e, "ts"),
-        model    = readModel(e),
-        status   = readStatus(e),
+        id = id,
+        method = readString(e, "method"),
+        path = readString(e, "path"),
+        ts = readString(e, "ts"),
+        model = readModel(e),
+        status = readStatus(e),
         selected = AppState.selectedProxyId.contains(id),
       )
     }
 
     val labels = ProxyListLabels(
       noCapturesTitle = I18n.t("proxy.noCapturesTitle"),
-      noCapturesHint  = I18n.t("proxy.noCapturesHint"),
+      noCapturesHint = I18n.t("proxy.noCapturesHint"),
     )
 
     ViewHelpers.setInnerHtml(list, ProxyListView.buildListFrag(entries, labels))
@@ -80,22 +81,22 @@ object ProxyList {
 
   private def readModel(e: js.Dynamic): Option[String] = {
     val body = e.selectDynamic("body")
-    if (js.isUndefined(body) || body == null) None
+    if (js.isUndefined(body) || body == null) none[String]
     else {
       val m = body.selectDynamic("model")
-      if (js.isUndefined(m) || m == null) None else Some(m.toString)
+      Option.unless(js.isUndefined(m) || m == null)(m.toString)
     }
   }
 
   private def readStatus(e: js.Dynamic): Option[Int] = {
     val resp = e.selectDynamic("response")
-    if (js.isUndefined(resp) || resp == null) None
+    if (js.isUndefined(resp) || resp == null) none[Int]
     else {
       val st = resp.selectDynamic("status")
-      if (js.isUndefined(st) || st == null) None
+      if (js.isUndefined(st) || st == null) none[Int]
       else {
-        try Some(st.asInstanceOf[Int])
-        catch { case _: Throwable => None }
+        try st.asInstanceOf[Int].some
+        catch { case _: Throwable => none[Int] }
       }
     }
   }
@@ -111,14 +112,14 @@ object ProxyList {
     // doesn't want it reset every time they click a different
     // request.
     AppState.maskOverrides.clear()
-    AppState.selectedProxyId = Some(id)
+    AppState.selectedProxyId = id.some
     renderProxyList()
     ProxyControl.callRenderProxyDetail()
   }
 
   def clearProxyCaptures(): Unit = {
     AppState.proxyCaptures = Nil
-    AppState.selectedProxyId = None
+    AppState.selectedProxyId = none[Double]
     AppState.maskOverrides.clear()
     // Reset the presenter baseline to the safe default on Clear.
     // The invariant: post-Clear, the next capture loads with

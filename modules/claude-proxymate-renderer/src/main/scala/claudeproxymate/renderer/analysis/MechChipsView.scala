@@ -4,9 +4,9 @@ import scalatags.Text.all.*
 
 /** One mechanism chip, ready for rendering. */
 final case class Chip(
-  key: String,     // unique identifier, used as data-key for click dispatch
-  label: String,   // visible text (icon + name)
-  cls: String,     // CSS subclass (cm/sc/sk/sa/mc/st)
+  key: String, // unique identifier, used as data-key for click dispatch
+  label: String, // visible text (icon + name)
+  cls: String, // CSS subclass (cm/sc/sk/sa/mc/st)
   metaKey: String, // key into ChipMeta map for the desc banner
 )
 
@@ -40,7 +40,7 @@ object MechChipsView {
         ),
         descMeta match {
           case Some(m) => buildDescBanner(m)
-          case None    => frag()
+          case None => frag()
         },
       )
 
@@ -48,7 +48,7 @@ object MechChipsView {
     val activeSuffix = if (activeKey.contains(c.key)) " active" else ""
     val classes      = s"$ChipClass ${c.cls} found btn$activeSuffix"
     span(
-      cls                := classes,
+      cls := classes,
       attr(ChipDataAttr) := c.key,
     )(c.label)
   }

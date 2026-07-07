@@ -34,7 +34,7 @@ object SseParserSpec extends Properties {
       ).mkString("\n")
 
       val result = SseParser.parseSseStream(sse)
-      Result.assert(result.isDefined) and {
+      Result.assert(result.isDefined).and {
         val json = result.get
         val id   = json.hcursor.get[String]("id").toOption
         Result.assert(id.contains("msg_1"))
@@ -61,9 +61,14 @@ object SseParserSpec extends Properties {
       ).mkString("\n")
 
       val result = SseParser.parseSseStream(sse)
-      Result.assert(result.isDefined) and {
-        val text = result.get.hcursor
-          .downField("content").downN(0).get[String]("text").toOption
+      Result.assert(result.isDefined).and {
+        val text = result
+          .get
+          .hcursor
+          .downField("content")
+          .downN(0)
+          .get[String]("text")
+          .toOption
         Result.assert(text.contains("Hello world"))
       }
     }
@@ -88,9 +93,14 @@ object SseParserSpec extends Properties {
       ).mkString("\n")
 
       val result = SseParser.parseSseStream(sse)
-      Result.assert(result.isDefined) and {
-        val thinking = result.get.hcursor
-          .downField("content").downN(0).get[String]("thinking").toOption
+      Result.assert(result.isDefined).and {
+        val thinking = result
+          .get
+          .hcursor
+          .downField("content")
+          .downN(0)
+          .get[String]("thinking")
+          .toOption
         Result.assert(thinking.contains("Let me think"))
       }
     }
@@ -109,12 +119,11 @@ object SseParserSpec extends Properties {
       ).mkString("\n")
 
       val result = SseParser.parseSseStream(sse)
-      Result.assert(result.isDefined) and {
+      Result.assert(result.isDefined).and {
         val json       = result.get
         val stopReason = json.hcursor.get[String]("stop_reason").toOption
         val outTokens  = json.hcursor.downField("usage").get[Int]("output_tokens").toOption
-        Result.assert(stopReason.contains("end_turn")) and
-          Result.assert(outTokens.contains(20))
+        Result.assert(stopReason.contains("end_turn")).and(Result.assert(outTokens.contains(20)))
       }
     }
 
@@ -155,12 +164,11 @@ object SseParserSpec extends Properties {
       ).mkString("\n")
 
       val result = SseParser.parseSseStream(sse)
-      Result.assert(result.isDefined) and {
+      Result.assert(result.isDefined).and {
         val json = result.get
         val text = json.hcursor.downField("content").downN(0).get[String]("text").toOption
         val stop = json.hcursor.get[String]("stop_reason").toOption
-        Result.assert(text.contains("Hi!")) and
-          Result.assert(stop.contains("end_turn"))
+        Result.assert(text.contains("Hi!")).and(Result.assert(stop.contains("end_turn")))
       }
     }
 }

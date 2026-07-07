@@ -25,8 +25,8 @@ object I18nPropertiesLoaderSpec extends Properties {
   )
 
   def testSameKeys: Result = {
-    val koKeys = ko.keySet
-    val enKeys = en.keySet
+    val koKeys      = ko.keySet
+    val enKeys      = en.keySet
     val missingInEn = koKeys -- enKeys
     val missingInKo = enKeys -- koKeys
     Result.all(
@@ -49,7 +49,7 @@ object I18nPropertiesLoaderSpec extends Properties {
 
   def testVariablePlaceholders: Result = {
     val varPattern = """\{(\w+)\}""".r
-    val issues = for {
+    val issues     = for {
       (key, koVal) <- ko.toList
       enVal        <- en.get(key).toList
       koVars = varPattern.findAllMatchIn(koVal).map(_.group(1)).toSet

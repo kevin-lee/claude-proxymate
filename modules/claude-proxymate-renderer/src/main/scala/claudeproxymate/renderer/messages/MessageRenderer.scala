@@ -1,5 +1,6 @@
 package claudeproxymate.renderer.messages
 
+import cats.syntax.all.*
 import claudeproxymate.core.HtmlIds
 import claudeproxymate.renderer.i18n.I18n
 import claudeproxymate.renderer.state.AppState
@@ -41,9 +42,11 @@ object MessageRenderer {
       s".${claudeproxymate.renderer.json.JsonTreeView.TokenMaskClass},.${claudeproxymate.renderer.json.JsonTreeView.TokenMaskRevealedClass}",
     )
     if (tokenEl != null) {
-      val tid = tokenEl.asInstanceOf[dom.html.Element].getAttribute(
-        claudeproxymate.renderer.json.JsonTreeView.TokenMaskDataAttr,
-      )
+      val tid = tokenEl
+        .asInstanceOf[dom.html.Element]
+        .getAttribute(
+          claudeproxymate.renderer.json.JsonTreeView.TokenMaskDataAttr,
+        )
       if (tid != null && tid.startsWith("m.")) { toggleMessageToken(tid); return }
     }
 
@@ -53,9 +56,11 @@ object MessageRenderer {
       s".${claudeproxymate.renderer.json.JsonTreeView.CorrMaskClass},.${claudeproxymate.renderer.json.JsonTreeView.CorrMaskRevealedClass}",
     )
     if (corrEl != null) {
-      val cid = corrEl.asInstanceOf[dom.html.Element].getAttribute(
-        claudeproxymate.renderer.json.JsonTreeView.CorrMaskDataAttr,
-      )
+      val cid = corrEl
+        .asInstanceOf[dom.html.Element]
+        .getAttribute(
+          claudeproxymate.renderer.json.JsonTreeView.CorrMaskDataAttr,
+        )
       if (cid != null && cid.startsWith("corr:m.")) { toggleMessageToken(cid); return }
     }
 
@@ -90,14 +95,14 @@ object MessageRenderer {
       val _ = AppState.maskOverrides.add(tokenId)
     }
 
-    val container = dom.document.getElementById(HtmlIds.ProxyDetailView)
+    val container   = dom.document.getElementById(HtmlIds.ProxyDetailView)
     if (container == null) return
     val containerEl = container.asInstanceOf[dom.html.Element]
     val savedScroll = containerEl.scrollTop
 
     val entry = AppState.proxyCaptures.find(e => e.id == AppState.selectedProxyId.map(_.asInstanceOf[js.Any]).orNull)
     entry match {
-      case None    => ()
+      case None => ()
       case Some(e) =>
         renderProxyMessages(e, containerEl)
         // scrollTop reset to 0 by setInnerHtml; restore on the next
@@ -110,19 +115,19 @@ object MessageRenderer {
 
   private def handleInput(e: dom.Event): Unit = {
     val target = e.target.asInstanceOf[dom.Element]
-    if (target == null || target.id != HtmlIds.MsgSearchInput) return
+    if (target == null || target.id =!= HtmlIds.MsgSearchInput) return
     setMsgSearch(target.asInstanceOf[dom.html.Input].value)
   }
 
   private def handleCompositionStart(e: dom.Event): Unit = {
     val target = e.target.asInstanceOf[dom.Element]
-    if (target == null || target.id != HtmlIds.MsgSearchInput) return
+    if (target == null || target.id =!= HtmlIds.MsgSearchInput) return
     AppState.imeComposing = true
   }
 
   private def handleCompositionEnd(e: dom.Event): Unit = {
     val target = e.target.asInstanceOf[dom.Element]
-    if (target == null || target.id != HtmlIds.MsgSearchInput) return
+    if (target == null || target.id =!= HtmlIds.MsgSearchInput) return
     AppState.imeComposing = false
     setMsgSearch(target.asInstanceOf[dom.html.Input].value)
   }
@@ -146,7 +151,7 @@ object MessageRenderer {
     * is never modified.
     */
   def captureMessages(entry: js.Dynamic): js.Array[js.Dynamic] = {
-    val body = entry.selectDynamic("body")
+    val body                       = entry.selectDynamic("body")
     val msgs: js.Array[js.Dynamic] =
       if (!js.isUndefined(body) && body != null) {
         val m = body.selectDynamic("messages")
@@ -156,7 +161,7 @@ object MessageRenderer {
 
     responseAssistantMessage(entry) match {
       case Some(respMsg) => msgs.concat(js.Array(respMsg))
-      case None          => msgs
+      case None => msgs
     }
   }
 
@@ -165,19 +170,18 @@ object MessageRenderer {
     * error objects, and non-message bodies yield `None`.
     */
   private def responseAssistantMessage(entry: js.Dynamic): Option[js.Dynamic] = {
-    val resp = entry.selectDynamic("response")
+    val resp     = entry.selectDynamic("response")
     val respBody =
       if (!js.isUndefined(resp) && resp != null) resp.selectDynamic("body")
       else null
-    if (respBody != null && !js.isUndefined(respBody) && js.typeOf(respBody) == "object") {
+    if (respBody != null && !js.isUndefined(respBody) && js.typeOf(respBody) === "object") {
       val role    = respBody.selectDynamic("role")
       val content = respBody.selectDynamic("content")
-      if (
-        !js.isUndefined(role) && role != null && role.toString == "assistant" &&
-        !js.isUndefined(content) && content != null
-      ) Some(respBody)
-      else None
-    } else None
+      Option.when(
+        !js.isUndefined(role) && role != null && role.toString === "assistant" &&
+          !js.isUndefined(content) && content != null
+      )(respBody)
+    } else none[js.Dynamic]
   }
 
   /** Visible cards for the active capture, honoring the active
@@ -192,24 +196,25 @@ object MessageRenderer {
   def buildVisibleCards(entry: js.Dynamic): List[MsgCard] = {
     val msgs = captureMessages(entry)
 
-    if (msgs.length == 0) return Nil
+    if (msgs.length === 0) return Nil
 
-    val typedOnly    = AppState.msgFilter == "typed"
-    val isUserFilter = AppState.msgFilter == "user" || typedOnly
+    val typedOnly    = AppState.msgFilter === "typed"
+    val isUserFilter = AppState.msgFilter === "user" || typedOnly
     val q            = AppState.msgSearchQuery
 
     val indexed: js.Array[(js.Dynamic, Int)] =
-      msgs.zipWithIndex.filter { case (m, _) =>
-        val role = m.role.asInstanceOf[String]
-        if (isUserFilter) role == "user"
-        else if (AppState.msgFilter == "assistant") role == "assistant"
-        else true
+      msgs.zipWithIndex.filter {
+        case (m, _) =>
+          val role = m.role.asInstanceOf[String]
+          if (isUserFilter) role === "user"
+          else if (AppState.msgFilter === "assistant") role === "assistant"
+          else true
       }
 
     val cards = scala.collection.mutable.ListBuffer.empty[MsgCard]
     for ((msg, rawIdx) <- indexed) {
-      val role = msg.role.asInstanceOf[String]
-      val rawContent = msg.selectDynamic("content")
+      val role                           = msg.role.asInstanceOf[String]
+      val rawContent                     = msg.selectDynamic("content")
       val contents: js.Array[js.Dynamic] =
         if (js.Array.isArray(rawContent)) rawContent.asInstanceOf[js.Array[js.Dynamic]]
         else {
@@ -218,12 +223,16 @@ object MessageRenderer {
         }
 
       // Skip user messages with no typed text when filtering
-      val shouldSkip = isUserFilter && role == "user" && !contents.exists { c =>
+      val shouldSkip = isUserFilter && role === "user" && !contents.exists { c =>
         val cType = c.selectDynamic("type")
         val cText = c.selectDynamic("text")
-        if (cType.asInstanceOf[String] != "text") false
+        if (cType.asInstanceOf[String] =!= "text") false
         else if (js.isUndefined(cText) || cText == null || cText.toString.trim.isEmpty) false
-        else MessageParser.parseUserText(cText.toString).exists(_.isInstanceOf[MessageParser.TextPart])
+        else
+          MessageParser.parseUserText(cText.toString).exists {
+            case MessageParser.Part.TextPart(_) => true
+            case MessageParser.Part.InjectedPart(_, _, _) => false
+          }
       }
 
       if (!shouldSkip) {
@@ -237,35 +246,35 @@ object MessageRenderer {
   def renderProxyMessages(entry: js.Dynamic, container: dom.html.Element): Unit = {
     val msgs = captureMessages(entry)
 
-    if (msgs.length == 0) {
+    if (msgs.length === 0) {
       ViewHelpers.setInnerHtml(container, MessageView.buildEmptyFrag(I18n.t("proxy.noMessages")))
       return
     }
 
-    val isUserFilter = AppState.msgFilter == "user" || AppState.msgFilter == "typed"
+    val isUserFilter = AppState.msgFilter === "user" || AppState.msgFilter === "typed"
     val q            = AppState.msgSearchQuery
     val cards        = buildVisibleCards(entry)
 
     container.style.cssText = "flex:1;overflow-y:auto;display:block"
 
     val filterLabels = FilterLabels(
-      user      = I18n.t("messages.filterUser"),
-      typed     = I18n.t("messages.filterTyped"),
+      user = I18n.t("messages.filterUser"),
+      typed = I18n.t("messages.filterTyped"),
       assistant = I18n.t("messages.filterAssistant"),
-      all       = I18n.t("messages.filterAll"),
+      all = I18n.t("messages.filterAll"),
     )
     val searchLabels = SearchLabels(
       placeholder = I18n.t("messages.searchPlaceholder"),
-      clear       = I18n.t("messages.searchClear"),
+      clear = I18n.t("messages.searchClear"),
     )
 
     val header = MessageView.buildHeaderFrag(
-      activeFilter  = AppState.msgFilter,
-      filterLabels  = filterLabels,
-      msgCountId    = HtmlIds.MsgCountEl,
+      activeFilter = AppState.msgFilter,
+      filterLabels = filterLabels,
+      msgCountId = HtmlIds.MsgCountEl,
       searchInputId = HtmlIds.MsgSearchInput,
-      searchLabels  = searchLabels,
-      query         = q,
+      searchLabels = searchLabels,
+      query = q,
     )
 
     val body2: Frag =
@@ -290,7 +299,7 @@ object MessageRenderer {
     if (inp != null && (q.nonEmpty || AppState.msgSearchWasFocused)) {
       val inputEl = inp.asInstanceOf[dom.html.Input]
       inputEl.focus()
-      val len = inputEl.value.length
+      val len     = inputEl.value.length
       inputEl.setSelectionRange(len, len)
     }
   }
@@ -300,29 +309,29 @@ object MessageRenderer {
     contents: js.Array[js.Dynamic],
     typedOnly: Boolean,
   ): MsgCard = {
-    if (role == "user") {
+    if (role === "user") {
       val parts = scala.collection.mutable.ListBuffer.empty[MsgPart]
       for (c <- contents) {
         val cType = c.selectDynamic("type").asInstanceOf[String]
-        if (cType == "text") {
-          val cText = c.selectDynamic("text")
-          val text  = if (!js.isUndefined(cText) && cText != null) cText.toString else ""
+        if (cType === "text") {
+          val cText  = c.selectDynamic("text")
+          val text   = if (!js.isUndefined(cText) && cText != null) cText.toString else ""
           val parsed = MessageParser.parseUserText(text)
           if (typedOnly) {
             parsed.foreach {
-              case MessageParser.TextPart(content) => parts += TextMsgPart(content)
-              case _: MessageParser.InjectedPart   => ()
+              case MessageParser.Part.TextPart(content) => parts += MsgPart.TextMsgPart(content)
+              case MessageParser.Part.InjectedPart(_, _, _) => ()
             }
           } else {
             parsed.foreach {
-              case MessageParser.TextPart(content) => parts += TextMsgPart(content)
-              case MessageParser.InjectedPart(label, content, cls) =>
-                parts += InjectedMsgPart(nextBadgeUid(), label, content, cls)
+              case MessageParser.Part.TextPart(content) => parts += MsgPart.TextMsgPart(content)
+              case MessageParser.Part.InjectedPart(label, content, cls) =>
+                parts += MsgPart.InjectedMsgPart(nextBadgeUid(), label, content, cls)
             }
           }
         }
       }
-      MsgCard(role, contents = Nil, userParts = parts.toList)
+      MsgCard(role, contents = Nil, userParts = parts.toList, rawIdx = 0)
     } else {
       val msgContents = contents.toList.map { c =>
         val cType = c.selectDynamic("type").asInstanceOf[String]
@@ -330,15 +339,15 @@ object MessageRenderer {
           case "text" =>
             val cText = c.selectDynamic("text")
             val text  = if (!js.isUndefined(cText) && cText != null) cText.toString else ""
-            TextContent(text)
+            MsgContent.TextContent(text)
           case "tool_use" =>
-            val name = c.selectDynamic("name")
+            val name    = c.selectDynamic("name")
             val nameStr = if (!js.isUndefined(name) && name != null) name.toString else ""
-            ToolUseContent(nameStr)
+            MsgContent.ToolUseContent(nameStr)
           case "tool_result" =>
-            val rc = c.selectDynamic("content")
-            val raw =
-              if (js.typeOf(rc) == "string") rc.asInstanceOf[String]
+            val rc        = c.selectDynamic("content")
+            val raw       =
+              if (js.typeOf(rc) === "string") rc.asInstanceOf[String]
               else if (js.Array.isArray(rc))
                 rc.asInstanceOf[js.Array[js.Dynamic]]
                   .map { x =>
@@ -349,12 +358,12 @@ object MessageRenderer {
               else "[object]"
             val preview   = raw.take(120)
             val truncated = raw.length > 120
-            ToolResultContent(preview, truncated)
+            MsgContent.ToolResultContent(preview, truncated)
           case other =>
-            OtherContent(other)
+            MsgContent.OtherContent(other)
         }
       }
-      MsgCard(role, contents = msgContents, userParts = Nil)
+      MsgCard(role, contents = msgContents, userParts = Nil, rawIdx = 0)
     }
   }
 
@@ -366,16 +375,16 @@ object MessageRenderer {
     */
   private def cardMatchesQuery(card: MsgCard, query: String): Boolean = {
     if (query.isEmpty) return true
-    val q = query.toLowerCase
+    val q                                   = query.toLowerCase
     def textOf(content: MsgContent): String = content match {
-      case TextContent(t)              => t
-      case ToolUseContent(n)           => n
-      case ToolResultContent(p, _)     => p
-      case OtherContent(t)             => t
+      case MsgContent.TextContent(t) => t
+      case MsgContent.ToolUseContent(n) => n
+      case MsgContent.ToolResultContent(p, _) => p
+      case MsgContent.OtherContent(t) => t
     }
-    def textOfPart(p: MsgPart): String = p match {
-      case TextMsgPart(c)                => c
-      case InjectedMsgPart(_, l, c, _)   => l + " " + c
+    def textOfPart(p: MsgPart): String      = p match {
+      case MsgPart.TextMsgPart(c) => c
+      case MsgPart.InjectedMsgPart(_, l, c, _) => l + " " + c
     }
     card.userParts.exists(p => textOfPart(p).toLowerCase.contains(q)) ||
     card.contents.exists(c => textOf(c).toLowerCase.contains(q))
@@ -383,7 +392,7 @@ object MessageRenderer {
 
   def setMsgFilter(f: String): Unit = {
     AppState.msgFilter = f
-    val entry = AppState.proxyCaptures.find(e => e.id == AppState.selectedProxyId.map(_.asInstanceOf[js.Any]).orNull)
+    val entry  = AppState.proxyCaptures.find(e => e.id == AppState.selectedProxyId.map(_.asInstanceOf[js.Any]).orNull)
     val detail = dom.document.getElementById(HtmlIds.ProxyDetailView)
     entry.foreach { e =>
       if (detail != null) renderProxyMessages(e, detail.asInstanceOf[dom.html.Element])
@@ -395,13 +404,13 @@ object MessageRenderer {
     if (AppState.imeComposing) return
     msgSearchDebounce { () =>
       AppState.msgSearchWasFocused = dom.document.activeElement match {
-        case el: dom.html.Element => el.id == HtmlIds.MsgSearchInput
-        case _                    => false
+        case el: dom.html.Element => el.id === HtmlIds.MsgSearchInput
+        case _ => false
       }
-      val entry = AppState.proxyCaptures.find(e => e.id == AppState.selectedProxyId.map(_.asInstanceOf[js.Any]).orNull)
+      val entry  = AppState.proxyCaptures.find(e => e.id == AppState.selectedProxyId.map(_.asInstanceOf[js.Any]).orNull)
       val detail = dom.document.getElementById(HtmlIds.ProxyDetailView)
       entry.foreach { e =>
-        if (detail != null && AppState.proxyDetailTab == "messages") {
+        if (detail != null && AppState.proxyDetailTab === "messages") {
           renderProxyMessages(e, detail.asInstanceOf[dom.html.Element])
         }
       }

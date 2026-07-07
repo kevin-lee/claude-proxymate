@@ -52,50 +52,51 @@ object SensitiveKeysSpec extends Properties {
   )
 
   private def must(s: String, expected: Boolean): Result =
-    Result.assert(SensitiveKeys.isSensitive(s) == expected)
+    Result
+      .assert(SensitiveKeys.isSensitive(s) == expected)
       .log(s"isSensitive(\"$s\") expected $expected")
 
-  def testApiKey: Result                        = must("api_key", true)
-  def testApikey: Result                        = must("apikey", true)
-  def testXApiKey: Result                       = must("x-api-key", true)
-  def testAuthorizationMixed: Result            = must("Authorization", true)
-  def testProxyAuthorization: Result            = must("proxy-authorization", true)
-  def testPassword: Result                      = must("password", true)
-  def testPasswd: Result                        = must("passwd", true)
-  def testSetCookie: Result                     = must("Set-Cookie", true)
-  def testCookie: Result                        = must("cookie", true)
-  def testBearer: Result                        = must("Bearer", true)
-  def testSecret: Result                        = must("secret", true)
-  def testClientSecret: Result                  = must("client_secret", true)
-  def testPrivateKey: Result                    = must("private_key", true)
-  def testAuthToken: Result                     = must("auth_token", true)
-  def testAccessToken: Result                   = must("access_token", true)
-  def testRefreshToken: Result                  = must("refresh_token", true)
-  def testIdToken: Result                       = must("id_token", true)
-  def testSessionId: Result                     = must("session_id", true)
-  def testSessionToken: Result                  = must("session_token", true)
-  def testCsrf: Result                          = must("csrf", true)
+  def testApiKey: Result             = must("api_key", true)
+  def testApikey: Result             = must("apikey", true)
+  def testXApiKey: Result            = must("x-api-key", true)
+  def testAuthorizationMixed: Result = must("Authorization", true)
+  def testProxyAuthorization: Result = must("proxy-authorization", true)
+  def testPassword: Result           = must("password", true)
+  def testPasswd: Result             = must("passwd", true)
+  def testSetCookie: Result          = must("Set-Cookie", true)
+  def testCookie: Result             = must("cookie", true)
+  def testBearer: Result             = must("Bearer", true)
+  def testSecret: Result             = must("secret", true)
+  def testClientSecret: Result       = must("client_secret", true)
+  def testPrivateKey: Result         = must("private_key", true)
+  def testAuthToken: Result          = must("auth_token", true)
+  def testAccessToken: Result        = must("access_token", true)
+  def testRefreshToken: Result       = must("refresh_token", true)
+  def testIdToken: Result            = must("id_token", true)
+  def testSessionId: Result          = must("session_id", true)
+  def testSessionToken: Result       = must("session_token", true)
+  def testCsrf: Result               = must("csrf", true)
 
-  def testDeviceId: Result                      = must("device_id", true)
-  def testAccountUuid: Result                   = must("account_uuid", true)
-  def testAccountId: Result                     = must("account_id", true)
-  def testUserId: Result                        = must("user_id", true)
-  def testClientId: Result                      = must("client_id", true)
-  def testRequestId: Result                     = must("request_id", true)
-  def testTraceId: Result                       = must("trace_id", true)
-  def testMetadataUserId: Result                = must("metadata.user_id", true)
+  def testDeviceId: Result       = must("device_id", true)
+  def testAccountUuid: Result    = must("account_uuid", true)
+  def testAccountId: Result      = must("account_id", true)
+  def testUserId: Result         = must("user_id", true)
+  def testClientId: Result       = must("client_id", true)
+  def testRequestId: Result      = must("request_id", true)
+  def testTraceId: Result        = must("trace_id", true)
+  def testMetadataUserId: Result = must("metadata.user_id", true)
 
-  def testTokenAloneNoMatch: Result             = must("token", false)
-  def testIdAloneNoMatch: Result                = must("id", false)
-  def testMessageIdNoMatch: Result              = must("message_id", false)
-  def testInputTokensNoMatch: Result            = must("input_tokens", false)
-  def testOutputTokensNoMatch: Result           = must("output_tokens", false)
-  def testCacheReadInputTokensNoMatch: Result   = must("cache_read_input_tokens", false)
+  def testTokenAloneNoMatch: Result               = must("token", false)
+  def testIdAloneNoMatch: Result                  = must("id", false)
+  def testMessageIdNoMatch: Result                = must("message_id", false)
+  def testInputTokensNoMatch: Result              = must("input_tokens", false)
+  def testOutputTokensNoMatch: Result             = must("output_tokens", false)
+  def testCacheReadInputTokensNoMatch: Result     = must("cache_read_input_tokens", false)
   def testCacheCreationInputTokensNoMatch: Result = must("cache_creation_input_tokens", false)
-  def testModelNoMatch: Result                  = must("model", false)
-  def testRoleNoMatch: Result                   = must("role", false)
-  def testContentNoMatch: Result                = must("content", false)
-  def testEmptyNoMatch: Result                  = must("", false)
+  def testModelNoMatch: Result                    = must("model", false)
+  def testRoleNoMatch: Result                     = must("role", false)
+  def testContentNoMatch: Result                  = must("content", false)
+  def testEmptyNoMatch: Result                    = must("", false)
 
   def testStringContainingPattern: Property =
     for {
@@ -104,7 +105,8 @@ object SensitiveKeysSpec extends Properties {
       suffix  <- Gen.string(Gen.alpha, Range.linear(0, 6)).log("suffix")
     } yield {
       val s = s"$prefix$pattern$suffix"
-      Result.assert(SensitiveKeys.isSensitive(s))
+      Result
+        .assert(SensitiveKeys.isSensitive(s))
         .log(s"isSensitive(\"$s\") expected true (built from pattern \"$pattern\")")
     }
 
@@ -118,7 +120,8 @@ object SensitiveKeysSpec extends Properties {
           if (c.isUpper) c.toLower else c.toUpper
         } else c
       )
-      Result.assert(SensitiveKeys.isSensitive(flipped))
+      Result
+        .assert(SensitiveKeys.isSensitive(flipped))
         .log(s"isSensitive(\"$flipped\") expected true (case-flipped pattern \"$pattern\")")
     }
 
@@ -128,7 +131,8 @@ object SensitiveKeysSpec extends Properties {
       // Patterns include letters and `-` `_`; restrict to digits + ` ` only.
       s <- Gen.string(Gen.frequency1(9 -> Gen.digit, 1 -> Gen.constant(' ')), Range.linear(0, 30)).log("s")
     } yield {
-      Result.assert(!SensitiveKeys.isSensitive(s))
+      Result
+        .assert(!SensitiveKeys.isSensitive(s))
         .log(s"isSensitive(\"$s\") expected false (no letters / underscores / dashes)")
     }
 }

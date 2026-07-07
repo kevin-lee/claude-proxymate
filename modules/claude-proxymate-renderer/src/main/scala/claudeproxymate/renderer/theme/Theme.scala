@@ -1,5 +1,6 @@
 package claudeproxymate.renderer.theme
 
+import cats.syntax.all.*
 import claudeproxymate.core.HtmlIds
 import claudeproxymate.renderer.i18n.I18n
 import org.scalajs.dom
@@ -40,7 +41,7 @@ object Theme {
 
   /** Effective theme in effect right now: "light" | "dark". */
   def effective: String =
-    if (_selection == "system") systemEffective() else _selection
+    if (_selection === "system") systemEffective() else _selection
 
   private def systemEffective(): String = {
     val mql = dom.window.matchMedia("(prefers-color-scheme: dark)")
@@ -71,9 +72,9 @@ object Theme {
   def toggle(): Unit = {
     val next = _selection match {
       case "system" => "light"
-      case "light"  => "dark"
-      case "dark"   => "system"
-      case _        => "system"
+      case "light" => "dark"
+      case "dark" => "system"
+      case _ => "system"
     }
     setSelection(next)
   }
@@ -94,18 +95,18 @@ object Theme {
     val logo = dom.document.getElementById(HtmlIds.LogoIcon)
     if (logo != null) {
       val img = logo.asInstanceOf[dom.html.Image]
-      img.src = if (eff == "dark") LogoDark else LogoLight
+      img.src = if (eff === "dark") LogoDark else LogoLight
     }
 
     val btn = dom.document.getElementById(HtmlIds.ThemeToggleBtn)
     if (btn != null) {
-      val el = btn.asInstanceOf[dom.html.Element]
+      val el    = btn.asInstanceOf[dom.html.Element]
       el.setAttribute("data-theme-state", _selection)
       val label = _selection match {
         case "system" => I18n.t("theme.system")
-        case "light"  => I18n.t("theme.light")
-        case "dark"   => I18n.t("theme.dark")
-        case _        => "Theme"
+        case "light" => I18n.t("theme.light")
+        case "dark" => I18n.t("theme.dark")
+        case _ => "Theme"
       }
       el.setAttribute("aria-label", label)
       el.setAttribute("title", label)
@@ -113,11 +114,11 @@ object Theme {
   }
 
   private def installSystemListener(): Unit = {
-    val mql = dom.window.matchMedia("(prefers-color-scheme: dark)")
+    val mql                                     = dom.window.matchMedia("(prefers-color-scheme: dark)")
     val listener: js.Function1[dom.Event, Unit] = { (_: dom.Event) =>
-      if (_selection == "system") apply()
+      if (_selection === "system") apply()
     }
-    val dyn = mql.asInstanceOf[js.Dynamic]
+    val dyn                                     = mql.asInstanceOf[js.Dynamic]
     if (!js.isUndefined(dyn.addEventListener)) {
       locally { val _ = dyn.addEventListener("change", listener) }
     } else if (!js.isUndefined(dyn.addListener)) {

@@ -1,5 +1,7 @@
 package claudeproxymate.renderer.util
 
+import cats.syntax.all.*
+
 import scala.scalajs.js
 
 /** Debounce timer utility.
@@ -8,15 +10,15 @@ import scala.scalajs.js
   */
 final class Debounce(delayMs: Int) {
 
-  private var timerId: Option[js.timers.SetTimeoutHandle] = None
+  private var timerId: Option[js.timers.SetTimeoutHandle] = none[js.timers.SetTimeoutHandle]
 
   def apply(fn: () => Unit): Unit = {
     timerId.foreach(js.timers.clearTimeout)
-    timerId = Some(js.timers.setTimeout(delayMs.toDouble)(fn()))
+    timerId = js.timers.setTimeout(delayMs.toDouble)(fn()).some
   }
 
   def cancel(): Unit = {
     timerId.foreach(js.timers.clearTimeout)
-    timerId = None
+    timerId = none[js.timers.SetTimeoutHandle]
   }
 }

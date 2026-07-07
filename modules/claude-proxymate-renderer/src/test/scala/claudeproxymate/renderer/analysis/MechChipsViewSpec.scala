@@ -39,7 +39,12 @@ object MechChipsViewSpec extends Properties {
   ): String =
     MechChipsView.buildChipsFrag(chips, activeKey, descMeta).render
 
-  private def chip(key: String = "cm_0", label: String = "📋 CLAUDE.md", cls: String = "cm", metaKey: String = "cm"): Chip =
+  private def chip(
+    key: String = "cm_0",
+    label: String = "📋 CLAUDE.md",
+    cls: String = "cm",
+    metaKey: String = "cm"
+  ): Chip =
     Chip(key, label, cls, metaKey)
 
   private def meta(color: String = "var(--green)", who: String = "Who", what: String = "What"): ChipMeta =
@@ -88,7 +93,7 @@ object MechChipsViewSpec extends Properties {
       chip(key = "sc_0", label = "⌨ /foo", cls = "sc", metaKey = "sc"),
       chip(key = "sk_0", label = "🔧 mySkill", cls = "sk", metaKey = "sk"),
     )
-    val out = render(chips)
+    val out   = render(chips)
     Result.all(
       List(
         Result.assert(out.contains("data-key=\"cm_0\"")).log("cm_0 missing"),
@@ -102,10 +107,11 @@ object MechChipsViewSpec extends Properties {
   }
 
   def testActiveOnlyMatchingChip: Result = {
-    val chips = List(chip(key = "cm_0"), chip(key = "sc_0", cls = "sc"))
-    val out   = render(chips, activeKey = Some("sc_0"))
+    val chips       = List(chip(key = "cm_0"), chip(key = "sc_0", cls = "sc"))
+    val out         = render(chips, activeKey = Some("sc_0"))
     val activeCount = out.split(" active\"", -1).length - 1
-    Result.assert(activeCount == 1)
+    Result
+      .assert(activeCount == 1)
       .log(s"expected 1 active, got $activeCount: $out")
   }
 
@@ -154,7 +160,8 @@ object MechChipsViewSpec extends Properties {
       chunk <- Gen.string(Gen.alpha, Range.linear(0, 12)).log("chunk")
     } yield {
       val out = render(List(chip(label = s"<script>$chunk</script>")))
-      Result.assert(!out.contains("<script>"))
+      Result
+        .assert(!out.contains("<script>"))
         .log(s"raw <script> leaked for chunk=$chunk: $out")
     }
 
@@ -163,7 +170,8 @@ object MechChipsViewSpec extends Properties {
       chunk <- Gen.string(Gen.alpha, Range.linear(0, 12)).log("chunk")
     } yield {
       val out = render(List(chip(key = s"<script>$chunk</script>")))
-      Result.assert(!out.contains("<script>"))
+      Result
+        .assert(!out.contains("<script>"))
         .log(s"raw <script> leaked for chunk=$chunk: $out")
     }
 
@@ -173,7 +181,8 @@ object MechChipsViewSpec extends Properties {
     } yield {
       val m   = meta(who = s"<script>$chunk</script>", what = s"<script>$chunk</script>")
       val out = render(List(chip()), descMeta = Some(m))
-      Result.assert(!out.contains("<script>"))
+      Result
+        .assert(!out.contains("<script>"))
         .log(s"raw <script> leaked for chunk=$chunk: $out")
     }
 
@@ -187,8 +196,8 @@ object MechChipsViewSpec extends Properties {
   // ── Active + desc combined ────────────────────────────────────────────
 
   def testActivePlusDesc: Result = {
-    val chips = List(chip(key = "cm_0"), chip(key = "sc_0", cls = "sc"))
-    val out   = render(chips, activeKey = Some("cm_0"), descMeta = Some(meta()))
+    val chips       = List(chip(key = "cm_0"), chip(key = "sc_0", cls = "sc"))
+    val out         = render(chips, activeKey = Some("cm_0"), descMeta = Some(meta()))
     val activeCount = out.split(" active\"", -1).length - 1
     Result.all(
       List(

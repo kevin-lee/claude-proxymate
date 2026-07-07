@@ -21,7 +21,10 @@ object JsonTreeViewSpec extends Properties {
     example("long string builds jt-str-long envelope", testLongStrEnvelope),
     example("long string preview is 80 chars + ellipsis", testLongStrPreviewLength),
     example("long string expanded splits on real newlines", testLongStrExpandedLines),
-    example("long string with literal backslash-n does NOT split (legacy dropped)", testLongStrLiteralBackslashNDoesNotSplit),
+    example(
+      "long string with literal backslash-n does NOT split (legacy dropped)",
+      testLongStrLiteralBackslashNDoesNotSplit
+    ),
     example("long string carries data-jt-str-id on all three carriers", testLongStrDataAttr),
     example("long string with <script> escapes properly in expanded", testLongStrExpandedEscape),
     // Container rendering
@@ -183,9 +186,11 @@ object JsonTreeViewSpec extends Properties {
       List(
         // `\"` in source is rendered to `\&quot;` in the output
         // (Scalatags HTML-escapes the `"`, the backslash stays).
-        Result.assert(out.contains("\\&quot;device_id\\&quot;"))
+        Result
+          .assert(out.contains("\\&quot;device_id\\&quot;"))
           .log(s"inner double-quote not JSON-escaped: $out"),
-        Result.assert(!out.contains("\"device_id\""))
+        Result
+          .assert(!out.contains("\"device_id\""))
           .log(s"raw inner literal `\"device_id\"` leaked: $out"),
       )
     )
@@ -205,8 +210,8 @@ object JsonTreeViewSpec extends Properties {
   }
 
   def testLongStrPreviewLength: Result = {
-    val long = ("x" * 80) + ("y" * 250)
-    val out  = render(parse(js.JSON.stringify(long)))
+    val long            = ("x" * 80) + ("y" * 250)
+    val out             = render(parse(js.JSON.stringify(long)))
     val previewExpected = ("x" * 80) + "…"
     Result.all(
       List(
@@ -219,9 +224,9 @@ object JsonTreeViewSpec extends Properties {
   def testLongStrExpandedLines: Result = {
     // Build a long string with REAL newlines; expanded view splits
     // on real `\n` chars per JSON viewer convention.
-    val pad   = "z" * 305
-    val value = "line1\nline2\n" + pad
-    val out   = render(parse(js.JSON.stringify(value)))
+    val pad      = "z" * 305
+    val value    = "line1\nline2\n" + pad
+    val out      = render(parse(js.JSON.stringify(value)))
     val expCount = out.split("class=\"jt-exp-line\"", -1).length - 1
     Result.all(
       List(
@@ -238,20 +243,22 @@ object JsonTreeViewSpec extends Properties {
     // (NOT a real newline) renders as a SINGLE expanded line.
     // Embedded `\n` escape sequences appear in the rendered text
     // per JSON.stringify convention.
-    val pad   = "z" * 305
-    val value = "line1\\nline2\\n" + pad
-    val out   = render(parse(js.JSON.stringify(value)))
+    val pad      = "z" * 305
+    val value    = "line1\\nline2\\n" + pad
+    val out      = render(parse(js.JSON.stringify(value)))
     val expCount = out.split("class=\"jt-exp-line\"", -1).length - 1
-    Result.assert(expCount == 1)
+    Result
+      .assert(expCount == 1)
       .log(s"expected exactly 1 jt-exp-line for literal-backslash-n value, got $expCount: $out")
   }
 
   def testLongStrDataAttr: Result = {
-    val long = "a" * 301
-    val out  = render(parse(js.JSON.stringify(long)))
+    val long        = "a" * 301
+    val out         = render(parse(js.JSON.stringify(long)))
     val occurrences = out.split("data-jt-str-id=\"jts1\"", -1).length - 1
     // Three carriers: -btn span, -s preview, expanded toggle
-    Result.assert(occurrences == 3)
+    Result
+      .assert(occurrences == 3)
       .log(s"expected 3 data-jt-str-id occurrences for 'jts1', got $occurrences in: $out")
   }
 
@@ -289,7 +296,7 @@ object JsonTreeViewSpec extends Properties {
   }
 
   def testSingleArr: Result = {
-    val out = render(parse("[1]"))
+    val out      = render(parse("[1]"))
     val rowCount = out.split("class=\"jt-row\"", -1).length - 1
     Result.all(
       List(
@@ -312,17 +319,19 @@ object JsonTreeViewSpec extends Properties {
   }
 
   def testMultiArrComma: Result = {
-    val out = render(parse("[1,2,3]"))
+    val out        = render(parse("[1,2,3]"))
     val commaCount = out.split(">,<", -1).length - 1
     // Two non-last entries (positions 0,1) emit commas; closing bracket has no comma at root.
-    Result.assert(commaCount == 2)
+    Result
+      .assert(commaCount == 2)
       .log(s"expected 2 commas, got $commaCount: $out")
   }
 
   def testMultiObjComma: Result = {
-    val out = render(parse("""{"a":1,"b":2,"c":3}"""))
+    val out        = render(parse("""{"a":1,"b":2,"c":3}"""))
     val commaCount = out.split(">,<", -1).length - 1
-    Result.assert(commaCount == 2)
+    Result
+      .assert(commaCount == 2)
       .log(s"expected 2 commas, got $commaCount: $out")
   }
 
@@ -354,8 +363,9 @@ object JsonTreeViewSpec extends Properties {
       val key  = s"<script>$chunk</script>"
       val json = js.Dynamic.literal()
       json.updateDynamic(key)("v")
-      val out = render(json)
-      Result.assert(!out.contains("<script>"))
+      val out  = render(json)
+      Result
+        .assert(!out.contains("<script>"))
         .log(s"raw <script> leaked for chunk=$chunk: $out")
     }
 
@@ -366,7 +376,8 @@ object JsonTreeViewSpec extends Properties {
       val payload = s"<script>alert('$chunk')</script>"
       val json    = js.Dynamic.literal(k = payload)
       val out     = render(json)
-      Result.assert(!out.contains("<script>"))
+      Result
+        .assert(!out.contains("<script>"))
         .log(s"raw <script> leaked for chunk=$chunk: $out")
     }
 
@@ -377,7 +388,8 @@ object JsonTreeViewSpec extends Properties {
       val payload = s"<script>alert('$chunk')</script>"
       val deep    = js.Dynamic.literal(a = js.Dynamic.literal(b = js.Array(payload)))
       val out     = render(deep)
-      Result.assert(!out.contains("<script>"))
+      Result
+        .assert(!out.contains("<script>"))
         .log(s"raw <script> leaked for chunk=$chunk: $out")
     }
 
@@ -429,14 +441,16 @@ object JsonTreeViewSpec extends Properties {
 
   def testNoContainerInlineOnclick: Result = {
     val out = render(parse("[1,2,3]"))
-    Result.assert(!out.contains("onclick="))
+    Result
+      .assert(!out.contains("onclick="))
       .log(s"unexpected inline onclick in container output: $out")
   }
 
   def testNoStringInlineOnclick: Result = {
     val long = "a" * 301
     val out  = render(parse(js.JSON.stringify(long)))
-    Result.assert(!out.contains("onclick="))
+    Result
+      .assert(!out.contains("onclick="))
       .log(s"unexpected inline onclick in long-string output: $out")
   }
 
@@ -459,16 +473,18 @@ object JsonTreeViewSpec extends Properties {
   }
 
   def testMaskApiKeyRevealed: Result = {
-    val raw = "sk-secret-value-123"
-    val value = parse(s"""{"api_key":"$raw"}""")
+    val raw        = "sk-secret-value-123"
+    val value      = parse(s"""{"api_key":"$raw"}""")
     reset()
     val totalBytes = js.JSON.stringify(value).length
     // Mask id is the dot-path; pre-add it to the reveal set, then render.
-    val _ = AppState.maskOverrides.add("$.api_key")
-    val out = JsonTreeView.buildJsonFrag(value, totalBytes, "hidden").render
+    val _          = AppState.maskOverrides.add("$.api_key")
+    val out        = JsonTreeView.buildJsonFrag(value, totalBytes, "hidden").render
     Result.all(
       List(
-        Result.assert(out.contains(s"""class="${JsonTreeView.MaskRevealedClass}"""")).log(s"jt-mask-revealed missing: $out"),
+        Result
+          .assert(out.contains(s"""class="${JsonTreeView.MaskRevealedClass}""""))
+          .log(s"jt-mask-revealed missing: $out"),
         Result.assert(out.contains(raw)).log(s"raw value missing when revealed: $out"),
       )
     )
@@ -489,7 +505,9 @@ object JsonTreeViewSpec extends Properties {
     val out = renderWithLabel(parse("""{"input_tokens":1234,"output_tokens":56}"""), "hidden")
     Result.all(
       List(
-        Result.assert(!out.contains(s"""class="${JsonTreeView.MaskClass}"""")).log(s"jt-mask span unexpectedly present: $out"),
+        Result
+          .assert(!out.contains(s"""class="${JsonTreeView.MaskClass}""""))
+          .log(s"jt-mask span unexpectedly present: $out"),
         Result.assert(out.contains("1234")).log(s"input_tokens value missing: $out"),
         Result.assert(out.contains("56")).log(s"output_tokens value missing: $out"),
       )
@@ -502,16 +520,23 @@ object JsonTreeViewSpec extends Properties {
     val out2  = renderWithLabel(value, "hidden")
     Result.all(
       List(
-        Result.assert(out1.contains(s"""${JsonTreeView.MaskDataAttr}="$$.metadata.user_id"""")).log(s"expected stable dot-path id `$$.metadata.user_id`: $out1"),
-        Result.assert(out1.contains(s"""${JsonTreeView.MaskDataAttr}="$$.metadata.api_key"""")).log(s"expected stable dot-path id `$$.metadata.api_key`: $out1"),
-        Result.assert(out1 == out2).log(s"renders should be identical across calls — masking is deterministic on the data"),
+        Result
+          .assert(out1.contains(s"""${JsonTreeView.MaskDataAttr}="$$.metadata.user_id""""))
+          .log(s"expected stable dot-path id `$$.metadata.user_id`: $out1"),
+        Result
+          .assert(out1.contains(s"""${JsonTreeView.MaskDataAttr}="$$.metadata.api_key""""))
+          .log(s"expected stable dot-path id `$$.metadata.api_key`: $out1"),
+        Result
+          .assert(out1 == out2)
+          .log(s"renders should be identical across calls — masking is deterministic on the data"),
       )
     )
   }
 
   def testMaskUsesProvidedLabel: Result = {
     val out = renderWithLabel(parse("""{"api_key":"v"}"""), "REDACTED-LABEL")
-    Result.assert(out.contains("REDACTED-LABEL"))
+    Result
+      .assert(out.contains("REDACTED-LABEL"))
       .log(s"provided maskLabel not in output: $out")
   }
 
@@ -523,7 +548,8 @@ object JsonTreeViewSpec extends Properties {
     val out = renderWithLabel(parse(s"""{"id":"$FakeMsgId"}"""), "hidden")
     Result.all(
       List(
-        Result.assert(out.contains(s"""class="${JsonTreeView.CorrMaskClass}""""))
+        Result
+          .assert(out.contains(s"""class="${JsonTreeView.CorrMaskClass}""""))
           .log(s"jt-corr-mask span missing: $out"),
         Result.assert(!out.contains(FakeMsgId)).log(s"raw id leaked: $out"),
       )
@@ -533,7 +559,8 @@ object JsonTreeViewSpec extends Properties {
   def testCorrMaskFingerprint: Result = {
     val out = renderWithLabel(parse(s"""{"id":"$FakeMsgId"}"""), "hidden")
     // Fingerprint is `msg_…<last-4>` where last-4 of `msg_01ABCDEFGHIJKLMNOPQRSTUVWXYZ` is `WXYZ`.
-    Result.assert(out.contains("msg_") && out.contains("…") && out.contains("WXYZ"))
+    Result
+      .assert(out.contains("msg_") && out.contains("…") && out.contains("WXYZ"))
       .log(s"fingerprint shape missing: $out")
   }
 
@@ -545,7 +572,8 @@ object JsonTreeViewSpec extends Properties {
     val out        = JsonTreeView.buildJsonFrag(data, totalBytes, "hidden").render
     Result.all(
       List(
-        Result.assert(out.contains(s"""class="${JsonTreeView.CorrMaskRevealedClass}""""))
+        Result
+          .assert(out.contains(s"""class="${JsonTreeView.CorrMaskRevealedClass}""""))
           .log(s"jt-corr-mask-revealed missing: $out"),
         Result.assert(out.contains(FakeMsgId)).log(s"raw id missing when revealed: $out"),
       )
@@ -554,7 +582,8 @@ object JsonTreeViewSpec extends Properties {
 
   def testCorrMaskNoFalsePositive: Result = {
     val out = renderWithLabel(parse("""{"id":42,"count":100}"""), "hidden")
-    Result.assert(!out.contains(s"""class="${JsonTreeView.CorrMaskClass}""""))
+    Result
+      .assert(!out.contains(s"""class="${JsonTreeView.CorrMaskClass}""""))
       .log(s"unexpected corr-mask on integer id: $out")
   }
 
@@ -565,7 +594,9 @@ object JsonTreeViewSpec extends Properties {
     Result.all(
       List(
         Result.assert(out.contains(s"""class="${JsonTreeView.MaskClass}"""")).log(s"field-name mask missing: $out"),
-        Result.assert(!out.contains(s"""class="${JsonTreeView.CorrMaskClass}"""")).log(s"unexpected inner corr-mask: $out"),
+        Result
+          .assert(!out.contains(s"""class="${JsonTreeView.CorrMaskClass}""""))
+          .log(s"unexpected inner corr-mask: $out"),
         Result.assert(!out.contains(FakeMsgId)).log(s"raw id leaked: $out"),
       )
     )
@@ -576,13 +607,14 @@ object JsonTreeViewSpec extends Properties {
   private val LongPad = "z" * 305 // pushes value past CollapseLenThreshold
 
   def testLongStrTokenInExpanded: Result = {
-    val key   = "sk-ant-abcdefghijklmnopqrstuvwxyz12345"
-    val value = LongPad + " " + key + " trailing"
-    val out   = render(parse(js.JSON.stringify(value)))
+    val key      = "sk-ant-abcdefghijklmnopqrstuvwxyz12345"
+    val value    = LongPad + " " + key + " trailing"
+    val out      = render(parse(js.JSON.stringify(value)))
     val expanded = out.substring(out.indexOf("class=\"jt-str-expanded\""))
     Result.all(
       List(
-        Result.assert(expanded.contains(s"""class="${JsonTreeView.TokenMaskClass}""""))
+        Result
+          .assert(expanded.contains(s"""class="${JsonTreeView.TokenMaskClass}""""))
           .log(s"jt-token-mask span missing from expanded view: $expanded"),
         Result.assert(!out.contains(key)).log(s"raw token leaked: $out"),
       )
@@ -593,18 +625,20 @@ object JsonTreeViewSpec extends Properties {
     val key   = "sk-ant-abcdefghijklmnopqrstuvwxyz12345"
     val value = LongPad + " " + key
     val out   = render(parse(js.JSON.stringify(value)))
-    Result.assert(!out.contains(key))
+    Result
+      .assert(!out.contains(key))
       .log(s"raw token leaked from long-string render: $out")
   }
 
   def testLongStrTokenInPreview: Result = {
     // Token at offset 0 — fully inside the first 80 chars of preview.
-    val key   = "sk-ant-abcdefghijklmnopqrstuvwxyz12345"
-    val value = key + " " + LongPad
-    val out   = render(parse(js.JSON.stringify(value)))
+    val key     = "sk-ant-abcdefghijklmnopqrstuvwxyz12345"
+    val value   = key + " " + LongPad
+    val out     = render(parse(js.JSON.stringify(value)))
     // The preview span exists; it should contain the mask.
     val preview = out.substring(out.indexOf("class=\"jt-str-preview\""), out.indexOf("class=\"jt-str-expanded\""))
-    Result.assert(preview.contains(s"""class="${JsonTreeView.TokenMaskClass}""""))
+    Result
+      .assert(preview.contains(s"""class="${JsonTreeView.TokenMaskClass}""""))
       .log(s"jt-token-mask span missing from preview: $preview")
   }
 
@@ -612,16 +646,18 @@ object JsonTreeViewSpec extends Properties {
     // Token starts at offset 60, length 38 → ends at 98, crossing
     // the 80-char preview boundary. Preview should NOT render a
     // mask span for it; expanded view DOES.
-    val key   = "sk-ant-abcdefghijklmnopqrstuvwxyz12345" // length 38
-    val value = ("a" * 60) + key + LongPad
-    val out   = render(parse(js.JSON.stringify(value)))
+    val key      = "sk-ant-abcdefghijklmnopqrstuvwxyz12345" // length 38
+    val value    = ("a" * 60) + key + LongPad
+    val out      = render(parse(js.JSON.stringify(value)))
     val preview  = out.substring(out.indexOf("class=\"jt-str-preview\""), out.indexOf("class=\"jt-str-expanded\""))
     val expanded = out.substring(out.indexOf("class=\"jt-str-expanded\""))
     Result.all(
       List(
-        Result.assert(!preview.contains(s"""class="${JsonTreeView.TokenMaskClass}""""))
+        Result
+          .assert(!preview.contains(s"""class="${JsonTreeView.TokenMaskClass}""""))
           .log(s"unexpected token mask in preview: $preview"),
-        Result.assert(expanded.contains(s"""class="${JsonTreeView.TokenMaskClass}""""))
+        Result
+          .assert(expanded.contains(s"""class="${JsonTreeView.TokenMaskClass}""""))
           .log(s"token mask missing from expanded view: $expanded"),
       )
     )
@@ -632,7 +668,8 @@ object JsonTreeViewSpec extends Properties {
     val key   = "sk-ant-abcdefghijklmnopqrstuvwxyz12345"
     val value = "abcd " + key + " " + LongPad
     val out   = render(parse(js.JSON.stringify(value)))
-    Result.assert(out.contains(s"""${JsonTreeView.TokenMaskDataAttr}="$$#5""""))
+    Result
+      .assert(out.contains(s"""${JsonTreeView.TokenMaskDataAttr}="$$#5""""))
       .log(s"expected `${JsonTreeView.TokenMaskDataAttr}=\"$$#5\"` in: $out")
   }
 
@@ -643,9 +680,11 @@ object JsonTreeViewSpec extends Properties {
     val out = renderWithLabel(parse(s"""{"text":"prefix $key suffix"}"""), "hidden")
     Result.all(
       List(
-        Result.assert(out.contains(s"""class="${JsonTreeView.TokenMaskClass}""""))
+        Result
+          .assert(out.contains(s"""class="${JsonTreeView.TokenMaskClass}""""))
           .log(s"jt-token-mask span missing: $out"),
-        Result.assert(!out.contains(key))
+        Result
+          .assert(!out.contains(key))
           .log(s"raw token leaked: $out"),
         Result.assert(out.contains("prefix ")).log(s"surrounding text lost: $out"),
         Result.assert(out.contains(" suffix")).log(s"surrounding text lost: $out"),
@@ -654,27 +693,30 @@ object JsonTreeViewSpec extends Properties {
   }
 
   def testTokenMaskFingerprint: Result = {
-    val key   = "sk-ant-abcdefghijklmnopqrstuvwxyz12345"
-    val out   = renderWithLabel(parse(s"""{"text":"$key"}"""), "hidden")
+    val key = "sk-ant-abcdefghijklmnopqrstuvwxyz12345"
+    val out = renderWithLabel(parse(s"""{"text":"$key"}"""), "hidden")
     // first-4 = "sk-a", last-4 = "2345"
-    Result.assert(out.contains("sk-a") && out.contains("2345") && out.contains("…"))
+    Result
+      .assert(out.contains("sk-a") && out.contains("2345") && out.contains("…"))
       .log(s"fingerprint shape missing: $out")
   }
 
   def testTokenMaskRevealed: Result = {
-    val key  = "sk-ant-abcdefghijklmnopqrstuvwxyz12345"
-    val data = parse(s"""{"text":"prefix $key suffix"}""")
+    val key        = "sk-ant-abcdefghijklmnopqrstuvwxyz12345"
+    val data       = parse(s"""{"text":"prefix $key suffix"}""")
     reset()
     val totalBytes = js.JSON.stringify(data).length
     // The token offset within the value `prefix sk-ant-... suffix` is 7
     // (length of "prefix "). Token id = `$.text#7`.
-    val _ = AppState.maskOverrides.add("$.text#7")
-    val out = JsonTreeView.buildJsonFrag(data, totalBytes, "hidden").render
+    val _          = AppState.maskOverrides.add("$.text#7")
+    val out        = JsonTreeView.buildJsonFrag(data, totalBytes, "hidden").render
     Result.all(
       List(
-        Result.assert(out.contains(s"""class="${JsonTreeView.TokenMaskRevealedClass}""""))
+        Result
+          .assert(out.contains(s"""class="${JsonTreeView.TokenMaskRevealedClass}""""))
           .log(s"jt-token-mask-revealed missing: $out"),
-        Result.assert(out.contains(key))
+        Result
+          .assert(out.contains(key))
           .log(s"raw token missing when revealed: $out"),
       )
     )
@@ -682,7 +724,8 @@ object JsonTreeViewSpec extends Properties {
 
   def testTokenMaskNoFalsePositive: Result = {
     val out = renderWithLabel(parse("""{"text":"plain claude-3-5-sonnet model name"}"""), "hidden")
-    Result.assert(!out.contains(s"""class="${JsonTreeView.TokenMaskClass}""""))
+    Result
+      .assert(!out.contains(s"""class="${JsonTreeView.TokenMaskClass}""""))
       .log(s"unexpected token-mask span: $out")
   }
 
@@ -694,7 +737,9 @@ object JsonTreeViewSpec extends Properties {
     Result.all(
       List(
         Result.assert(out.contains(s"""class="${JsonTreeView.MaskClass}"""")).log(s"field-name mask missing: $out"),
-        Result.assert(!out.contains(s"""class="${JsonTreeView.TokenMaskClass}"""")).log(s"unexpected inner token-mask: $out"),
+        Result
+          .assert(!out.contains(s"""class="${JsonTreeView.TokenMaskClass}""""))
+          .log(s"unexpected inner token-mask: $out"),
         Result.assert(!out.contains(key)).log(s"raw token leaked: $out"),
       )
     )
@@ -735,14 +780,16 @@ object JsonTreeViewSpec extends Properties {
   def testResolvePathMissingKey: Result = {
     val root = parse("""{"a":1}""")
     val v    = JsonTreeView.resolvePath(root, "$.nope")
-    Result.assert(v == null || js.isUndefined(v))
+    Result
+      .assert(v == null || js.isUndefined(v))
       .log(s"missing key should return null/undefined, got $v")
   }
 
   def testResolvePathOutOfRange: Result = {
     val root = parse("""[1,2]""")
     val v    = JsonTreeView.resolvePath(root, "$[10]")
-    Result.assert(v == null || js.isUndefined(v))
+    Result
+      .assert(v == null || js.isUndefined(v))
       .log(s"out-of-range index should return null, got $v")
   }
 }

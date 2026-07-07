@@ -1,5 +1,6 @@
 package claudeproxymate.renderer.messages
 
+import cats.syntax.all.*
 import claudeproxymate.renderer.copy.MaskedCopy
 
 /** Result of a WYSIWYG plain-text rendering: the text plus span
@@ -42,6 +43,9 @@ final case class PlainTextResult(text: String, revealed: Int, total: Int)
   */
 object MessageCopy {
 
+  import MsgContent.*
+  import MsgPart.*
+
   /** WYSIWYG plain-text rendering of `cards`. Empty list →
     * `PlainTextResult("", 0, 0)`.
     */
@@ -58,34 +62,37 @@ object MessageCopy {
       r.text
     }
 
-    cards.zipWithIndex.foreach { case (card, idx) =>
-      if (idx > 0) buf.append("\n")
-      buf.append(s"# ${card.role}\n\n")
-      if (card.role == "user" && card.userParts.nonEmpty) {
-        card.userParts.zipWithIndex.foreach {
-          case (TextMsgPart(content), partIdx)                  =>
-            buf.append(append(content, s"m.${card.rawIdx}.user.$partIdx")).append("\n\n")
-          case (InjectedMsgPart(_, label, content, _), partIdx) =>
-            buf.append(s"[$label]\n")
-              .append(append(content, s"m.${card.rawIdx}.inj.$partIdx"))
-              .append("\n\n")
+    cards.zipWithIndex.foreach {
+      case (card, idx) =>
+        if (idx > 0) buf.append("\n")
+        buf.append(s"# ${card.role}\n\n")
+        if (card.role === "user" && card.userParts.nonEmpty) {
+          card.userParts.zipWithIndex.foreach {
+            case (TextMsgPart(content), partIdx) =>
+              buf.append(append(content, s"m.${card.rawIdx}.user.$partIdx")).append("\n\n")
+            case (InjectedMsgPart(_, label, content, _), partIdx) =>
+              buf
+                .append(s"[$label]\n")
+                .append(append(content, s"m.${card.rawIdx}.inj.$partIdx"))
+                .append("\n\n")
+          }
+        } else {
+          card.contents.zipWithIndex.foreach {
+            case (TextContent(text), partIdx) =>
+              buf.append(append(text, s"m.${card.rawIdx}.text.$partIdx")).append("\n\n")
+            case (ToolUseContent(name), _) =>
+              buf.append(s"[tool: $name]\n\n")
+            case (ToolResultContent(preview, truncated), partIdx) =>
+              val ell = if (truncated) "…" else ""
+              buf
+                .append(s"[tool result] ")
+                .append(append(preview, s"m.${card.rawIdx}.tr.$partIdx"))
+                .append(ell)
+                .append("\n\n")
+            case (OtherContent(typeName), _) =>
+              buf.append(s"[$typeName]\n\n")
+          }
         }
-      } else {
-        card.contents.zipWithIndex.foreach {
-          case (TextContent(text), partIdx)                     =>
-            buf.append(append(text, s"m.${card.rawIdx}.text.$partIdx")).append("\n\n")
-          case (ToolUseContent(name), _)                        =>
-            buf.append(s"[tool: $name]\n\n")
-          case (ToolResultContent(preview, truncated), partIdx) =>
-            val ell = if (truncated) "…" else ""
-            buf.append(s"[tool result] ")
-              .append(append(preview, s"m.${card.rawIdx}.tr.$partIdx"))
-              .append(ell)
-              .append("\n\n")
-          case (OtherContent(typeName), _)                      =>
-            buf.append(s"[$typeName]\n\n")
-        }
-      }
     }
     PlainTextResult(buf.toString, revealed, total)
   }

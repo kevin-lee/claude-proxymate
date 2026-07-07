@@ -1,5 +1,6 @@
 package claudeproxymate.electron
 
+import cats.syntax.all.*
 import claudeproxymate.electron.facades.{NodeCrypto, NodeFs, NodeHttps, NodePath}
 
 import java.util.concurrent.atomic.AtomicReference
@@ -18,11 +19,11 @@ object Analytics {
     sessionId: Option[String],
   )
 
-  private val state = new AtomicReference[State](State(None, "", None))
+  private val state = new AtomicReference[State](State(none[String], "", none[String]))
 
   def init(path: String): Unit = {
     val sid = js.Date.now().toLong.toString
-    state.updateAndGet(s => s.copy(userDataPath = path, sessionId = Some(sid))): Unit
+    state.updateAndGet(s => s.copy(userDataPath = path, sessionId = sid.some)): Unit
   }
 
   private def getClientId(): String = {
@@ -32,7 +33,7 @@ object Analytics {
       case None =>
         val filePath = NodePath.join(current.userDataPath, "analytics.json")
         val id       = readOrCreateClientId(filePath)
-        state.updateAndGet(s => s.copy(clientId = Some(id))): Unit
+        state.updateAndGet(s => s.copy(clientId = id.some)): Unit
         id
     }
   }
@@ -45,10 +46,10 @@ object Analytics {
           val parsed = JSON.parse(data)
           Option(parsed.selectDynamic("clientId").asInstanceOf[String]).filter(_.nonEmpty)
         } catch {
-          case _: Throwable => None
+          case _: Throwable => none[String]
         }
       } else {
-        None
+        none[String]
       }
 
     existing.getOrElse {

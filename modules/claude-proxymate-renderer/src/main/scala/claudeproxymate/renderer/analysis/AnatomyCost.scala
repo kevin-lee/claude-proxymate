@@ -41,10 +41,10 @@ object AnatomyCost {
 
     def cost(tokens: Int, rate: Double): Double = tokens * rate / 1000000.0
 
-    val uncachedCost = cost(inputTokens, rates.input)
-    val cacheReadCost = cost(cacheRead, rates.cacheRead)
+    val uncachedCost   = cost(inputTokens, rates.input)
+    val cacheReadCost  = cost(cacheRead, rates.cacheRead)
     val cacheWriteCost = cost(cacheWrite, rates.cacheWrite5m)
-    val outputCost = cost(outputTokens, rates.output)
+    val outputCost     = cost(outputTokens, rates.output)
 
     val segments = List(
       CostSegment("token.uncachedInput", inputTokens, uncachedCost, "var(--blue)"),
@@ -54,28 +54,28 @@ object AnatomyCost {
     )
 
     CostCard(
-      model            = model,
-      estimated        = false,
-      reqKb            = reqKb,
+      model = model,
+      estimated = false,
+      reqKb = reqKb,
       totalInputTokens = totalIn,
-      outputTokens     = outputTokens,
-      cacheHitPct      = cachePct,
-      segments         = segments,
-      totalCostUsd     = uncachedCost + cacheReadCost + cacheWriteCost + outputCost,
-      estTokens        = 0,
+      outputTokens = outputTokens,
+      cacheHitPct = cachePct,
+      segments = segments,
+      totalCostUsd = uncachedCost + cacheReadCost + cacheWriteCost + outputCost,
+      estTokens = 0,
     )
   }
 
   def estimateOnly(model: String, reqKb: String, estTokens: Int): CostCard =
     CostCard(
-      model            = model,
-      estimated        = true,
-      reqKb            = reqKb,
+      model = model,
+      estimated = true,
+      reqKb = reqKb,
       totalInputTokens = 0,
-      outputTokens     = 0,
-      cacheHitPct      = 0,
-      segments         = Nil,
-      totalCostUsd     = 0.0,
-      estTokens        = estTokens,
+      outputTokens = 0,
+      cacheHitPct = 0,
+      segments = Nil,
+      totalCostUsd = 0.0,
+      estTokens = estTokens,
     )
 }

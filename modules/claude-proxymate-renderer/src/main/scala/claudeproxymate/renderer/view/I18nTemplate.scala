@@ -1,5 +1,6 @@
 package claudeproxymate.renderer.view
 
+import cats.syntax.all.*
 import scalatags.Text.all.*
 
 /** Renders an i18n string that may contain `{{...}}` presentation tokens
@@ -22,7 +23,7 @@ object I18nTemplate {
   private val PairedTags: Set[String] = Set("b", "strong", "i", "small", "code")
 
   def render(s: String): Frag = {
-    val (parsed, _) = parse(s, 0, None)
+    val (parsed, _) = parse(s, 0, none[String])
     frag(parsed)
   }
 
@@ -33,10 +34,10 @@ object I18nTemplate {
     * consumed close tag (or `s.length` if we consumed to end of string).
     */
   private def parse(s: String, start: Int, end: Option[String]): (List[Frag], Int) = {
-    val out      = scala.collection.mutable.ListBuffer.empty[Frag]
-    val literal  = new StringBuilder
-    var i        = start
-    var stopped  = false
+    val out     = scala.collection.mutable.ListBuffer.empty[Frag]
+    val literal = new StringBuilder
+    var i       = start
+    var stopped = false
 
     def flushLiteral(): Unit = {
       if (literal.nonEmpty) {
@@ -70,12 +71,12 @@ object I18nTemplate {
             flushLiteral()
             out += (name match {
               case "br" => br
-              case _    => stringFrag(s.substring(i, next))
+              case _ => stringFrag(s.substring(i, next))
             })
             i = next
           } else if (PairedTags.contains(name)) {
             flushLiteral()
-            val (inner, afterClose) = parse(s, next, Some(name))
+            val (inner, afterClose) = parse(s, next, name.some)
             out += wrapPaired(name, inner)
             i = afterClose
           } else {
@@ -95,11 +96,11 @@ object I18nTemplate {
   }
 
   private def wrapPaired(name: String, children: List[Frag]): Frag = name match {
-    case "b"      => b(frag(children))
+    case "b" => b(frag(children))
     case "strong" => strong(frag(children))
-    case "i"      => i(frag(children))
-    case "small"  => small(frag(children))
-    case "code"   => code(frag(children))
-    case _        => frag(children)
+    case "i" => i(frag(children))
+    case "small" => small(frag(children))
+    case "code" => code(frag(children))
+    case _ => frag(children)
   }
 }

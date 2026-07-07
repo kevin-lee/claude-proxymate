@@ -24,7 +24,10 @@ object MaskedCopySpec extends Properties {
     example("regex token in non-sensitive string field is redacted with sentinel", testRegexTokenRedacted),
     example("multiple regex tokens in one string are all redacted", testMultipleRegexTokens),
     example("non-token string preserved verbatim", testNonTokenStringPreserved),
-    example("regex token inside sensitive-key value still field-replaced (no double mask)", testRegexInsideSensitiveKey),
+    example(
+      "regex token inside sensitive-key value still field-replaced (no double mask)",
+      testRegexInsideSensitiveKey
+    ),
     // WYSIWYG: correlation ids follow the on-screen mask state
     example("masked correlation id (msg_…) copies as sentinel", testCorrIdMasked),
     example("revealed correlation id copies verbatim", testCorrIdRevealed),
@@ -37,7 +40,7 @@ object MaskedCopySpec extends Properties {
     example("copy walker queries exactly the ids the JSON tree renders", testIdAgreementWithJsonTree),
   )
 
-  private def parse(s: String): js.Dynamic    = js.JSON.parse(s)
+  private def parse(s: String): js.Dynamic     = js.JSON.parse(s)
   private def stringify(d: js.Dynamic): String = js.JSON.stringify(d)
 
   /* All-masked predicate: the screen-share-safe default baseline. */
@@ -51,7 +54,8 @@ object MaskedCopySpec extends Properties {
     val out = MaskedCopy.maskBody(v, maskAll)
     Result.all(
       List(
-        Result.assert(out.body.asInstanceOf[String] == "plain")
+        Result
+          .assert(out.body.asInstanceOf[String] == "plain")
           .log("primitive should be returned unchanged"),
         Result.assert(out.total == 0).log(s"unexpected spans: total=${out.total}"),
       )
@@ -60,7 +64,8 @@ object MaskedCopySpec extends Properties {
 
   def testNull: Result = {
     val v = null.asInstanceOf[js.Dynamic]
-    Result.assert(MaskedCopy.maskBody(v, maskAll).body == null)
+    Result
+      .assert(MaskedCopy.maskBody(v, maskAll).body == null)
       .log("null should be returned as null")
   }
 
@@ -97,7 +102,8 @@ object MaskedCopySpec extends Properties {
 
   def testArrayOfObjects: Result = {
     val out = stringify(MaskedCopy.maskBody(parse("""[{"api_key":"a"},{"api_key":"b"}]"""), maskAll).body)
-    Result.assert(!out.contains("\"a\"") && !out.contains("\"b\""))
+    Result
+      .assert(!out.contains("\"a\"") && !out.contains("\"b\""))
       .log(s"raw leaked from array element: $out")
   }
 
@@ -122,7 +128,8 @@ object MaskedCopySpec extends Properties {
     val before = stringify(input)
     val _      = MaskedCopy.maskBody(input, maskAll)
     val after  = stringify(input)
-    Result.assert(before == after)
+    Result
+      .assert(before == after)
       .log(s"input was mutated: before=$before after=$after")
   }
 
@@ -139,7 +146,8 @@ object MaskedCopySpec extends Properties {
 
   def testCaseInsensitive: Result = {
     val out = stringify(MaskedCopy.maskBody(parse("""{"Authorization":"Bearer xyz"}"""), maskAll).body)
-    Result.assert(!out.contains("Bearer xyz"))
+    Result
+      .assert(!out.contains("Bearer xyz"))
       .log(s"mixed-case sensitive key not masked: $out")
   }
 
@@ -170,7 +178,9 @@ object MaskedCopySpec extends Properties {
   }
 
   def testNonTokenStringPreserved: Result = {
-    val out = stringify(MaskedCopy.maskBody(parse("""{"text":"plain claude-3-5-sonnet model","model":"claude"}"""), maskAll).body)
+    val out = stringify(
+      MaskedCopy.maskBody(parse("""{"text":"plain claude-3-5-sonnet model","model":"claude"}"""), maskAll).body
+    )
     Result.all(
       List(
         Result.assert(out.contains("plain claude-3-5-sonnet model")).log(s"non-token text lost: $out"),
@@ -204,7 +214,8 @@ object MaskedCopySpec extends Properties {
       List(
         Result.assert(!out.contains(FakeMsgId)).log(s"masked correlation id leaked: $out"),
         Result.assert(out.contains(MaskedCopy.Sentinel)).log(s"sentinel missing: $out"),
-        Result.assert(res.total == 1 && res.revealed == 0)
+        Result
+          .assert(res.total == 1 && res.revealed == 0)
           .log(s"counts wrong: revealed=${res.revealed} total=${res.total}"),
       )
     )
@@ -216,7 +227,8 @@ object MaskedCopySpec extends Properties {
     Result.all(
       List(
         Result.assert(out.contains(FakeMsgId)).log(s"revealed correlation id missing: $out"),
-        Result.assert(res.total == 1 && res.revealed == 1)
+        Result
+          .assert(res.total == 1 && res.revealed == 1)
           .log(s"counts wrong: revealed=${res.revealed} total=${res.total}"),
       )
     )
@@ -230,7 +242,8 @@ object MaskedCopySpec extends Properties {
     Result.all(
       List(
         Result.assert(out.contains(FakeAnthropic)).log(s"revealed token missing: $out"),
-        Result.assert(res.total == 1 && res.revealed == 1)
+        Result
+          .assert(res.total == 1 && res.revealed == 1)
           .log(s"counts wrong: revealed=${res.revealed} total=${res.total}"),
       )
     )
@@ -246,7 +259,8 @@ object MaskedCopySpec extends Properties {
         Result.assert(out.contains(k1)).log(s"revealed first token missing: $out"),
         Result.assert(!out.contains(k2)).log(s"masked second token leaked: $out"),
         Result.assert(out.contains(MaskedCopy.Sentinel)).log(s"sentinel missing: $out"),
-        Result.assert(res.total == 2 && res.revealed == 1)
+        Result
+          .assert(res.total == 2 && res.revealed == 1)
           .log(s"counts wrong: revealed=${res.revealed} total=${res.total}"),
       )
     )
@@ -267,10 +281,12 @@ object MaskedCopySpec extends Properties {
       List(
         Result.assert(!partialOut.contains(FakeAnthropic)).log(s"interior token leaked: $partialOut"),
         Result.assert(partialOut.contains(MaskedCopy.Sentinel)).log(s"interior sentinel missing: $partialOut"),
-        Result.assert(partial.total == 2 && partial.revealed == 1)
+        Result
+          .assert(partial.total == 2 && partial.revealed == 1)
           .log(s"partial counts wrong: revealed=${partial.revealed} total=${partial.total}"),
         Result.assert(fullOut.contains(FakeAnthropic)).log(s"fully revealed token missing: $fullOut"),
-        Result.assert(full.total == 2 && full.revealed == 2)
+        Result
+          .assert(full.total == 2 && full.revealed == 2)
           .log(s"full counts wrong: revealed=${full.revealed} total=${full.total}"),
       )
     )
@@ -282,26 +298,31 @@ object MaskedCopySpec extends Properties {
     val revealed = MaskedCopy.maskBody(v, Set("$#0"))
     Result.all(
       List(
-        Result.assert(masked.body.asInstanceOf[String] == MaskedCopy.Sentinel)
+        Result
+          .assert(masked.body.asInstanceOf[String] == MaskedCopy.Sentinel)
           .log(s"masked root string should be sentinel: ${stringify(masked.body)}"),
-        Result.assert(masked.total == 1 && masked.revealed == 0)
+        Result
+          .assert(masked.total == 1 && masked.revealed == 0)
           .log(s"masked counts wrong: revealed=${masked.revealed} total=${masked.total}"),
-        Result.assert(revealed.body.asInstanceOf[String] == FakeAnthropic)
+        Result
+          .assert(revealed.body.asInstanceOf[String] == FakeAnthropic)
           .log(s"revealed root string should be verbatim: ${stringify(revealed.body)}"),
-        Result.assert(revealed.total == 1 && revealed.revealed == 1)
+        Result
+          .assert(revealed.total == 1 && revealed.revealed == 1)
           .log(s"revealed counts wrong: revealed=${revealed.revealed} total=${revealed.total}"),
       )
     )
   }
 
   def testMaskedSensitiveInteriorNotQueried: Result = {
-    val queried = scala.collection.mutable.Set.empty[String]
+    val queried                     = scala.collection.mutable.Set.empty[String]
     val recorder: String => Boolean = { id => queried += id; false }
-    val _ = MaskedCopy.maskBody(parse(s"""{"api_key":"$FakeAnthropic"}"""), recorder)
+    val _                           = MaskedCopy.maskBody(parse(s"""{"api_key":"$FakeAnthropic"}"""), recorder)
     Result.all(
       List(
         Result.assert(queried.contains("$.api_key")).log(s"field id not queried: $queried"),
-        Result.assert(!queried.contains("$.api_key#0"))
+        Result
+          .assert(!queried.contains("$.api_key#0"))
           .log(s"interior token id queried despite masked field: $queried"),
       )
     )
@@ -313,23 +334,24 @@ object MaskedCopySpec extends Properties {
      * embedded token. No newlines, so the long string renders as a
      * single expanded slice with absolute offsets. */
     val longStr = ("x" * 150) + FakeAnthropic + ("y" * 200)
-    val json =
+    val json    =
       s"""{"a":{"api_key":"$FakeAnthropic","note":"has $FakeAnthropic inside"},""" +
         s""""arr":[{"id":"$FakeMsgId"},"plain"],"long":"$longStr","n":42}"""
-    val value = parse(json)
+    val value   = parse(json)
 
     AppState.jtId = 0
     AppState.jtLine = 0
     AppState.maskOverrides.clear()
     AppState.presenterMaskAll = true
-    val html   = JsonTreeView.buildJsonFrag(value, stringify(value).length).render
-    val attrRe = ("data-(?:mask|token|corr)-id=\"([^\"]+)\"").r
+    val html        = JsonTreeView.buildJsonFrag(value, stringify(value).length).render
+    val attrRe      = ("data-(?:mask|token|corr)-id=\"([^\"]+)\"").r
     val renderedIds = attrRe.findAllMatchIn(html).map(_.group(1)).toSet
 
     val queried = scala.collection.mutable.Set.empty[String]
     val _       = MaskedCopy.maskBody(value, { id => queried += id; false })
 
-    Result.assert(queried.toSet == renderedIds)
+    Result
+      .assert(queried.toSet == renderedIds)
       .log(s"render ids: $renderedIds\ncopy ids: ${queried.toSet}")
   }
 }

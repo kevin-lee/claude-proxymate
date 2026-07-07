@@ -1,5 +1,6 @@
 package claudeproxymate.renderer.messages
 
+import claudeproxymate.renderer.messages.MsgContent.*
 import claudeproxymate.renderer.state.AppState
 import hedgehog.*
 import hedgehog.runner.*
@@ -29,10 +30,11 @@ object MessageRendererSpec extends Properties {
     js.Dynamic.literal("role" -> role, "content" -> js.Array(textBlock(text)))
 
   private def requestEntry(messages: js.Dynamic*): js.Dynamic =
-    js.Dynamic.literal(
-      "id"   -> 1,
-      "body" -> js.Dynamic.literal("messages" -> js.Array(messages*)),
-    )
+    js.Dynamic
+      .literal(
+        "id"   -> 1,
+        "body" -> js.Dynamic.literal("messages" -> js.Array(messages*)),
+      )
 
   private def withResponse(entry: js.Dynamic, responseBody: js.Any): js.Dynamic = {
     entry.updateDynamic("response")(js.Dynamic.literal("status" -> 200, "body" -> responseBody))
@@ -40,11 +42,12 @@ object MessageRendererSpec extends Properties {
   }
 
   private def assistantResponseBody(text: String): js.Dynamic =
-    js.Dynamic.literal(
-      "role"    -> "assistant",
-      "type"    -> "message",
-      "content" -> js.Array(textBlock(text)),
-    )
+    js.Dynamic
+      .literal(
+        "role"    -> "assistant",
+        "type"    -> "message",
+        "content" -> js.Array(textBlock(text)),
+      )
 
   private def visibleCards(entry: js.Dynamic, filter: String): List[MsgCard] = {
     AppState.msgFilter = filter
@@ -65,8 +68,10 @@ object MessageRendererSpec extends Properties {
   def testResponseAppended: Result = {
     val entry = withResponse(requestEntry(message("user", "hello")), assistantResponseBody("hi there"))
     val cards = visibleCards(entry, filter = "all")
-    (Result.assert(cards.map(_.role) == List("user", "assistant")).log(s"cards: $cards")
-      .and(Result.assert(cards.lastOption.map(cardText).contains("hi there")).log(s"cards: $cards")))
+    Result
+      .assert(cards.map(_.role) == List("user", "assistant"))
+      .log(s"cards: $cards")
+      .and(Result.assert(cards.lastOption.map(cardText).contains("hi there")).log(s"cards: $cards"))
   }
 
   def testResponseRawIdx: Result = {
@@ -85,12 +90,14 @@ object MessageRendererSpec extends Properties {
   }
 
   def testErrorObjectResponseIgnored: Result = {
-    val errorBody = js.Dynamic.literal(
-      "type"  -> "error",
-      "error" -> js.Dynamic.literal("type" -> "overloaded_error", "message" -> "Overloaded"),
-    )
-    val entry = withResponse(requestEntry(message("user", "hello")), errorBody)
-    val cards = visibleCards(entry, filter = "all")
+    val errorBody = js
+      .Dynamic
+      .literal(
+        "type"  -> "error",
+        "error" -> js.Dynamic.literal("type" -> "overloaded_error", "message" -> "Overloaded"),
+      )
+    val entry     = withResponse(requestEntry(message("user", "hello")), errorBody)
+    val cards     = visibleCards(entry, filter = "all")
     Result.assert(cards.map(_.role) == List("user")).log(s"cards: $cards")
   }
 
@@ -103,13 +110,15 @@ object MessageRendererSpec extends Properties {
   def testAssistantFilterIncludesResponse: Result = {
     val entry = withResponse(requestEntry(message("user", "hello")), assistantResponseBody("hi"))
     val cards = visibleCards(entry, filter = "assistant")
-    (Result.assert(cards.map(_.role) == List("assistant")).log(s"cards: $cards")
-      .and(Result.assert(cards.headOption.map(cardText).contains("hi")).log(s"cards: $cards")))
+    Result
+      .assert(cards.map(_.role) == List("assistant"))
+      .log(s"cards: $cards")
+      .and(Result.assert(cards.headOption.map(cardText).contains("hi")).log(s"cards: $cards"))
   }
 
   def testNonMutating: Result = {
-    val entry = withResponse(requestEntry(message("user", "hello")), assistantResponseBody("hi"))
-    val _     = visibleCards(entry, filter = "all")
+    val entry   = withResponse(requestEntry(message("user", "hello")), assistantResponseBody("hi"))
+    val _       = visibleCards(entry, filter = "all")
     val reqMsgs = entry.body.messages.asInstanceOf[js.Array[js.Dynamic]]
     Result.assert(reqMsgs.length == 1).log(s"request messages length: ${reqMsgs.length}")
   }
