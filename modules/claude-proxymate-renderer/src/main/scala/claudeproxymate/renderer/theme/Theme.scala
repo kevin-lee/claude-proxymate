@@ -61,7 +61,7 @@ object Theme {
     * undefined at the inline-handler call site).
     */
   def install(): Unit =
-    dom.document.addEventListener("click", handleClick _)
+    dom.document.addEventListener("click", handleClick(_))
 
   private def handleClick(e: dom.MouseEvent): Unit = {
     val target = e.target.asInstanceOf[dom.Element]

@@ -39,7 +39,7 @@ object CurlHttpClient {
     headers: Headers,
     body: Array[Byte],
   ): Response[IO] = {
-    Zone { implicit z =>
+    Zone {
       val curl = LibCurl.curl_easy_init()
       if (curl == null) {
         ProxyErrorHttp4s.asResponse(ProxyError.CurlInitFailed)
@@ -64,7 +64,7 @@ object CurlHttpClient {
 
           // Request body
           if (body.nonEmpty) {
-            val bodyPtr = alloc[Byte](body.length.toULong)
+            val bodyPtr = alloc[Byte](body.length.toUSize)
             (0 until body.length).foreach { i =>
               !(bodyPtr + i) = body(i)
             }
@@ -101,8 +101,8 @@ object CurlHttpClient {
           val fileSize = stdio.ftell(tmpFile).toInt
           stdio.rewind(tmpFile)
 
-          val buf = alloc[Byte](fileSize.toULong)
-          stdio.fread(buf, 1.toULong, fileSize.toULong, tmpFile): Unit
+          val buf = alloc[Byte](fileSize.toUSize)
+          stdio.fread(buf, 1.toUSize, fileSize.toUSize, tmpFile): Unit
 
           val respData = new Array[Byte](fileSize)
           (0 until fileSize).foreach { j =>

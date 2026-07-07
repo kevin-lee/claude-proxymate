@@ -18,7 +18,7 @@ object DtabListeners {
   val DtabDataAttr: String = "data-dtab"
 
   def install(): Unit =
-    dom.document.addEventListener("click", handleClick _)
+    dom.document.addEventListener("click", handleClick(_))
 
   private def handleClick(e: dom.MouseEvent): Unit = {
     val target = e.target.asInstanceOf[dom.Element]

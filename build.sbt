@@ -42,7 +42,9 @@ lazy val root = (project in file("."))
   .aggregate(coreJvm, coreJs, coreNative, proxyServer, electron, preload, renderer)
 
 // Core cross-project: JVM + JS + Native
-// Note: hedgehog tests only run on JVM and JS (hedgehog does not publish for SN 0.4)
+/* Note: hedgehog tests run on JVM and JS only. The hedgehog runner hangs at test
+ * execution on Scala Native 0.5 (compile and link succeed), so the Native platform
+ * excludes the shared hedgehog specs and uses munit for Native-only tests instead. */
 lazy val core =
   module("core", crossProject(JVMPlatform, JSPlatform, NativePlatform).crossType(CrossType.Full))
     .enablePlugins(BuildInfoPlugin)
@@ -69,6 +71,11 @@ lazy val core =
       Test / javaOptions += s"-Di18n.dir=${(ThisBuild / baseDirectory).value / "i18n"}",
     )
     .jsSettings(libraryDependencies ++= libs.tests.hedgehog.value)
+    .nativeSettings(
+      libraryDependencies ++= libs.tests.munitNative.value,
+      /* The shared specs are hedgehog-based, so they are excluded on Native. */
+      Test / unmanagedSourceDirectories := (Test / unmanagedSourceDirectories).value.filterNot(_.getPath.contains("shared")),
+    )
 
 lazy val coreJvm    = core.jvm
 lazy val coreJs     = core.js.settings(jsSettingsForFuture)
@@ -340,7 +347,7 @@ lazy val props = new {
   val RepoName       = gitHubRepo.fold("claude-proxymate")(_.nameToString)
   val ProjectName    = RepoName
 
-  val ScalaVersion = "3.3.7"
+  val ScalaVersion = "3.8.4"
 
   val Org     = "io.kevinlee"
   val OrgName = "Kevin's Code"
@@ -355,22 +362,21 @@ lazy val props = new {
 
   val AuthorEmail = "kevin.code@kevinlee.io"
 
-  /* Note: Scala Native 0.4.17 required because http4s 0.23.33 does not yet publish for Scala Native 0.5 */
-  val CirceVersion = "0.14.8"
+  val CirceVersion = "0.14.16"
 
-  val CatsVersion = "2.11.0"
+  val CatsVersion = "2.13.0"
 
-  val CatsEffectVersion = "3.5.7"
+  val CatsEffectVersion = "3.7.0"
 
-  val Http4sVersion = "0.23.33"
+  val Http4sVersion = "0.23.34"
 
-  val Fs2Version = "3.11.0"
+  val Fs2Version = "3.13.0"
 
-  val ScalaJsDomVersion = "2.8.0"
+  val ScalaJsDomVersion = "2.8.1"
 
-  val HedgehogVersion = "0.13.0"
+  val HedgehogVersion = "0.13.1"
 
-  val MunitVersion = "1.0.0"
+  val MunitVersion = "1.3.3"
 
   val ScalatagsVersion = "0.13.1"
 
@@ -413,15 +419,6 @@ lazy val libs = new {
     Def.setting("com.lihaoyi" %%% "scalatags" % props.ScalatagsVersion)
 
   lazy val tests = new {
-    // hedgehog supports only Scala Native 0.5, so use it for only JVM and JS
-//    lazy val hedgehogJvm = Def.setting(
-//      List(
-//        "qa.hedgehog" %% "hedgehog-core"   % props.HedgehogVersion % Test,
-//        "qa.hedgehog" %% "hedgehog-runner" % props.HedgehogVersion % Test,
-//        "qa.hedgehog" %% "hedgehog-sbt"    % props.HedgehogVersion % Test,
-//      )
-//    )
-
     lazy val hedgehog = Def.setting(
       List(
         "qa.hedgehog" %%% "hedgehog-core"   % props.HedgehogVersion % Test,
@@ -430,7 +427,7 @@ lazy val libs = new {
       )
     )
 
-    // munit is used by the Scala Native server module where hedgehog isn't published.
+    /* munit is used by the Scala Native modules (hedgehog's runner hangs on SN 0.5). */
     lazy val munitNative = Def.setting(
       List(
         "org.scalameta" %%% "munit" % props.MunitVersion % Test,
@@ -458,7 +455,6 @@ def module(projectName: String, crossProject: CrossProject.Builder): CrossProjec
       name := prefixedName,
       fork := true,
       scalacOptions ++= List("-no-indent", "-explain"),
-      // Note: hedgehog test deps added per-platform (not available on SN 0.4)
       licenses := props.licenses,
     )
 }

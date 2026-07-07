@@ -210,11 +210,11 @@ sbt compile
 
 ### Run tests
 
-Tests are written with [hedgehog](https://github.com/hedgehogqa/scala-hedgehog) (property-based) on the JVM and Scala.js, and [munit](https://scalameta.org/munit/) on Scala Native (where hedgehog isn't published for SN 0.4). 33 spec files in total.
+Tests are written with [hedgehog](https://github.com/hedgehogqa/scala-hedgehog) (property-based) on the JVM and Scala.js, and [munit](https://scalameta.org/munit/) on Scala Native (the hedgehog test runner hangs on SN 0.5, so the Native platform runs deterministic munit ports of the shared core specs). 43 spec files in total.
 
 ```bash
-# All tests (core on JVM + JS, renderer on JS, server on Native)
-sbt "coreJVM/test; coreJS/test; renderer/test; proxyServer/test"
+# All tests (core on JVM + JS + Native, renderer on JS, server on Native)
+sbt "coreJVM/test; coreJS/test; coreNative/test; renderer/test; proxyServer/test"
 
 # Core only — SSE/CLAUDE.md/mechanism parsers, Request Anatomy,
 #             masking primitives, JSON-line protocol, i18n loader, HTML gen
@@ -464,22 +464,20 @@ claude-proxymate/
 
 | Component    | Technology                                 | Version          |
 |--------------|--------------------------------------------|------------------|
-| Language     | Scala 3                                    | 3.3.7 (LTS)      |
+| Language     | Scala 3                                    | 3.8.4            |
 | Build        | sbt                                        | 1.12.5           |
 | Build info   | sbt-buildinfo                              | 0.13.1           |
-| JSON         | circe                                      | 0.14.8           |
-| HTTP server  | http4s Ember                               | 0.23.33          |
-| HTTPS client | libcurl FFI (default) / http4s Ember + s2n | system / 0.23.33 |
-| Streaming    | fs2                                        | 3.11.0           |
-| Effects      | cats-effect                                | 3.5.7            |
-| Native       | Scala Native                               | 0.4.17           |
-| JS           | Scala.js                                   | 1.20.2           |
+| JSON         | circe                                      | 0.14.16          |
+| HTTP server  | http4s Ember                               | 0.23.34          |
+| HTTPS client | libcurl FFI (default) / http4s Ember + s2n | system / 0.23.34 |
+| Streaming    | fs2                                        | 3.13.0           |
+| Effects      | cats-effect                                | 3.7.0            |
+| Native       | Scala Native                               | 0.5.12           |
+| JS           | Scala.js                                   | 1.22.0           |
 | HTML/views   | ScalaTags                                  | 0.13.1           |
-| DOM          | scalajs-dom                                | 2.8.0            |
+| DOM          | scalajs-dom                                | 2.8.1            |
 | Desktop      | Electron                                   | 41.x             |
-| Tests        | hedgehog (JVM/JS) / munit (Native)         | 0.13.0 / 1.0.0   |
-
-> Scala Native is pinned to 0.4.17 because http4s 0.23.33 does not yet publish for Scala Native 0.5.
+| Tests        | hedgehog (JVM/JS) / munit (Native)         | 0.13.1 / 1.3.3   |
 
 ## License
 
