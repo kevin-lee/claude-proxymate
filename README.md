@@ -479,7 +479,7 @@ claude-proxymate/
 | Desktop      | Electron                                   | 41.x             |
 | Tests        | hedgehog (JVM/JS) / munit (Native)         | 0.13.0 / 1.0.0   |
 
-> Scala Native is pinned to 0.4.17 because http4s-curl does not yet publish for Scala Native 0.5.
+> Scala Native is pinned to 0.4.17 because http4s 0.23.33 does not yet publish for Scala Native 0.5.
 
 ## License
 
