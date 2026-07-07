@@ -16,8 +16,8 @@ import org.scalajs.dom
 object ProxyInfoPopover {
 
   def install(): Unit = {
-    dom.document.addEventListener("click", handleClick _)
-    dom.document.addEventListener("keydown", escapeKeyHandler _)
+    dom.document.addEventListener("click", handleClick(_))
+    dom.document.addEventListener("keydown", escapeKeyHandler(_))
   }
 
   private def handleClick(e: dom.MouseEvent): Unit = {

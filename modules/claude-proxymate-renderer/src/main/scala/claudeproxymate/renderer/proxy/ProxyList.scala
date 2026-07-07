@@ -22,7 +22,7 @@ object ProxyList {
     * `.prx-entry[data-id]` clicks. Called from RendererMain.
     */
   def install(): Unit = {
-    dom.document.addEventListener("click", handleClick _)
+    dom.document.addEventListener("click", handleClick(_))
   }
 
   private def handleClick(e: dom.MouseEvent): Unit = {

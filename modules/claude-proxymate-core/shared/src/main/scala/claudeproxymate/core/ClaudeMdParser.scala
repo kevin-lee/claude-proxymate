@@ -8,9 +8,12 @@ import scala.util.matching.Regex
   */
 object ClaudeMdParser {
 
-  // (?s) enables DOTALL so . matches newlines (equivalent to [\s\S] in JS)
-  private val sectionPattern: Regex =
-    """(?s)Contents of (.+?) \((.+?)\):\n\n(.*?)(?=\n\nContents of |\s*$)""".r
+  /* Scala Native's java.util.regex is RE2-based and rejects lookahead, so only the
+   * section header is matched here; each body is sliced between consecutive header
+   * matches. Equivalent to the old `(.*?)(?=\n\nContents of |\s*$)` capture because
+   * the body is trimmed either way. */
+  private val headerPattern: Regex =
+    """Contents of (.+?) \((.+?)\):\n\n""".r
 
   private val globalPattern: Regex     = "(?i)global|private global".r
   private val memoryDescPattern: Regex = "(?i)memory".r
@@ -19,12 +22,14 @@ object ClaudeMdParser {
   private val claudeMdPattern: Regex   = "(?i)CLAUDE\\.md$".r
 
   def parseClaudeMdSections(inner: String): List[Section] = {
-    sectionPattern
-      .findAllMatchIn(inner)
-      .map { m =>
+    val headers = headerPattern.findAllMatchIn(inner).toList
+    headers
+      .zipWithIndex
+      .map { case (m, i) =>
         val path    = m.group(1)
         val desc    = m.group(2)
-        val content = m.group(3).trim
+        val bodyEnd = headers.lift(i + 1).fold(inner.length)(_.start)
+        val content = inner.substring(m.end, bodyEnd).trim
         val fname   = path.split('/').last
 
         val isGlobal = globalPattern.findFirstIn(desc).isDefined
@@ -46,6 +51,5 @@ object ClaudeMdParser {
         val scope = if (isGlobal) "global" else "local"
         Section(label, path, content, cls, scope)
       }
-      .toList
   }
 }

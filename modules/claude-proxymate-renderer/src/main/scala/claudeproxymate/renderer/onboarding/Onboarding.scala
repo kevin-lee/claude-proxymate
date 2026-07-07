@@ -21,8 +21,8 @@ object Onboarding {
   private var currentSlide: Int = 0
 
   def install(): Unit = {
-    dom.document.addEventListener("click", handleClick _)
-    dom.document.addEventListener("keydown", handleKeydown _)
+    dom.document.addEventListener("click", handleClick(_))
+    dom.document.addEventListener("keydown", handleKeydown(_))
   }
 
   private def handleClick(e: dom.MouseEvent): Unit = {

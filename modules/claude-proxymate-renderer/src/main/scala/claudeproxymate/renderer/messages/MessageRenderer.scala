@@ -23,10 +23,10 @@ object MessageRenderer {
 
   /** Install the document-level listeners. Called from RendererMain. */
   def install(): Unit = {
-    dom.document.addEventListener("click", handleClick _)
-    dom.document.addEventListener("input", handleInput _)
-    dom.document.addEventListener("compositionstart", handleCompositionStart _)
-    dom.document.addEventListener("compositionend", handleCompositionEnd _)
+    dom.document.addEventListener("click", handleClick(_))
+    dom.document.addEventListener("input", handleInput(_))
+    dom.document.addEventListener("compositionstart", handleCompositionStart(_))
+    dom.document.addEventListener("compositionend", handleCompositionEnd(_))
   }
 
   private def handleClick(e: dom.MouseEvent): Unit = {

@@ -27,8 +27,8 @@ object ProxyControl {
     * `onclick="toggleProxy()"`.
     */
   def install(): Unit = {
-    dom.document.addEventListener("click", handleClick _)
-    dom.document.addEventListener("input", handleInput _)
+    dom.document.addEventListener("click", handleClick(_))
+    dom.document.addEventListener("input", handleInput(_))
   }
 
   private def handleClick(e: dom.MouseEvent): Unit = {
