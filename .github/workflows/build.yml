@@ -1,0 +1,98 @@
+name: Build
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: sbt/setup-sbt@v1
+
+      - name: Run core tests
+        run: sbt "coreJVM/test; coreJS/test; coreNative/test; proxyServer/test; renderer/test"
+
+  electron-mac:
+    needs: test
+    if: github.event_name != 'pull_request'
+    runs-on: macos-latest
+    # Scala.js fullLinkJS (Closure full optimization) is heap-hungry; the sbt
+    # launcher default of 1 GB OOMs during the renderer link. .jvmopts sets the
+    # heap for local + CI builds; this reasserts it in CI in case a runner image
+    # ignores .jvmopts. Keep in sync with release.yml.
+    env:
+      SBT_OPTS: "-Xms1G -Xmx4G -XX:+UseG1GC -XX:ReservedCodeCacheSize=512m"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: sbt/setup-sbt@v1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Build binary for production
+        run: sbt prodUi
+
+      - name: Install Electron dependencies
+        run: cd electron-app && npm install
+
+      # Smoke check only: no signing credentials are passed, so electron-builder
+      # ad-hoc signs and skips notarization (graceful degradation, verified in
+      # release.yml's comments). This deliberately avoids the slow notarization
+      # round-trip.
+      - name: Package with electron-builder (unsigned)
+        run: cd electron-app && npx electron-builder --mac --arm64
+
+      # Reduced version of release.yml's verify: this job never has signing
+      # credentials, so only the ad-hoc seal + arch checks apply (no
+      # Developer-ID / spctl / stapler branch).
+      - name: Verify DMG (unsigned smoke)
+        run: |
+          set -euo pipefail
+          cd electron-app/release
+          DMGS=(*.dmg)
+          if [ "${#DMGS[@]}" -ne 1 ]; then
+            echo "Expected exactly 1 arm64 DMG, got: ${DMGS[*]}"
+            exit 1
+          fi
+          hdiutil verify "${DMGS[0]}"
+          MNT=$(hdiutil attach "${DMGS[0]}" -nobrowse -readonly | awk -F'\t' '/\/Volumes\//{print $NF}')
+          trap 'hdiutil detach "$MNT" -quiet' EXIT
+          # At minimum an ad-hoc signature with a valid resource seal; a
+          # seal-less app is reported by macOS as "damaged" with no recovery.
+          codesign --verify --deep --strict "$MNT/Claude Proxymate.app"
+          for bin in "Contents/MacOS/Claude Proxymate" "Contents/Resources/claude-proxymate"; do
+            ARCH_INFO=$(file "$MNT/Claude Proxymate.app/$bin")
+            echo "$ARCH_INFO"
+            if ! echo "$ARCH_INFO" | grep -q "arm64"; then
+              echo "ERROR: $bin is not arm64"
+              exit 1
+            fi
+          done
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-arm64
+          path: electron-app/release/*-arm64.dmg
