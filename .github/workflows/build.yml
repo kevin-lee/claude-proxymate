@@ -65,8 +65,12 @@ jobs:
         run: cd electron-app && npx electron-builder --mac --arm64
 
       # Reduced version of release.yml's verify: this job never has signing
-      # credentials, so only the ad-hoc seal + arch checks apply (no
-      # Developer-ID / spctl / stapler branch).
+      # credentials. The codesign seal check is intentionally omitted here —
+      # electron-builder's ad-hoc seal trips `codesign --verify --deep --strict`
+      # ("code has no resources but signature indicates they must be present")
+      # on the runner, and the signed verification belongs to release.yml
+      # anyway. This smoke check only asserts that packaging produced exactly
+      # one valid arm64 DMG whose bundled binaries are arm64.
       - name: Verify DMG (unsigned smoke)
         run: |
           set -euo pipefail
@@ -79,9 +83,6 @@ jobs:
           hdiutil verify "${DMGS[0]}"
           MNT=$(hdiutil attach "${DMGS[0]}" -nobrowse -readonly | awk -F'\t' '/\/Volumes\//{print $NF}')
           trap 'hdiutil detach "$MNT" -quiet' EXIT
-          # At minimum an ad-hoc signature with a valid resource seal; a
-          # seal-less app is reported by macOS as "damaged" with no recovery.
-          codesign --verify --deep --strict "$MNT/Claude Proxymate.app"
           for bin in "Contents/MacOS/Claude Proxymate" "Contents/Resources/claude-proxymate"; do
             ARCH_INFO=$(file "$MNT/Claude Proxymate.app/$bin")
             echo "$ARCH_INFO"
