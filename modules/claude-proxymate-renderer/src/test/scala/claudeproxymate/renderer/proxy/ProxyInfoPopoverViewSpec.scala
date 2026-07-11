@@ -1,5 +1,6 @@
 package claudeproxymate.renderer.proxy
 
+import claudeproxymate.renderer.detail.TokenPopoverLinks
 import hedgehog.*
 import hedgehog.runner.*
 
@@ -9,19 +10,20 @@ object ProxyInfoPopoverViewSpec extends Properties {
     example("buildPopoverFrag contains title class", testTitleClass),
     example("buildPopoverFrag contains body class", testBodyClass),
     example("buildPopoverFrag renders title text", testTitleText),
-    example("buildPopoverFrag renders {{br}} in desc as <br />", testDescBrRendered),
-    example("buildPopoverFrag does not leak literal {{br}}", testNoLiteralBrToken),
-    example("buildPopoverFrag preserves unknown {{foo}} as literal", testUnknownTokenLiteral),
-    example("buildPopoverFrag with empty desc still renders title", testEmptyDesc),
-    property("buildPopoverFrag never leaks raw <script> from title or desc", testNoScriptLeak),
+    example("buildPopoverFrag contains website link href", testWebsiteHref),
+    example("buildPopoverFrag contains bug report link href", testIssuesHref),
+    example("buildPopoverFrag links carry external-link, _blank and noopener", testLinkAttrs),
+    example("buildPopoverFrag renders both link labels", testLinkLabels),
+    property("buildPopoverFrag never leaks raw <script> from labels", testNoScriptLeak),
   )
 
   private def render(labels: ProxyInfoPopoverLabels): String =
     ProxyInfoPopoverView.buildPopoverFrag(labels).render
 
   private val sampleLabels = ProxyInfoPopoverLabels(
-    title = "⚡ Live API Traffic Intercept",
-    desc = "Intercepts API requests from the Claude Code CLI.{{br}}Start the proxy, then run Claude Code.",
+    title = "About Claude Proxymate",
+    websiteLabel = "Website",
+    bugReportLabel = "Report a bug",
   )
 
   def testTitleClass: Result =
@@ -36,33 +38,41 @@ object ProxyInfoPopoverViewSpec extends Properties {
 
   def testTitleText: Result =
     Result
-      .assert(render(sampleLabels).contains("⚡ Live API Traffic Intercept"))
+      .assert(render(sampleLabels).contains("About Claude Proxymate"))
       .log(render(sampleLabels))
 
-  def testDescBrRendered: Result =
+  def testWebsiteHref: Result =
     Result
-      .assert(render(sampleLabels).contains("<br />"))
+      .assert(render(sampleLabels).contains(s"""href="${ProxyInfoPopoverView.WebsiteHref}""""))
       .log(render(sampleLabels))
 
-  def testNoLiteralBrToken: Result = {
-    val html = render(sampleLabels)
-    Result.assert(!html.contains("{{br}}")).log(s"literal {{br}} leaked: $html")
-  }
+  def testIssuesHref: Result =
+    Result
+      .assert(render(sampleLabels).contains(s"""href="${ProxyInfoPopoverView.IssuesHref}""""))
+      .log(render(sampleLabels))
 
-  def testUnknownTokenLiteral: Result = {
-    val html = render(sampleLabels.copy(desc = "before {{foo}}x{{/foo}} after"))
+  def testLinkAttrs: Result = {
+    val html = render(sampleLabels)
     Result.all(
       List(
-        Result.assert(html.contains("{{foo}}")).log(s"opening not literal: $html"),
-        Result.assert(html.contains("{{/foo}}")).log(s"closing not literal: $html"),
-        Result.assert(!html.contains("<foo")).log(s"leaked tag: $html"),
+        (html.split(TokenPopoverLinks.ExternalLinkClass, -1).length - 1 ==== 2)
+          .log(s"expected 2 external-link anchors: $html"),
+        (html.split("""target="_blank"""", -1).length - 1 ==== 2)
+          .log(s"expected 2 target=_blank anchors: $html"),
+        (html.split("""rel="noopener"""", -1).length - 1 ==== 2)
+          .log(s"expected 2 rel=noopener anchors: $html"),
       )
     )
   }
 
-  def testEmptyDesc: Result = {
-    val html = render(sampleLabels.copy(desc = ""))
-    Result.assert(html.contains("⚡ Live API Traffic Intercept")).log(html)
+  def testLinkLabels: Result = {
+    val html = render(sampleLabels)
+    Result.all(
+      List(
+        Result.assert(html.contains("Website")).log(s"website label missing: $html"),
+        Result.assert(html.contains("Report a bug")).log(s"bug report label missing: $html"),
+      )
+    )
   }
 
   def testNoScriptLeak: Property =
@@ -72,7 +82,8 @@ object ProxyInfoPopoverViewSpec extends Properties {
       val payload = s"<script>alert('$evil')</script>"
       val labels  = ProxyInfoPopoverLabels(
         title = payload,
-        desc = s"line1 {{br}} $payload",
+        websiteLabel = payload,
+        bugReportLabel = payload,
       )
       val html    = render(labels)
       Result

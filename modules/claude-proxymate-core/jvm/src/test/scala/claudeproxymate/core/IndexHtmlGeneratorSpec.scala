@@ -41,7 +41,7 @@ object IndexHtmlGeneratorSpec extends Properties {
     "proxy.startFirst"         -> "startFirst",
     "proxy.startProxy"         -> "startProxy",
     "proxy.clear"              -> "clear",
-    "proxy.interceptTitle"     -> "intercept",
+    "proxy.aboutTitle"         -> "about",
     "proxy.capturedRequests"   -> "captured",
     "proxy.noCapturesTitle"    -> "noCapturesTitle",
     "proxy.selectRequestTitle" -> "selectRequestTitle",
