@@ -43,8 +43,9 @@ object ProxyInfoPopover {
       val pop    = dom.document.createElement("div").asInstanceOf[dom.html.Div]
       pop.className = ProxyInfoPopoverView.PopoverClass
       val labels = ProxyInfoPopoverLabels(
-        title = I18n.t("proxy.interceptTitle"),
-        desc = I18n.t("proxy.interceptDesc"),
+        title = I18n.t("proxy.aboutTitle"),
+        websiteLabel = I18n.t("proxy.aboutWebsite"),
+        bugReportLabel = I18n.t("proxy.aboutBugReport"),
       )
       ViewHelpers.setInnerHtml(pop, ProxyInfoPopoverView.buildPopoverFrag(labels))
       locally { val _ = bar.appendChild(pop) }

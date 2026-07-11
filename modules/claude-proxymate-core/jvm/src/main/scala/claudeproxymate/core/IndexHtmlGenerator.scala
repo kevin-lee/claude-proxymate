@@ -274,7 +274,7 @@ object IndexHtmlGenerator {
           id := HtmlIds.ProxyInfoBtn,
           cls := "proxy-bar-info",
           attr("aria-label") := "Info",
-          attr("title") := tx(m, "proxy.interceptTitle"),
+          attr("title") := tx(m, "proxy.aboutTitle"),
         )("\u2139"),
       ),
     )
