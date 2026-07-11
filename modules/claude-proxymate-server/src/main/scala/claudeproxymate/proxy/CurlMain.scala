@@ -1,6 +1,6 @@
 package claudeproxymate.proxy
 
-import cats.effect.{IO, IOApp}
+import cats.effect.{ExitCode, IO, IOApp}
 import com.comcast.ip4s.*
 import org.http4s.ember.server.EmberServerBuilder
 import claudeproxymate.core.ProxyEvent
@@ -14,22 +14,10 @@ import claudeproxymate.core.ProxyEvent
   *   Compile / mainClass := Some("claudeproxymate.proxy.CurlMain")  // libcurl (default)
   *   Compile / mainClass := Some("claudeproxymate.proxy.Main")      // s2n
   */
-object CurlMain extends IOApp.Simple {
+object CurlMain extends IOApp {
 
-  private def parsePort(args: List[String]): Int = {
-    args match {
-      case "--port" :: portStr :: _ =>
-        portStr.toIntOption.filter(p => p >= 1024 && p <= 65535).getOrElse(8888)
-      case _ :: rest => parsePort(rest)
-      case Nil => 8888
-    }
-  }
-
-  override def run: IO[Unit] = {
-    val portNum = parsePort(
-      sys.props.get("sun.java.command").map(_.split("\\s+").toList).getOrElse(Nil)
-    )
-    val port    = Port.fromInt(portNum).getOrElse(port"8888")
+  override def run(args: List[String]): IO[ExitCode] = {
+    val port = Port.fromInt(PortArg.parse(args)).getOrElse(port"8888")
 
     EmberServerBuilder
       .default[IO]
@@ -43,5 +31,12 @@ object CurlMain extends IOApp.Simple {
           _ <- IO.never[Unit]
         } yield ()
       }
+      .handleErrorWith { e =>
+        /* Bind/startup failures must reach the Electron main process as a
+         * protocol event (stdout); the stack trace still goes to stderr. */
+        EventEmitter.emit(ProxyEvent.ProxyError(Option(e.getMessage).getOrElse(e.getClass.getName))) *>
+          IO.raiseError(e)
+      }
+      .as(ExitCode.Success)
   }
 }

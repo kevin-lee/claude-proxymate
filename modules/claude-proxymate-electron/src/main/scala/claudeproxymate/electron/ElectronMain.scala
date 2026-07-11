@@ -23,6 +23,10 @@ object ElectronMain {
         Analytics.init(ElectronApp.getPath("userData"))
         Analytics.trackEvent("app_open")
 
+        /* Remove ANTHROPIC_BASE_URL residue a crashed previous run may
+         * have left in VS Code settings (record-driven, see VsCodeSync). */
+        VsCodeSync.sweepOnLaunch()
+
         if (platform === "darwin") {
           try {
             val _ = ElectronApp
@@ -58,6 +62,9 @@ object ElectronMain {
     ElectronApp.on(
       "before-quit",
       { () =>
+        /* Disable + remove first so the child-exit event from the kill
+         * below finds the sync already off and no-ops. */
+        VsCodeSync.onQuit()
         IpcHandlers.stopProxyIfRunning()
       }
     )

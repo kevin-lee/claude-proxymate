@@ -230,6 +230,12 @@
     .proxy-bar-btn-primary { padding: 6px 14px; font-size: 12px; flex: 0 0 auto; }
     .proxy-bar-btn-clear { padding: 6px 12px; font-size: 12px; flex: 0 0 auto; }
     .proxy-bar-btn-mask  { padding: 6px 12px; font-size: 12px; flex: 0 0 auto; white-space: nowrap; }
+    .proxy-bar-btn-vscode { padding: 6px 12px; font-size: 12px; flex: 0 0 auto; white-space: nowrap; }
+    .proxy-bar-btn-vscode.on {
+      color: var(--green);
+      border-color: color-mix(in srgb, var(--green) 45%, transparent);
+      background: color-mix(in srgb, var(--green) 10%, transparent);
+    }
 
     /* C3 PR 5 — presenter-mode state chip (status indicator next to
        Stopped/Running). Echoes mask.toggle button text but compact. */

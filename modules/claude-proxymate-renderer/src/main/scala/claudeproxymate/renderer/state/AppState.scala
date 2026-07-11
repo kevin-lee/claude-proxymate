@@ -22,6 +22,11 @@ object AppState {
   var proxyRunning: Boolean                 = false
   var proxyActualPort: Int                  = 8888
 
+  // VS Code ANTHROPIC_BASE_URL auto-sync toggle (mirrors the main
+  // process's VsCodeSync state; authoritative value comes from
+  // proxyStatus() / vscodeSyncSet() results)
+  var vscodeSyncEnabled: Boolean = false
+
   // Badge toggle
   var activeBadgeUid: Option[String] = none[String]
 
