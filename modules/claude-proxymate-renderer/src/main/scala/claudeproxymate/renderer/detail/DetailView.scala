@@ -24,7 +24,7 @@ import scala.scalajs.js
   */
 object DetailView {
 
-  private val PricingDate = "2026-04-20"
+  private val PricingDate = "2026-07-10"
 
   def renderProxyDetail(): Unit = {
     val entry  = AppState.proxyCaptures.find(e => e.id == AppState.selectedProxyId.map(_.asInstanceOf[js.Any]).orNull)
