@@ -10,8 +10,16 @@ import scala.scalajs.js.JSON
 /** Google Analytics 4 integration. Ports analytics.js. */
 object Analytics {
 
-  private val MeasurementId = sys.env.getOrElse("GA_MEASUREMENT_ID", "")
-  private val ApiSecret     = sys.env.getOrElse("GA_API_SECRET", "")
+  /* Build-time values from the generated AnalyticsConfig; the env lookup only
+   * serves local dev runs, since end users never have these variables set. */
+  private val MeasurementId =
+    Option(AnalyticsConfig.measurementId)
+      .filter(_.nonEmpty)
+      .getOrElse(sys.env.getOrElse("GA_MEASUREMENT_ID", ""))
+  private val ApiSecret =
+    Option(AnalyticsConfig.apiSecret)
+      .filter(_.nonEmpty)
+      .getOrElse(sys.env.getOrElse("GA_API_SECRET", ""))
 
   final private case class State(
     clientId: Option[String],
