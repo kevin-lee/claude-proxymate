@@ -34,7 +34,15 @@ object IpcHandlers {
     IpcMain.handle(
       IpcChannels.ProxyStop,
       { (_: js.Dynamic, _: js.Dynamic) =>
-        stopProxy()
+        stopProxy(getMainWindow)
+      }: js.Function2[js.Dynamic, js.Dynamic, js.Any]
+    )
+
+    IpcMain.handle(
+      IpcChannels.VsCodeSyncSet,
+      { (_: js.Dynamic, enabledArg: js.Dynamic) =>
+        val enabled = !js.isUndefined(enabledArg) && enabledArg != null && enabledArg.asInstanceOf[Boolean]
+        VsCodeSync.setEnabled(enabled, getMainWindow)
       }: js.Function2[js.Dynamic, js.Dynamic, js.Any]
     )
 
@@ -146,6 +154,8 @@ object IpcHandlers {
             "exit",
             { (_: js.Any) =>
               state.set(ProxyState.empty)
+              VsCodeSync.onProxyStopped(getMainWindow)
+              pushProxyState(js.Dynamic.literal(state = "stopped"), getMainWindow)
             }: js.Function1[js.Any, Unit]
           )
 
@@ -153,6 +163,11 @@ object IpcHandlers {
             "error",
             { (_: js.Any) =>
               state.updateAndGet(s => s.copy(process = none[ChildProcess], port = none[Int])): Unit
+              VsCodeSync.onProxyStopped(getMainWindow)
+              pushProxyState(
+                js.Dynamic.literal(state = "error", message = "failed to launch proxy binary"),
+                getMainWindow,
+              )
             }: js.Function1[js.Any, Unit]
           )
 
@@ -190,26 +205,51 @@ object IpcHandlers {
          * this warns only on genuine drift, never on benign output. */
         val _ = js.Dynamic.global.console.warn("Dropped proxy event line:", err)
       case Right(event) =>
-        getMainWindow().foreach { win =>
-          if (!win.isDestroyed()) {
-            // Forced only for the two renderer-facing cases; internal
-            // events skip the second parse.
-            lazy val parsed = JSON.parse(line)
-            event match {
-              case _: ProxyEvent.RequestCaptured =>
-                win.webContents.send(IpcChannels.ProxyRequest, parsed.selectDynamic("request"))
-              case _: ProxyEvent.ResponseCaptured =>
-                win.webContents.send(IpcChannels.ProxyResponse, parsed.selectDynamic("response"))
-              case ProxyEvent.ProxyStarted(_) | ProxyEvent.ProxyStopped | ProxyEvent.ProxyError(_) =>
-                () // internal events — not forwarded to the renderer
+        event match {
+          case ProxyEvent.ProxyStarted(port) =>
+            /* Authoritative "proxy is up" signal: carries the port the
+             * binary actually bound, unlike startProxy's optimistic
+             * return. */
+            VsCodeSync.onProxyStarted(port, getMainWindow)
+            pushProxyState(js.Dynamic.literal(state = "started", port = port), getMainWindow)
+          case ProxyEvent.ProxyStopped =>
+            VsCodeSync.onProxyStopped(getMainWindow)
+            pushProxyState(js.Dynamic.literal(state = "stopped"), getMainWindow)
+          case ProxyEvent.ProxyError(message) =>
+            VsCodeSync.onProxyStopped(getMainWindow)
+            pushProxyState(js.Dynamic.literal(state = "error", message = message), getMainWindow)
+          case _: ProxyEvent.RequestCaptured | _: ProxyEvent.ResponseCaptured =>
+            getMainWindow().foreach { win =>
+              if (!win.isDestroyed()) {
+                // Forced only for the two renderer-facing cases; internal
+                // events skip the second parse.
+                lazy val parsed = JSON.parse(line)
+                event match {
+                  case _: ProxyEvent.RequestCaptured =>
+                    win.webContents.send(IpcChannels.ProxyRequest, parsed.selectDynamic("request"))
+                  case _: ProxyEvent.ResponseCaptured =>
+                    win.webContents.send(IpcChannels.ProxyResponse, parsed.selectDynamic("response"))
+                  case ProxyEvent.ProxyStarted(_) | ProxyEvent.ProxyStopped | ProxyEvent.ProxyError(_) =>
+                    () // handled above — unreachable in this branch
+                }
+              } else ()
             }
-          } else ()
         }
     }
   }
 
-  private def stopProxy(): js.Dynamic = {
+  /** Forward a truthful proxy state change to the renderer's proxy bar. */
+  private def pushProxyState(payload: js.Dynamic, getMainWindow: () => Option[BrowserWindow]): Unit = {
+    getMainWindow().foreach { win =>
+      if (!win.isDestroyed()) {
+        win.webContents.send(IpcChannels.ProxyState, payload)
+      } else ()
+    }
+  }
+
+  private def stopProxy(getMainWindow: () => Option[BrowserWindow]): js.Dynamic = {
     stopProxyIfRunning()
+    VsCodeSync.onProxyStopped(getMainWindow)
     js.Dynamic.literal(stopped = true)
   }
 
@@ -217,10 +257,10 @@ object IpcHandlers {
     val current = state.get()
     current.process match {
       case Some(child) if !child.killed =>
-        js.Dynamic.literal(running = true, port = current.port.getOrElse(0))
+        js.Dynamic.literal(running = true, port = current.port.getOrElse(0), vscodeSync = VsCodeSync.isEnabled)
       case Some(_) | None =>
         state.updateAndGet(s => s.copy(process = none[ChildProcess], port = none[Int])): Unit
-        js.Dynamic.literal(running = false)
+        js.Dynamic.literal(running = false, vscodeSync = VsCodeSync.isEnabled)
     }
   }
 }

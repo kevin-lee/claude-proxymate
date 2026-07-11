@@ -365,6 +365,35 @@ The UI visualizes:
 - Token cost breakdown with model-based pricing
 - Privacy masking with WYSIWYG copy and a global presenter-mode toggle
 
+### VS Code auto-sync
+
+The **VS Code** toggle in the proxy bar manages `ANTHROPIC_BASE_URL` for the
+Claude Code VS Code extension automatically, so you never edit `settings.json`
+by hand:
+
+- **ON** — while the proxy runs, `{"name": "ANTHROPIC_BASE_URL", "value": "http://localhost:<port>"}`
+  is kept in `claudeCode.environmentVariables` of every detected editor
+  (VS Code, VS Code Insiders, VSCodium, Cursor). Proxy stop, app quit, and a
+  crash-recovery sweep at the next launch all remove it again.
+- **OFF** (the default at every launch) — the entry is removed if present and
+  the app never touches VS Code settings afterwards.
+
+Safety: settings files are edited with `jsonc-parser` (comments and formatting
+survive), backed up under the app's `userData` directory before every write,
+verified after writing, and restored from the backup if anything goes wrong.
+An `ANTHROPIC_BASE_URL` you set yourself (e.g. a corporate gateway) is never
+modified or removed. Removal only deletes the entry Claude Proxymate added:
+the `claudeCode.environmentVariables` property and any other entries in it are
+always left in place (an empty array may remain when Claude Proxymate created
+the property itself, and comments placed between entries of that one array may
+be reformatted by the edit).
+
+Limitations: only the default VS Code profile is managed (not
+`User/profiles/<id>`), snap/flatpak/`Code - OSS` install locations are not
+detected, running two app instances can fight over the entry, and already-open
+Claude Code sessions in VS Code keep their environment until a new session
+starts.
+
 ## Project Structure
 
 ```

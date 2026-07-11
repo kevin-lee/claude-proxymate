@@ -46,6 +46,31 @@ object Preload {
         openExternal = { (url: String) =>
           IpcRenderer.invoke(IpcChannels.ShellOpenExternal, url)
         }: js.Function1[String, js.Promise[js.Any]],
+        onProxyState = { (cb: js.Function1[js.Dynamic, Unit]) =>
+          /* Self-cleaning: a renderer reload re-registers, so drop any
+           * previous listener first. */
+          IpcRenderer.removeAllListeners(IpcChannels.ProxyState)
+          IpcRenderer.on(
+            IpcChannels.ProxyState,
+            { (_: js.Dynamic, data: js.Dynamic) =>
+              cb(data)
+            }: js.Function2[js.Dynamic, js.Dynamic, Unit]
+          )
+        }: js.Function1[js.Function1[js.Dynamic, Unit], Unit],
+        vscodeSyncSet = { (enabled: js.Any) =>
+          IpcRenderer.invoke(IpcChannels.VsCodeSyncSet, enabled)
+        }: js.Function1[js.Any, js.Promise[js.Any]],
+        onVscodeSyncEvent = { (cb: js.Function1[js.Dynamic, Unit]) =>
+          /* Self-cleaning: a renderer reload re-registers, so drop any
+           * previous listener first to avoid duplicate alert handlers. */
+          IpcRenderer.removeAllListeners(IpcChannels.VsCodeSyncEvent)
+          IpcRenderer.on(
+            IpcChannels.VsCodeSyncEvent,
+            { (_: js.Dynamic, data: js.Dynamic) =>
+              cb(data)
+            }: js.Function2[js.Dynamic, js.Dynamic, Unit]
+          )
+        }: js.Function1[js.Function1[js.Dynamic, Unit], Unit],
       )
 
     ContextBridge.exposeInMainWorld(IpcChannels.BridgeName, api.asInstanceOf[js.Object])

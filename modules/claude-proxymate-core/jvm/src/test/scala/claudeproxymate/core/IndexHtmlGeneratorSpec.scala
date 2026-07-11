@@ -13,6 +13,7 @@ object IndexHtmlGeneratorSpec extends Properties {
     example("onboard dots carry their data-onboard-slide attributes", testOnboardDotsDataAttr),
     example("proxy cmd copy button has the ProxyCmdCopyBtn id", testProxyCmdCopyBtnId),
     example("proxy clear button has the ProxyClearBtn id", testProxyClearBtnId),
+    example("VS Code toggle button has the VsCodeToggleBtn id", testVsCodeToggleBtnId),
     example("copy detail button has the CopyDetailBtn id", testCopyDetailBtnId),
     example("existing button ids are preserved", testExistingButtonIdsPreserved),
     example("dtab buttons carry their data-dtab attributes", testDtabDataAttrs),
@@ -120,6 +121,11 @@ object IndexHtmlGeneratorSpec extends Properties {
     Result
       .assert(rendered.contains(s"""id="${HtmlIds.ProxyClearBtn}""""))
       .log(s"`id=\"${HtmlIds.ProxyClearBtn}\"` missing from generated HTML")
+
+  def testVsCodeToggleBtnId: Result =
+    Result
+      .assert(rendered.contains(s"""id="${HtmlIds.VsCodeToggleBtn}""""))
+      .log(s"`id=\"${HtmlIds.VsCodeToggleBtn}\"` missing from generated HTML")
 
   def testCopyDetailBtnId: Result =
     Result

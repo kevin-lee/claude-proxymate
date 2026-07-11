@@ -271,6 +271,14 @@ object IndexHtmlGenerator {
           attr("aria-label") := tx(m, "mask.toggleRevealAll"),
         )(tx(m, "mask.toggleRevealAll")),
         button(
+          id := HtmlIds.VsCodeToggleBtn,
+          cls := "btn btn-copy proxy-bar-btn-vscode",
+          i18n := "vscode.btnOff",
+          i18nTitle := "vscode.titleOff",
+          attr("title") := tx(m, "vscode.titleOff"),
+          attr("aria-label") := tx(m, "vscode.titleOff"),
+        )(tx(m, "vscode.btnOff")),
+        button(
           id := HtmlIds.ProxyInfoBtn,
           cls := "proxy-bar-info",
           attr("aria-label") := "Info",

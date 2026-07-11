@@ -17,6 +17,7 @@ import claudeproxymate.renderer.search.{ProxyDetailSearchListeners, SearchNaviga
 import claudeproxymate.renderer.state.{AppState, PresenterMode}
 import claudeproxymate.renderer.theme.Theme
 import claudeproxymate.renderer.update.UpdateChecker
+import claudeproxymate.renderer.vscode.VsCodeSyncToggle
 import org.scalajs.dom
 
 import scala.scalajs.js
@@ -62,6 +63,8 @@ object RendererMain {
     installPresenterModeClicks()
     PresenterMode.renderButton()
     PresenterMode.renderChip()
+    VsCodeSyncToggle.install()
+    VsCodeSyncToggle.renderButton()
     Onboarding.showIfNeeded()
   }
 
@@ -183,6 +186,11 @@ object RendererMain {
           val _ = api
             .proxyStatus()
             .`then`[Unit] { (st: js.Dynamic) =>
+              /* Both branches: re-sync the VS Code toggle after a window
+               * reload / re-creation — the main process keeps the flag. */
+              val vscodeSync = st.selectDynamic("vscodeSync")
+              AppState.vscodeSyncEnabled = !js.isUndefined(vscodeSync) && vscodeSync.asInstanceOf[Boolean]
+              VsCodeSyncToggle.renderButton()
               if (st.running.asInstanceOf[Boolean]) {
                 AppState.proxyRunning = true
                 AppState.proxyActualPort = st.port.asInstanceOf[Int]
