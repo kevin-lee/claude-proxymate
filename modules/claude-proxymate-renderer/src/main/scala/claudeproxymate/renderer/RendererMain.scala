@@ -2,6 +2,7 @@ package claudeproxymate.renderer
 
 import cats.syntax.all.*
 import claudeproxymate.core.HtmlIds
+import claudeproxymate.core.RouteMode
 import claudeproxymate.renderer.analysis.MechChips
 import claudeproxymate.renderer.copy.CopyUtil
 import claudeproxymate.renderer.detail.{DtabListeners, TokenPopover}
@@ -13,11 +14,11 @@ import claudeproxymate.renderer.onboarding.Onboarding
 import claudeproxymate.renderer.proxy.ProxyControl
 import claudeproxymate.renderer.proxy.ProxyInfoPopover
 import claudeproxymate.renderer.proxy.ProxyList
+import claudeproxymate.renderer.route.RouteControl
 import claudeproxymate.renderer.search.{ProxyDetailSearchListeners, SearchNavigation}
 import claudeproxymate.renderer.state.{AppState, PresenterMode}
 import claudeproxymate.renderer.theme.Theme
 import claudeproxymate.renderer.update.UpdateChecker
-import claudeproxymate.renderer.vscode.VsCodeSyncToggle
 import org.scalajs.dom
 
 import scala.scalajs.js
@@ -62,16 +63,15 @@ object RendererMain {
     CopyUtil.install()
     installPresenterModeClicks()
     PresenterMode.renderButton()
-    PresenterMode.renderChip()
-    VsCodeSyncToggle.install()
-    VsCodeSyncToggle.renderButton()
+    RouteControl.install()
+    RouteControl.render()
     Onboarding.showIfNeeded()
   }
 
-  /** Wire the toolbar button + status chip to PresenterMode.toggle.
+  /** Wire the status-bar mask switch to PresenterMode.toggle.
     * Uses document-level delegation rather than direct
-    * `addEventListener` on the elements so the listener survives
-    * any future re-rendering of the proxy bar.
+    * `addEventListener` on the element so the listener survives
+    * any future re-rendering of the status bar.
     */
   private def installPresenterModeClicks(): Unit = {
     dom
@@ -81,7 +81,7 @@ object RendererMain {
         { (e: dom.MouseEvent) =>
           val target = e.target.asInstanceOf[dom.Element]
           if (target != null) {
-            val hit = target.closest(s"#${HtmlIds.MaskToggleBtn},#${HtmlIds.MaskStateChip}")
+            val hit = target.closest(s"#${HtmlIds.MaskToggleBtn}")
             if (hit != null) {
               e.preventDefault()
               PresenterMode.toggle()
@@ -176,6 +176,8 @@ object RendererMain {
     if (bar != null) bar.asInstanceOf[dom.html.Element].style.display = "flex"
     val panel = dom.document.getElementById(HtmlIds.ProxyPanel)
     if (panel != null) panel.asInstanceOf[dom.html.Element].style.display = "flex"
+    val sbar  = dom.document.getElementById(HtmlIds.StatusBar)
+    if (sbar != null) sbar.asInstanceOf[dom.html.Element].style.display = "flex"
   }
 
   private def syncProxyStatus(): Unit = {
@@ -186,11 +188,15 @@ object RendererMain {
           val _ = api
             .proxyStatus()
             .`then`[Unit] { (st: js.Dynamic) =>
-              /* Both branches: re-sync the VS Code toggle after a window
-               * reload / re-creation — the main process keeps the flag. */
-              val vscodeSync = st.selectDynamic("vscodeSync")
-              AppState.vscodeSyncEnabled = !js.isUndefined(vscodeSync) && vscodeSync.asInstanceOf[Boolean]
-              VsCodeSyncToggle.renderButton()
+              /* Both branches: re-sync the Route Claude control after a
+               * window reload / re-creation — the main process keeps
+               * (and persists) the mode. */
+              val routeMode = st.selectDynamic("routeMode")
+              AppState.routeMode =
+                if (js.typeOf(routeMode) === "string") {
+                  RouteMode.parse(routeMode.asInstanceOf[String]).getOrElse(RouteMode.Manual)
+                } else RouteMode.Manual
+              RouteControl.render()
               if (st.running.asInstanceOf[Boolean]) {
                 AppState.proxyRunning = true
                 AppState.proxyActualPort = st.port.asInstanceOf[Int]

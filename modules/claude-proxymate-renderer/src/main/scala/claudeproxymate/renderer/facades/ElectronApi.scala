@@ -15,8 +15,8 @@ trait ElectronApi extends js.Object {
   def offProxy(): Unit                                          = js.native
   def onProxyState(cb: js.Function1[js.Dynamic, Unit]): Unit    = js.native
   def openExternal(url: String): js.Promise[js.Dynamic]         = js.native
-  def vscodeSyncSet(enabled: Boolean): js.Promise[js.Dynamic]   = js.native
-  def onVscodeSyncEvent(cb: js.Function1[js.Dynamic, Unit]): Unit = js.native
+  def routeModeSet(mode: String): js.Promise[js.Dynamic]        = js.native
+  def onRouteModeEvent(cb: js.Function1[js.Dynamic, Unit]): Unit = js.native
 }
 
 object ElectronApi {

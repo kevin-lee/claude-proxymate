@@ -53,6 +53,19 @@ object ProxyList {
     if (list == null) return
     if (countEl != null) countEl.textContent = AppState.proxyCaptures.length.toString
 
+    /* Clear lives in the panel header, next to what it clears — hidden
+     * while there is nothing to clear. The status-bar request counter
+     * follows the same list. */
+    val clearBtn = dom.document.getElementById(HtmlIds.ProxyClearBtn)
+    if (clearBtn != null) {
+      if (AppState.proxyCaptures.isEmpty) {
+        locally { val _ = clearBtn.classList.add("u-hide") }
+      } else {
+        locally { val _ = clearBtn.classList.remove("u-hide") }
+      }
+    } else ()
+    ProxyControl.renderReqCount()
+
     val entries = AppState.proxyCaptures.map { e =>
       val id = e.id.asInstanceOf[Double]
       ProxyListEntry(
@@ -127,7 +140,6 @@ object ProxyList {
     // immediately before screen-sharing a fresh session.
     AppState.presenterMaskAll = true
     PresenterMode.renderButton()
-    PresenterMode.renderChip()
     renderProxyList()
     ProxyControl.callRenderProxyDetail()
   }

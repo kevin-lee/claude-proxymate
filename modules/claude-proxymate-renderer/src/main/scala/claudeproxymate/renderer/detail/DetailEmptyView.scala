@@ -18,10 +18,8 @@ object DetailEmptyView {
 
   def buildFrag(labels: DetailEmptyLabels): Frag =
     div(cls := "proxy-empty")(
-      span(style := "font-size:28px")("🔍"),
-      span(
-        labels.selectRequestTitle,
-        I18nTemplate.render(labels.selectRequestHint),
-      ),
+      span(cls := "empty-icon")("🔍"),
+      span(cls := "empty-title")(labels.selectRequestTitle),
+      span(cls := "proxy-empty-hint")(I18nTemplate.render(labels.selectRequestHint)),
     )
 }

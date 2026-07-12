@@ -24,8 +24,10 @@ object ElectronMain {
         Analytics.trackEvent("app_open")
 
         /* Remove ANTHROPIC_BASE_URL residue a crashed previous run may
-         * have left in VS Code settings (record-driven, see VsCodeSync). */
-        VsCodeSync.sweepOnLaunch()
+         * have left in VS Code or Claude settings (record-driven, see
+         * RouteSync), then restore the persisted route selection. */
+        RouteSync.sweepOnLaunch()
+        RouteSync.loadPersistedMode()
 
         if (platform === "darwin") {
           try {
@@ -62,9 +64,9 @@ object ElectronMain {
     ElectronApp.on(
       "before-quit",
       { () =>
-        /* Disable + remove first so the child-exit event from the kill
-         * below finds the sync already off and no-ops. */
-        VsCodeSync.onQuit()
+        /* Reset + remove first so the child-exit event from the kill
+         * below finds the route already off and no-ops. */
+        RouteSync.onQuit()
         IpcHandlers.stopProxyIfRunning()
       }
     )

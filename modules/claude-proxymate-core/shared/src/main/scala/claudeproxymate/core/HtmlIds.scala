@@ -13,20 +13,26 @@ object HtmlIds {
   val OnboardNext: String  = "onboardNext"
 
   // ── Header ──
+  val AppHeader: String      = "appHeader"
   val BuildVer: String       = "buildVer"
   val UpdateBadge: String    = "updateBadge"
   val LogoIcon: String       = "logoIcon"
   val LangToggleBtn: String  = "langToggleBtn"
   val ThemeToggleBtn: String = "themeToggleBtn"
 
-  // ── Proxy Bar ──
+  // ── Address Bar ──
   val ProxyBar: String        = "proxyBar"
   val ProxyInfoBtn: String    = "proxyInfoBtn"
   val ProxyCmdCopyBtn: String = "proxyCmdCopyBtn"
   val ProxyClearBtn: String   = "proxyClearBtn"
-  val MaskToggleBtn: String   = "maskToggleBtn"
-  val MaskStateChip: String   = "maskStateChip"
-  val VsCodeToggleBtn: String = "vscodeToggleBtn"
+  val ProxyPortLock: String   = "proxyPortLock"
+
+  // ── Status Bar ──
+  val StatusBar: String      = "statusBar"
+  val StatusPort: String     = "statusPort"
+  val StatusReqCount: String = "statusReqCount"
+  val MaskToggleBtn: String  = "maskToggleBtn"
+  val RouteSeg: String       = "routeSeg"
 
   // ── Proxy Panel ──
   val ProxyPanel: String = "proxyPanel"

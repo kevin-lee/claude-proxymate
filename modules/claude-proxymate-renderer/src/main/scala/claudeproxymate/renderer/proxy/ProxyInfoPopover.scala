@@ -34,7 +34,7 @@ object ProxyInfoPopover {
   }
 
   private def toggle(): Unit = {
-    val bar      = dom.document.getElementById(HtmlIds.ProxyBar)
+    val bar      = dom.document.getElementById(HtmlIds.AppHeader)
     if (bar == null) return
     val existing = bar.querySelector("." + ProxyInfoPopoverView.PopoverClass)
     if (existing != null) {

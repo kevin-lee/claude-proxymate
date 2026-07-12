@@ -8,8 +8,8 @@ import org.scalajs.dom
 /** C3 PR 5 — presenter mode (global mask-all / reveal-all).
   *
   * Owns the "decisive global toggle" semantics: a single click on
-  * the toolbar button (or the chord ⌘⇧M / Ctrl+Shift+M, or the
-  * status chip) flips [[AppState.presenterMaskAll]] and clears
+  * the status-bar "Mask secrets" switch (or the chord ⌘⇧M /
+  * Ctrl+Shift+M) flips [[AppState.presenterMaskAll]] and clears
   * [[AppState.maskOverrides]] so the new baseline takes hold
   * cleanly. Per-span clicks (which add/remove individual ids in
   * `maskOverrides`) are dissent against the current baseline and
@@ -30,7 +30,7 @@ object PresenterMode {
 
   /** Flip the global baseline and clear all per-span overrides.
     * Triggers a full re-render of the active capture's detail view.
-    * Updates the toolbar button label and status chip text.
+    * Updates the status-bar switch.
     */
   def toggle(): Unit = {
     AppState.presenterMaskAll = !AppState.presenterMaskAll
@@ -39,8 +39,8 @@ object PresenterMode {
   }
 
   /** Re-render the active capture (preserving scroll position) and
-    * sync the button label + chip text with the current state.
-    * Called by [[toggle]] and on init.
+    * sync the switch with the current state. Called by [[toggle]] and
+    * on init.
     */
   def refresh(): Unit = {
     val container = dom.document.getElementById(HtmlIds.ProxyDetailView)
@@ -53,28 +53,29 @@ object PresenterMode {
       }
     }
     renderButton()
-    renderChip()
   }
 
-  /** Update the toolbar button's label and aria-label based on the
-    * current state. When `presenterMaskAll=true` the next action is
-    * "reveal all"; when `false` the next action is "mask all."
+  /** Sync the status-bar "Mask secrets" switch with the current state:
+    * ON (green, knob right) = everything masked. Never writes
+    * `textContent` — the switch's knob is a child span that must
+    * survive. `data-i18n-title` is rewritten to the current state's key
+    * so a later `applyI18n` (locale switch) keeps the tooltip truthful.
     */
   def renderButton(): Unit = {
-    val btn  = dom.document.getElementById(HtmlIds.MaskToggleBtn)
+    val btn = dom.document.getElementById(HtmlIds.MaskToggleBtn)
     if (btn == null) return
-    val key  = if (AppState.presenterMaskAll) "mask.toggleRevealAll" else "mask.toggleMaskAll"
-    val text = I18n.t(key)
-    btn.textContent = text
-    btn.asInstanceOf[dom.html.Element].setAttribute("aria-label", text)
-    btn.asInstanceOf[dom.html.Element].setAttribute("title", text)
-  }
-
-  /** Update the status chip's label based on the current state. */
-  def renderChip(): Unit = {
-    val chip = dom.document.getElementById(HtmlIds.MaskStateChip)
-    if (chip == null) return
-    val key  = if (AppState.presenterMaskAll) "mask.chipMaskAll" else "mask.chipRevealAll"
-    chip.textContent = I18n.t(key)
+    val el  = btn.asInstanceOf[dom.html.Element]
+    val on  = AppState.presenterMaskAll
+    if (on) {
+      locally { val _ = el.classList.add("on") }
+    } else {
+      locally { val _ = el.classList.remove("on") }
+    }
+    val titleKey = if (on) "mask.switchTitleOn" else "mask.switchTitleOff"
+    val title    = I18n.t(titleKey)
+    el.setAttribute("aria-checked", on.toString)
+    el.setAttribute("title", title)
+    el.setAttribute("aria-label", title)
+    el.setAttribute("data-i18n-title", titleKey)
   }
 }
