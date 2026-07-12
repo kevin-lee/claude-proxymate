@@ -378,7 +378,7 @@ lazy val props = new {
   val Org     = "io.kevinlee"
   val OrgName = "Kevin's Code"
 
-  val ProjectVersion = "0.1.2"
+  val ProjectVersion = "0.2.0"
 
   val ProductName = "Claude Proxymate"
 
