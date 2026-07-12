@@ -15,7 +15,8 @@ Inspired by an early version of [claude-inspector](https://github.com/kangraemin
   - known-shape **secrets** in free text (`sk-ant-…` and friends) via regex detection,
   - verbose **correlation IDs** (`msg_…`, `toolu_…`) compacted to a short tag,
   - sensitive **URL query-string** values.
-  - **Presenter mode** — one decisive global mask-all / reveal-all toggle (⌘⇧M). **Copy is WYSIWYG**: the clipboard follows the on-screen mask state.
+  - **Presenter mode** — one decisive global mask-all / reveal-all control: the **Mask secrets** switch in the status bar (or ⌘⇧M). **Copy is WYSIWYG**: the clipboard follows the on-screen mask state.
+- **Route Claude** — a Manual / VS Code / Global control that manages `ANTHROPIC_BASE_URL` for you: in VS Code-family `settings.json` or globally in `~/.claude/settings.json`, applied only while the proxy runs and cleaned up on stop/quit/crash.
 - **Search** across request / response / analysis / messages with match navigation.
 - **Theme** — system / light / dark, with OS `prefers-color-scheme` tracking.
 - **i18n** — English and Korean, externalized to `.properties` files and loaded at runtime.
@@ -97,7 +98,7 @@ opening one of those:
 │          ▼                                      │
 │  ┌───────────────────┐                          │
 │  │ claude-proxymate  │ ◄── Scala Native binary  │
-│  │ (localhost:9090)  │                          │
+│  │ (localhost:8888)  │                          │
 │  │ stdout → JSON     │──► parsed to UI via IPC  │
 │  └─────────┬─────────┘                          │
 │            │ HTTPS                              │
@@ -129,7 +130,7 @@ Dependency graph:
 At a glance, the modules interact as a left-to-right runtime pipeline, with `core` as a shared library that every other module depends on at compile time:
 
 ```
-  ┌──────────────────┐ localhost:9090 ┌─────────────────────────────────────────────────────┐
+  ┌──────────────────┐ localhost:8888 ┌─────────────────────────────────────────────────────┐
   │ Claude Code CLI  │──────────────► │                Electron Application                 │
   └──────────────────┘                │                                                     │
                                       │  ┌───────────┐ IPC  ┌──────────┐ IPC  ┌───────────┐ │
@@ -210,7 +211,7 @@ sbt compile
 
 ### Run tests
 
-Tests are written with [hedgehog](https://github.com/hedgehogqa/scala-hedgehog) (property-based) on the JVM and Scala.js, and [munit](https://scalameta.org/munit/) on Scala Native (the hedgehog test runner hangs on SN 0.5, so the Native platform runs deterministic munit ports of the shared core specs). 43 spec files in total.
+Tests are written with [hedgehog](https://github.com/hedgehogqa/scala-hedgehog) (property-based) on the JVM and Scala.js, and [munit](https://scalameta.org/munit/) on Scala Native (the hedgehog test runner hangs on SN 0.5, so the Native platform runs deterministic munit ports of the shared core specs). 49 spec files in total.
 
 ```bash
 # All tests (core on JVM + JS + Native, renderer on JS, server on Native)
@@ -249,7 +250,7 @@ Compile / mainClass := Some("claudeproxymate.proxy.Main")
 
 The binary is output to:
 ```
-modules/claude-proxymate-server/target/scala-3.3.7/claude-proxymate-server-out
+modules/claude-proxymate-server/target/scala-3.8.4/claude-proxymate-server-out
 ```
 
 ### Build the Scala.js modules
@@ -264,9 +265,9 @@ sbt renderer/fastLinkJS   # or renderer/fullLinkJS
 
 Output paths (replace `-fastopt` for `fastLinkJS`):
 ```
-modules/claude-proxymate-electron/target/scala-3.3.7/claude-proxymate-electron-opt/main.js
-modules/claude-proxymate-preload/target/scala-3.3.7/claude-proxymate-preload-opt/main.js
-modules/claude-proxymate-renderer/target/scala-3.3.7/claude-proxymate-renderer-opt/main.js
+modules/claude-proxymate-electron/target/scala-3.8.4/claude-proxymate-electron-opt/main.js
+modules/claude-proxymate-preload/target/scala-3.8.4/claude-proxymate-preload-opt/main.js
+modules/claude-proxymate-renderer/target/scala-3.8.4/claude-proxymate-renderer-opt/main.js
 ```
 
 ### Generated assets
@@ -310,22 +311,22 @@ build step for the GA4 analytics integration.
 Run the native proxy binary directly, without the Electron UI:
 
 ```bash
-# Default port 9090
-./modules/claude-proxymate-server/target/scala-3.3.7/claude-proxymate-server-out
+# Default port 8888
+./modules/claude-proxymate-server/target/scala-3.8.4/claude-proxymate-server-out
 
 # Custom port
-./modules/claude-proxymate-server/target/scala-3.3.7/claude-proxymate-server-out --port 8080
+./modules/claude-proxymate-server/target/scala-3.8.4/claude-proxymate-server-out --port 8080
 ```
 
 The proxy emits JSON line events to stdout:
-- `{"type":"proxy_started","port":9090}`
+- `{"type":"proxy_started","port":8888}`
 - `{"type":"request_captured","request":{...}}`
 - `{"type":"response_captured","response":{...}}`
 
 Then configure Claude Code to route through the proxy:
 
 ```bash
-export ANTHROPIC_BASE_URL=http://localhost:9090
+export ANTHROPIC_BASE_URL=http://localhost:8888
 claude
 ```
 
@@ -348,11 +349,10 @@ npm start
 
 Once the app is running:
 
-1. Click **Start Proxy** (defaults to port 9090)
-2. In a separate terminal, configure Claude Code:
+1. Click **▶ Start Proxy** in the address bar (defaults to port 8888; the port is remembered across launches)
+2. In a separate terminal, run the command shown in the address bar (the ⧉ button copies it) — or let **Route Claude** in the status bar set `ANTHROPIC_BASE_URL` for you:
    ```bash
-   export ANTHROPIC_BASE_URL=http://localhost:9090
-   claude
+   ANTHROPIC_BASE_URL=http://localhost:8888 claude
    ```
 3. Use Claude Code normally. All API requests and responses appear in the inspector UI in real-time.
 
@@ -363,7 +363,7 @@ The UI visualizes:
 - Detected prompt augmentation mechanisms (output style, slash commands, skills, sub-agents, MCP tools)
 - The Request Anatomy dashboard (segment sizes, structural facts, mechanism inventory, anomalies)
 - Token cost breakdown with model-based pricing
-- Privacy masking with WYSIWYG copy and a global presenter-mode toggle
+- Privacy masking with WYSIWYG copy and the status-bar Mask secrets switch
 
 ### Route Claude (Manual / VS Code / Global)
 
@@ -436,6 +436,9 @@ claude-proxymate/
 │   │   │   ├── UrlScheme.scala          # Validate URLs before shell.openExternal
 │   │   │   ├── ProxyError.scala         # Typed proxy errors (platform-neutral)
 │   │   │   ├── JsonLineProtocol.scala   # Encode/decode ProxyEvent as JSON lines
+│   │   │   ├── RouteMode.scala          # Route Claude mode ADT (manual / vscode / global)
+│   │   │   ├── VsCodeEnv.scala          # Pure apply/remove decisions for VS Code settings
+│   │   │   ├── ClaudeEnv.scala          # Pure apply/remove decisions for ~/.claude/settings.json
 │   │   │   ├── IpcChannels.scala        # IPC channel name constants (single source of truth)
 │   │   │   └── HtmlIds.scala            # DOM element ID constants shared with renderer
 │   │   └── jvm/src/main/scala/claudeproxymate/core/
@@ -457,6 +460,10 @@ claude-proxymate/
 │   │   └── src/main/scala/claudeproxymate/electron/
 │   │       ├── ElectronMain.scala        # BrowserWindow, app lifecycle, IPC, hardening
 │   │       ├── IpcHandlers.scala         # Spawn/kill proxy, parse stdout, forward events
+│   │       ├── RouteSync.scala           # Route Claude coordinator: mode, exclusion, lifecycle, persistence
+│   │       ├── SyncFileOps.scala         # Shared backup → write → verify → restore protocol + ownership record
+│   │       ├── VsCodeSync.scala          # VS Code-family settings.json backend
+│   │       ├── ClaudeSettingsSync.scala  # ~/.claude/settings.json (env object) backend
 │   │       ├── Analytics.scala           # GA4 integration
 │   │       ├── Config.scala              # Environment variable access
 │   │       └── facades/                  # @js.native Electron & Node.js facades
@@ -475,6 +482,7 @@ claude-proxymate/
 │           ├── util/                         # HtmlUtil, Debounce, JsJsonBridge
 │           ├── json/                         # JsonTreeView (+ JsonTreeViewer logic)
 │           ├── proxy/                        # Proxy control, capture list, info popover
+│           ├── route/                        # Route Claude segmented control
 │           ├── messages/                     # Message parsing, rendering, masked copy, badges
 │           ├── search/                       # Search match navigation + listeners
 │           ├── analysis/                     # Analysis tab, Request Anatomy, mechanism chips
