@@ -36,7 +36,8 @@ object ProxyListView {
   def buildListFrag(entries: List[ProxyListEntry], labels: ProxyListLabels): Frag =
     if (entries.isEmpty)
       div(cls := "hist-empty")(
-        labels.noCapturesTitle,
+        span(cls := "empty-icon")("📡"),
+        span(cls := "empty-title")(labels.noCapturesTitle),
         small(I18nTemplate.render(labels.noCapturesHint)),
       )
     else

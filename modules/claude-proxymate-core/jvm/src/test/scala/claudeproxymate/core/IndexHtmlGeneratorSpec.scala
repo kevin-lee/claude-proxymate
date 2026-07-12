@@ -13,7 +13,10 @@ object IndexHtmlGeneratorSpec extends Properties {
     example("onboard dots carry their data-onboard-slide attributes", testOnboardDotsDataAttr),
     example("proxy cmd copy button has the ProxyCmdCopyBtn id", testProxyCmdCopyBtnId),
     example("proxy clear button has the ProxyClearBtn id", testProxyClearBtnId),
-    example("VS Code toggle button has the VsCodeToggleBtn id", testVsCodeToggleBtnId),
+    example("header has the AppHeader id", testAppHeaderId),
+    example("address bar carries the port lock", testProxyPortLockId),
+    example("status bar elements have their ids", testStatusBarElementIds),
+    example("route segments carry their data-route attributes", testRouteSegDataAttrs),
     example("copy detail button has the CopyDetailBtn id", testCopyDetailBtnId),
     example("existing button ids are preserved", testExistingButtonIdsPreserved),
     example("dtab buttons carry their data-dtab attributes", testDtabDataAttrs),
@@ -38,14 +41,26 @@ object IndexHtmlGeneratorSpec extends Properties {
     "onboard.btn"              -> "btn",
     "header.logoSub"           -> "Proxy",
     "proxy.port"               -> "port",
-    "proxy.stopped"            -> "stopped",
     "proxy.startFirst"         -> "startFirst",
     "proxy.startProxy"         -> "startProxy",
+    "proxy.portLocked"         -> "portLocked",
     "proxy.clear"              -> "clear",
     "proxy.aboutTitle"         -> "about",
     "proxy.capturedRequests"   -> "captured",
     "proxy.noCapturesTitle"    -> "noCapturesTitle",
     "proxy.selectRequestTitle" -> "selectRequestTitle",
+    "proxy.selectRequestHint"  -> "selectRequestHint",
+    "status.stopped"           -> "stopped",
+    "status.running"           -> "running",
+    "mask.switchLabel"         -> "maskSecrets",
+    "mask.switchTitleOn"       -> "maskTitleOn",
+    "route.label"              -> "routeClaude",
+    "route.manual"             -> "manual",
+    "route.vscode"             -> "vscode",
+    "route.global"             -> "global",
+    "route.manualTitle"        -> "manualTitle",
+    "route.vscodeTitle"        -> "vscodeTitle",
+    "route.globalTitle"        -> "globalTitle",
     "copy.copy"                -> "copy",
   )
 
@@ -122,10 +137,38 @@ object IndexHtmlGeneratorSpec extends Properties {
       .assert(rendered.contains(s"""id="${HtmlIds.ProxyClearBtn}""""))
       .log(s"`id=\"${HtmlIds.ProxyClearBtn}\"` missing from generated HTML")
 
-  def testVsCodeToggleBtnId: Result =
+  def testAppHeaderId: Result =
     Result
-      .assert(rendered.contains(s"""id="${HtmlIds.VsCodeToggleBtn}""""))
-      .log(s"`id=\"${HtmlIds.VsCodeToggleBtn}\"` missing from generated HTML")
+      .assert(rendered.contains(s"""id="${HtmlIds.AppHeader}""""))
+      .log(s"`id=\"${HtmlIds.AppHeader}\"` missing from generated HTML")
+
+  def testProxyPortLockId: Result =
+    Result
+      .assert(rendered.contains(s"""id="${HtmlIds.ProxyPortLock}""""))
+      .log(s"`id=\"${HtmlIds.ProxyPortLock}\"` missing from generated HTML")
+
+  def testStatusBarElementIds: Result =
+    Result.all(
+      List(
+        HtmlIds.StatusBar,
+        HtmlIds.StatusPort,
+        HtmlIds.StatusReqCount,
+        HtmlIds.MaskToggleBtn,
+        HtmlIds.RouteSeg,
+        HtmlIds.ProxyInfoBtn,
+      ).map { id =>
+        Result
+          .assert(rendered.contains(s"""id="$id""""))
+          .log(s"`id=\"$id\"` missing from generated HTML")
+      }
+    )
+
+  def testRouteSegDataAttrs: Result =
+    Result.all(List("manual", "vscode", "global").map { mode =>
+      Result
+        .assert(rendered.contains(s"""data-route="$mode""""))
+        .log(s"`data-route=\"$mode\"` missing from generated HTML")
+    })
 
   def testCopyDetailBtnId: Result =
     Result

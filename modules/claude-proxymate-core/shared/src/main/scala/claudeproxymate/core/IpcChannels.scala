@@ -9,10 +9,10 @@ object IpcChannels {
   val ProxyResponse: String     = "proxy-response"
   val ProxyState: String        = "proxy-state"
   val ShellOpenExternal: String = "shell-open-external"
-  val VsCodeSyncSet: String     = "vscode-sync-set"
-  val VsCodeSyncEvent: String   = "vscode-sync-event"
+  val RouteModeSet: String      = "route-mode-set"
+  val RouteModeEvent: String    = "route-mode-event"
   val BridgeName: String        = "electronAPI"
 
-  val invokeChannels: List[String] = List(ProxyStart, ProxyStop, ProxyStatus, ShellOpenExternal, VsCodeSyncSet)
-  val eventChannels: List[String]  = List(ProxyRequest, ProxyResponse, ProxyState, VsCodeSyncEvent)
+  val invokeChannels: List[String] = List(ProxyStart, ProxyStop, ProxyStatus, ShellOpenExternal, RouteModeSet)
+  val eventChannels: List[String]  = List(ProxyRequest, ProxyResponse, ProxyState, RouteModeEvent)
 }

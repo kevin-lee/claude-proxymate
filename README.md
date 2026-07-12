@@ -365,34 +365,45 @@ The UI visualizes:
 - Token cost breakdown with model-based pricing
 - Privacy masking with WYSIWYG copy and a global presenter-mode toggle
 
-### VS Code auto-sync
+### Route Claude (Manual / VS Code / Global)
 
-The **VS Code** toggle in the proxy bar manages `ANTHROPIC_BASE_URL` for the
-Claude Code VS Code extension automatically, so you never edit `settings.json`
-by hand:
+The **Route Claude** segmented control in the status bar manages
+`ANTHROPIC_BASE_URL` automatically, so you never edit a settings file by hand.
+Exactly one mode is active at a time — selecting one removes the entry from
+the other target:
 
-- **ON** — while the proxy runs, `{"name": "ANTHROPIC_BASE_URL", "value": "http://localhost:<port>"}`
+- **Manual** — no settings file is touched; copy the command from the address
+  bar and run Claude yourself.
+- **VS Code** — while the proxy runs, `{"name": "ANTHROPIC_BASE_URL", "value": "http://localhost:<port>"}`
   is kept in `claudeCode.environmentVariables` of every detected editor
-  (VS Code, VS Code Insiders, VSCodium, Cursor). Proxy stop, app quit, and a
-  crash-recovery sweep at the next launch all remove it again.
-- **OFF** (the default at every launch) — the entry is removed if present and
-  the app never touches VS Code settings afterwards.
+  (VS Code, VS Code Insiders, VSCodium, Cursor). Applies to newly started
+  Claude Code sessions in those editors.
+- **Global** — while the proxy runs, `"ANTHROPIC_BASE_URL": "http://localhost:<port>"`
+  is kept in the top-level `env` object of `~/.claude/settings.json` (the file
+  and `~/.claude/` are created if missing). Applies to all newly started
+  Claude sessions.
+
+The selection is remembered across app restarts, but the env var itself only
+exists while the proxy actually runs: proxy stop, app quit, and a
+crash-recovery sweep at the next launch all remove it from **every** target,
+whatever the mode. Selecting VS Code or Global while the proxy is stopped just
+arms the route; the value is written when the proxy starts, using the port it
+actually bound.
 
 Safety: settings files are edited with `jsonc-parser` (comments and formatting
 survive), backed up under the app's `userData` directory before every write,
 verified after writing, and restored from the backup if anything goes wrong.
 An `ANTHROPIC_BASE_URL` you set yourself (e.g. a corporate gateway) is never
 modified or removed. Removal only deletes the entry Claude Proxymate added:
-the `claudeCode.environmentVariables` property and any other entries in it are
-always left in place (an empty array may remain when Claude Proxymate created
-the property itself, and comments placed between entries of that one array may
-be reformatted by the edit).
+the `claudeCode.environmentVariables` property / the `env` object and any
+other entries in them are always left in place (an empty array or object may
+remain when Claude Proxymate created the property itself, and comments placed
+between entries of that one array may be reformatted by the edit).
 
 Limitations: only the default VS Code profile is managed (not
 `User/profiles/<id>`), snap/flatpak/`Code - OSS` install locations are not
 detected, running two app instances can fight over the entry, and already-open
-Claude Code sessions in VS Code keep their environment until a new session
-starts.
+Claude sessions keep their environment until a new session starts.
 
 ## Project Structure
 

@@ -64,8 +64,9 @@ object IndexHtmlGenerator {
       body(
         onboardingModal(defaultLocale),
         headerSection(defaultLocale),
-        proxyBar(defaultLocale),
+        addressBar(defaultLocale),
         mainSection(defaultLocale),
+        statusBar(defaultLocale),
         script(src := "renderer.js"),
       ),
     ).render
@@ -149,7 +150,7 @@ object IndexHtmlGenerator {
   // ── Header ──
 
   private def headerSection(m: Map[String, String]): Frag =
-    tag("header")(cls := "header")(
+    tag("header")(id := HtmlIds.AppHeader, cls := "header")(
       div(cls := "logo")(
         img(
           id := HtmlIds.LogoIcon,
@@ -178,6 +179,13 @@ object IndexHtmlGenerator {
           id := HtmlIds.LangToggleBtn,
           style := "padding:4px 10px;border-radius:5px;font-size:11px;background:none;border:1px solid var(--border);color:var(--dim);cursor:pointer;transition:all .15s;white-space:nowrap;font-weight:700;",
         )(""),
+        button(
+          id := HtmlIds.ProxyInfoBtn,
+          cls := "hdr-info",
+          attr("aria-label") := tx(m, "proxy.aboutTitle"),
+          i18nTitle := "proxy.aboutTitle",
+          attr("title") := tx(m, "proxy.aboutTitle"),
+        )("ℹ"),
       ),
     )
 
@@ -216,76 +224,93 @@ object IndexHtmlGenerator {
       proxyStream(m),
     )
 
-  // ── Proxy Bar (browser address-bar style) ──
+  // ── Address Bar (Start/Stop, port, copyable command) ──
 
-  private def proxyBar(m: Map[String, String]): Frag =
-    div(id := HtmlIds.ProxyBar, cls := "proxy-bar", style := "display:none")(
-      div(cls := "proxy-bar-left")(
-        tag("label")(cls := "proxy-bar-port")(
-          span(cls := "proxy-bar-port-label", i18n := "proxy.port")(tx(m, "proxy.port")),
-          input(
-            tpe := "number",
-            id := HtmlIds.ProxyPort,
-            value := "8888",
-            attr("min") := "1024",
-            attr("max") := "65535",
-          ),
-        ),
-        div(id := HtmlIds.ProxyStatus, cls := "proxy-status proxy-bar-status")(
-          span(cls := "ps-dot"),
-          span(id := HtmlIds.ProxyStatusText, i18n := "proxy.stopped")(tx(m, "proxy.stopped")),
+  private def addressBar(m: Map[String, String]): Frag =
+    div(id := HtmlIds.ProxyBar, cls := "address-bar", style := "display:none")(
+      button(
+        cls := "btn addr-start",
+        id := HtmlIds.ProxyStartBtn,
+        i18n := "proxy.startProxy",
+      )(tx(m, "proxy.startProxy")),
+      tag("label")(cls := "addr-port")(
+        span(cls := "addr-port-label", i18n := "proxy.port")(tx(m, "proxy.port")),
+        input(
+          tpe := "number",
+          id := HtmlIds.ProxyPort,
+          value := "8888",
+          attr("min") := "1024",
+          attr("max") := "65535",
         ),
         span(
-          id := HtmlIds.MaskStateChip,
-          cls := "mask-state-chip",
-          i18n := "mask.chipMaskAll",
-        )(tx(m, "mask.chipMaskAll")),
+          id := HtmlIds.ProxyPortLock,
+          cls := "port-lock u-hide",
+          i18nTitle := "proxy.portLocked",
+          attr("title") := tx(m, "proxy.portLocked"),
+        )("\uD83D\uDD12"),
       ),
-      div(id := HtmlIds.ProxyCmdBox, cls := "proxy-bar-cmd")(
-        span(id := HtmlIds.ProxyCmdText, style := "color:var(--dim)", i18n := "proxy.startFirst")(
+      div(id := HtmlIds.ProxyCmdBox, cls := "addr-cmd")(
+        span(id := HtmlIds.ProxyCmdText, i18n := "proxy.startFirst")(
           tx(m, "proxy.startFirst"),
         ),
         button(
           id := HtmlIds.ProxyCmdCopyBtn,
-          cls := "proxy-bar-cmd-copy",
+          cls := "addr-cmd-copy",
+          disabled := "disabled",
           attr("aria-label") := "Copy command",
           attr("title") := tx(m, "copy.copy"),
         )("\u29C9"),
       ),
-      div(cls := "proxy-bar-right")(
-        button(
-          cls := "btn btn-send proxy-bar-btn-primary",
-          id := HtmlIds.ProxyStartBtn,
-          i18n := "proxy.startProxy",
-        )(tx(m, "proxy.startProxy")),
-        button(
-          id := HtmlIds.ProxyClearBtn,
-          cls := "btn btn-copy proxy-bar-btn-clear",
-          i18n := "proxy.clear",
-        )(tx(m, "proxy.clear")),
+    )
+
+  // ── Status Bar (IDE-style bottom bar) ──
+
+  private val dataRoute = attr("data-route")
+
+  private def statusBar(m: Map[String, String]): Frag =
+    div(id := HtmlIds.StatusBar, cls := "status-bar", style := "display:none")(
+      div(id := HtmlIds.ProxyStatus, cls := "sb-status")(
+        span(cls := "ps-dot"),
+        span(id := HtmlIds.ProxyStatusText, i18n := "status.stopped")(tx(m, "status.stopped")),
+      ),
+      span(cls := "sb-item")(
+        span(i18n := "proxy.port")(tx(m, "proxy.port")),
+        span(id := HtmlIds.StatusPort, cls := "sb-port")("8888"),
+      ),
+      span(id := HtmlIds.StatusReqCount, cls := "sb-item u-hide"),
+      span(cls := "sb-spacer"),
+      tag("label")(cls := "sb-item")(
+        span(i18n := "mask.switchLabel")(tx(m, "mask.switchLabel")),
         button(
           id := HtmlIds.MaskToggleBtn,
-          cls := "btn btn-copy proxy-bar-btn-mask",
-          i18n := "mask.toggleRevealAll",
-          attr("title") := tx(m, "mask.toggleRevealAll"),
-          attr("aria-label") := tx(m, "mask.toggleRevealAll"),
-        )(tx(m, "mask.toggleRevealAll")),
-        button(
-          id := HtmlIds.VsCodeToggleBtn,
-          cls := "btn btn-copy proxy-bar-btn-vscode",
-          i18n := "vscode.btnOff",
-          i18nTitle := "vscode.titleOff",
-          attr("title") := tx(m, "vscode.titleOff"),
-          attr("aria-label") := tx(m, "vscode.titleOff"),
-        )(tx(m, "vscode.btnOff")),
-        button(
-          id := HtmlIds.ProxyInfoBtn,
-          cls := "proxy-bar-info",
-          attr("aria-label") := "Info",
-          attr("title") := tx(m, "proxy.aboutTitle"),
-        )("\u2139"),
+          cls := "switch on",
+          attr("role") := "switch",
+          attr("aria-checked") := "true",
+          i18nTitle := "mask.switchTitleOn",
+          attr("title") := tx(m, "mask.switchTitleOn"),
+          attr("aria-label") := tx(m, "mask.switchTitleOn"),
+        )(span(cls := "knob")),
+      ),
+      span(cls := "sb-divider"),
+      span(cls := "sb-item")(
+        span(i18n := "route.label")(tx(m, "route.label")),
+        div(id := HtmlIds.RouteSeg, cls := "seg")(
+          routeSegBtn(m, "manual", active = true),
+          routeSegBtn(m, "vscode", active = false),
+          routeSegBtn(m, "global", active = false),
+        ),
       ),
     )
+
+  private def routeSegBtn(m: Map[String, String], mode: String, active: Boolean): Frag =
+    button(
+      cls := (if (active) "seg-btn active" else "seg-btn"),
+      dataRoute := mode,
+      i18n := s"route.$mode",
+      i18nTitle := s"route.${mode}Title",
+      attr("title") := tx(m, s"route.${mode}Title"),
+      attr("aria-pressed") := active.toString,
+    )(tx(m, s"route.$mode"))
 
   // ── Proxy Stream ──
 
@@ -294,7 +319,12 @@ object IndexHtmlGenerator {
       div(cls := "proxy-list")(
         div(cls := "panel-header")(
           span(i18n := "proxy.capturedRequests")(tx(m, "proxy.capturedRequests")),
-          span(style := "font-size:10px;color:var(--dim)", id := HtmlIds.ProxyCount)("0"),
+          span(cls := "count-pill", id := HtmlIds.ProxyCount)("0"),
+          button(
+            id := HtmlIds.ProxyClearBtn,
+            cls := "copy-small panel-clear u-hide",
+            i18n := "proxy.clear",
+          )(tx(m, "proxy.clear")),
         ),
         div(cls := "hist-list", id := HtmlIds.ProxyList)(
           // Placeholder; replaced at renderer startup by ProxyList.renderProxyList().
@@ -333,9 +363,12 @@ object IndexHtmlGenerator {
           // placeholder once a capture is selected (or stays as a plain-
           // text title until then). Same trick as proxy.noCapturesTitle.
           div(cls := "proxy-empty")(
-            span(style := "font-size:28px")("\uD83D\uDD0D"),
-            span(i18n := "proxy.selectRequestTitle")(
+            span(cls := "empty-icon")("\uD83D\uDD0D"),
+            span(cls := "empty-title", i18n := "proxy.selectRequestTitle")(
               tx(m, "proxy.selectRequestTitle"),
+            ),
+            span(cls := "proxy-empty-hint", i18n := "proxy.selectRequestHint")(
+              tx(m, "proxy.selectRequestHint"),
             ),
           ),
         ),

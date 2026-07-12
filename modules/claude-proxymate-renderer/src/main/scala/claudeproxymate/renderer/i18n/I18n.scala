@@ -107,10 +107,13 @@ object I18n {
     // re-render proxy content that depends on locale
     claudeproxymate.renderer.proxy.ProxyList.renderProxyList()
     claudeproxymate.renderer.detail.DetailView.renderProxyDetail()
-    // Re-render proxy status to correct the text overwritten by the generic data-i18n loop above.
-    // The status element has data-i18n="proxy.stopped" as a default, but when the proxy is running
-    // it needs to show "Running on port {port}" (or the Korean equivalent) instead.
+    /* Re-render the state-dependent chrome the generic data-i18n loops
+     * above cannot get right: the status bar / address bar reflect
+     * proxyRunning (renderProxyStatus also refreshes the request
+     * counter), and the mask switch's tooltip depends on the current
+     * baseline. */
     claudeproxymate.renderer.proxy.ProxyControl.renderProxyStatus()
+    claudeproxymate.renderer.state.PresenterMode.renderButton()
     claudeproxymate.renderer.theme.Theme.apply()
   }
 }

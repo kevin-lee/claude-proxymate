@@ -57,15 +57,15 @@ object Preload {
             }: js.Function2[js.Dynamic, js.Dynamic, Unit]
           )
         }: js.Function1[js.Function1[js.Dynamic, Unit], Unit],
-        vscodeSyncSet = { (enabled: js.Any) =>
-          IpcRenderer.invoke(IpcChannels.VsCodeSyncSet, enabled)
+        routeModeSet = { (mode: js.Any) =>
+          IpcRenderer.invoke(IpcChannels.RouteModeSet, mode)
         }: js.Function1[js.Any, js.Promise[js.Any]],
-        onVscodeSyncEvent = { (cb: js.Function1[js.Dynamic, Unit]) =>
+        onRouteModeEvent = { (cb: js.Function1[js.Dynamic, Unit]) =>
           /* Self-cleaning: a renderer reload re-registers, so drop any
            * previous listener first to avoid duplicate alert handlers. */
-          IpcRenderer.removeAllListeners(IpcChannels.VsCodeSyncEvent)
+          IpcRenderer.removeAllListeners(IpcChannels.RouteModeEvent)
           IpcRenderer.on(
-            IpcChannels.VsCodeSyncEvent,
+            IpcChannels.RouteModeEvent,
             { (_: js.Dynamic, data: js.Dynamic) =>
               cb(data)
             }: js.Function2[js.Dynamic, js.Dynamic, Unit]

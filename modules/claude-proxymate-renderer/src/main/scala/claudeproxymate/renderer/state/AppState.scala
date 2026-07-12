@@ -1,6 +1,7 @@
 package claudeproxymate.renderer.state
 
 import cats.syntax.all.*
+import claudeproxymate.core.RouteMode
 
 import scala.collection.mutable
 import scala.scalajs.js
@@ -22,10 +23,10 @@ object AppState {
   var proxyRunning: Boolean                 = false
   var proxyActualPort: Int                  = 8888
 
-  // VS Code ANTHROPIC_BASE_URL auto-sync toggle (mirrors the main
-  // process's VsCodeSync state; authoritative value comes from
-  // proxyStatus() / vscodeSyncSet() results)
-  var vscodeSyncEnabled: Boolean = false
+  /* Route Claude selection (mirrors the main process's RouteSync state;
+   * the authoritative value comes from proxyStatus() / routeModeSet()
+   * results). */
+  var routeMode: RouteMode = RouteMode.Manual
 
   // Badge toggle
   var activeBadgeUid: Option[String] = none[String]

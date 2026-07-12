@@ -39,11 +39,15 @@ object ProxyControl {
       case _ => none[ProxyStateEvent]
     }
 
+  private val PortStorageKey = "ci-port"
+
   /** Install doc-level listeners for the port input (`#proxyPort`) and
     * the start/stop proxy button (`#proxyStartBtn`), plus the
     * `proxy-state` event subscription that owns `AppState.proxyRunning`.
+    * Also restores the persisted port.
     */
   def install(): Unit = {
+    loadPersistedPort()
     dom.document.addEventListener("click", handleClick(_))
     dom.document.addEventListener("input", handleInput(_))
     ElectronApi.get.foreach { api =>
@@ -52,6 +56,26 @@ object ProxyControl {
       }
     }
   }
+
+  /** Restore the persisted port (localStorage, same convention as
+    * `ci-theme` / `ci-lang`) into the address-bar input and the
+    * status-bar port display.
+    */
+  private def loadPersistedPort(): Unit = {
+    val stored = dom.window.localStorage.getItem(PortStorageKey)
+    if (stored != null) {
+      parsePort(stored).foreach { port =>
+        val portEl = dom.document.getElementById(HtmlIds.ProxyPort)
+        if (portEl != null) portEl.asInstanceOf[dom.html.Input].value = port.toString
+        val statusPort = dom.document.getElementById(HtmlIds.StatusPort)
+        if (statusPort != null) statusPort.textContent = port.toString
+      }
+    } else ()
+  }
+
+  private def parsePort(value: String): Option[Int] =
+    (try value.toInt.some
+    catch { case _: Throwable => none[Int] }).filter(port => port >= 1024 && port <= 65535)
 
   /** Pending-toggle watchdog: if neither a state event nor an invoke
     * failure arrives (e.g. an old binary that emits nothing), reconcile
@@ -103,6 +127,8 @@ object ProxyControl {
         if (portInput != null) {
           portInput.asInstanceOf[dom.html.Input].value = actualPort.toString
         } else ()
+        /* The actually bound port is the truth — persist it. */
+        dom.window.localStorage.setItem(PortStorageKey, actualPort.toString)
         enableStartBtn()
         renderProxyStatus()
       case Some(ProxyStateEvent.Stopped) =>
@@ -135,23 +161,18 @@ object ProxyControl {
     if (target.closest(s"#${HtmlIds.ProxyStartBtn}") != null) toggleProxy()
   }
 
+  /** Port edits only happen while stopped (the input is disabled while
+    * running): mirror the value into the status bar and persist it.
+    */
   private def handleInput(e: dom.Event): Unit = {
     val target = e.target.asInstanceOf[dom.Element]
     if (target == null || target.id =!= HtmlIds.ProxyPort) return
-    updateProxyCmd()
-  }
-
-  def updateProxyCmd(): Unit = {
-    val portEl = dom.document.getElementById(HtmlIds.ProxyPort)
-    val cmdEl  = dom.document.getElementById(HtmlIds.ProxyCmdText)
-    if (portEl == null || cmdEl == null || !AppState.proxyRunning) return
-
-    val port = portEl.asInstanceOf[dom.html.Input].value match {
-      case s if s.nonEmpty => s
-      case _ => "8888"
+    val value      = target.asInstanceOf[dom.html.Input].value
+    val statusPort = dom.document.getElementById(HtmlIds.StatusPort)
+    if (statusPort != null) statusPort.textContent = value else ()
+    parsePort(value).foreach { port =>
+      dom.window.localStorage.setItem(PortStorageKey, port.toString)
     }
-    cmdEl.asInstanceOf[dom.html.Element].style.color = "var(--green)"
-    cmdEl.textContent = commandText(port)
   }
 
   /** The copy-paste CLI command. Uses the same base URL builder as the
@@ -163,37 +184,97 @@ object ProxyControl {
     s"${VsCodeEnv.EnvVarName}=${VsCodeEnv.baseUrl(parsedPort)} claude"
   }
 
+  /** Render every state-dependent piece of the new layout: the
+    * status-bar status/port/request-count, the address-bar Start/Stop
+    * button, the port lock, and the command box. Colors come from CSS
+    * classes (`running` modifiers), not inline styles.
+    */
   @JSExportTopLevel("renderProxyStatus")
   def renderProxyStatus(): Unit = {
     val status   = dom.document.getElementById(HtmlIds.ProxyStatus)
     val statusTx = dom.document.getElementById(HtmlIds.ProxyStatusText)
     val startBtn = dom.document.getElementById(HtmlIds.ProxyStartBtn)
-    val cmdEl    = dom.document.getElementById(HtmlIds.ProxyCmdText)
     if (status == null || startBtn == null) return
 
     val statusEl = status.asInstanceOf[dom.html.Element]
     val btnEl    = startBtn.asInstanceOf[dom.html.Button]
+    val running  = AppState.proxyRunning
 
-    if (AppState.proxyRunning) {
+    if (running) {
       locally { val _ = statusEl.classList.add("running") }
-      if (statusTx != null)
-        statusTx.textContent = I18n.t("proxy.running", Map("port" -> AppState.proxyActualPort.toString))
-      btnEl.textContent = I18n.t("proxy.stopProxy")
-      btnEl.style.background = "var(--red)"
-      if (cmdEl != null) {
-        cmdEl.asInstanceOf[dom.html.Element].style.color = "var(--green)"
-        cmdEl.textContent = commandText(AppState.proxyActualPort.toString)
-      }
     } else {
       locally { val _ = statusEl.classList.remove("running") }
-      if (statusTx != null) statusTx.textContent = I18n.t("proxy.stopped")
-      btnEl.textContent = I18n.t("proxy.startProxy")
-      btnEl.style.background = "var(--blue)"
-      if (cmdEl != null) {
-        cmdEl.asInstanceOf[dom.html.Element].style.color = "var(--dim)"
-        cmdEl.textContent = I18n.t("proxy.startFirst")
-      }
     }
+    if (statusTx != null) {
+      statusTx.textContent = I18n.t(if (running) "status.running" else "status.stopped")
+    } else ()
+
+    btnEl.textContent = I18n.t(if (running) "proxy.stopProxy" else "proxy.startProxy")
+    if (running) {
+      locally { val _ = btnEl.classList.add("running") }
+    } else {
+      locally { val _ = btnEl.classList.remove("running") }
+    }
+
+    val portEl = dom.document.getElementById(HtmlIds.ProxyPort)
+    if (portEl != null) {
+      val input = portEl.asInstanceOf[dom.html.Input]
+      input.disabled = running
+      if (running) input.title = I18n.t("proxy.portLocked") else input.removeAttribute("title")
+    } else ()
+    val lockEl = dom.document.getElementById(HtmlIds.ProxyPortLock)
+    if (lockEl != null) {
+      if (running) {
+        locally { val _ = lockEl.classList.remove("u-hide") }
+      } else {
+        locally { val _ = lockEl.classList.add("u-hide") }
+      }
+    } else ()
+
+    val statusPort = dom.document.getElementById(HtmlIds.StatusPort)
+    if (statusPort != null) {
+      statusPort.textContent =
+        if (running) AppState.proxyActualPort.toString
+        else if (portEl != null) portEl.asInstanceOf[dom.html.Input].value
+        else AppState.proxyActualPort.toString
+    } else ()
+
+    val reqCount = dom.document.getElementById(HtmlIds.StatusReqCount)
+    if (reqCount != null) {
+      if (running) {
+        locally { val _ = reqCount.classList.remove("u-hide") }
+      } else {
+        locally { val _ = reqCount.classList.add("u-hide") }
+      }
+    } else ()
+    renderReqCount()
+
+    val cmdBox = dom.document.getElementById(HtmlIds.ProxyCmdBox)
+    if (cmdBox != null) {
+      if (running) {
+        locally { val _ = cmdBox.classList.add("running") }
+      } else {
+        locally { val _ = cmdBox.classList.remove("running") }
+      }
+    } else ()
+    val cmdEl  = dom.document.getElementById(HtmlIds.ProxyCmdText)
+    if (cmdEl != null) {
+      cmdEl.textContent =
+        if (running) commandText(AppState.proxyActualPort.toString)
+        else I18n.t("proxy.startFirst")
+    } else ()
+    val copyBtn = dom.document.getElementById(HtmlIds.ProxyCmdCopyBtn)
+    if (copyBtn != null) copyBtn.asInstanceOf[dom.html.Button].disabled = !running else ()
+  }
+
+  /** Status-bar request counter ("{count} requests"); text is
+    * locale-dependent, visibility is owned by [[renderProxyStatus]].
+    */
+  def renderReqCount(): Unit = {
+    val el = dom.document.getElementById(HtmlIds.StatusReqCount)
+    if (el != null) {
+      el.textContent = I18n.t("status.requests", Map("count" -> AppState.proxyCaptures.length.toString))
+    } else ()
   }
 
   def toggleProxy(): Unit = {

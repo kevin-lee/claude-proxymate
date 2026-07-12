@@ -1,7 +1,7 @@
 package claudeproxymate.electron
 
 import cats.syntax.all.*
-import claudeproxymate.core.{IpcChannels, JsonLineProtocol, ProxyEvent, UrlScheme}
+import claudeproxymate.core.{IpcChannels, JsonLineProtocol, ProxyEvent, RouteMode, UrlScheme}
 import claudeproxymate.electron.facades._
 
 import java.util.concurrent.atomic.AtomicReference
@@ -39,10 +39,15 @@ object IpcHandlers {
     )
 
     IpcMain.handle(
-      IpcChannels.VsCodeSyncSet,
-      { (_: js.Dynamic, enabledArg: js.Dynamic) =>
-        val enabled = !js.isUndefined(enabledArg) && enabledArg != null && enabledArg.asInstanceOf[Boolean]
-        VsCodeSync.setEnabled(enabled, getMainWindow)
+      IpcChannels.RouteModeSet,
+      { (_: js.Dynamic, modeArg: js.Dynamic) =>
+        val requested =
+          if (js.isUndefined(modeArg) || modeArg == null || js.typeOf(modeArg) =!= "string") none[RouteMode]
+          else RouteMode.parse(modeArg.asInstanceOf[String])
+        requested match {
+          case Some(mode) => RouteSync.setMode(mode, getMainWindow)
+          case None => RouteSync.statusResultJs
+        }
       }: js.Function2[js.Dynamic, js.Dynamic, js.Any]
     )
 
@@ -154,7 +159,7 @@ object IpcHandlers {
             "exit",
             { (_: js.Any) =>
               state.set(ProxyState.empty)
-              VsCodeSync.onProxyStopped(getMainWindow)
+              RouteSync.onProxyStopped(getMainWindow)
               pushProxyState(js.Dynamic.literal(state = "stopped"), getMainWindow)
             }: js.Function1[js.Any, Unit]
           )
@@ -163,7 +168,7 @@ object IpcHandlers {
             "error",
             { (_: js.Any) =>
               state.updateAndGet(s => s.copy(process = none[ChildProcess], port = none[Int])): Unit
-              VsCodeSync.onProxyStopped(getMainWindow)
+              RouteSync.onProxyStopped(getMainWindow)
               pushProxyState(
                 js.Dynamic.literal(state = "error", message = "failed to launch proxy binary"),
                 getMainWindow,
@@ -210,13 +215,13 @@ object IpcHandlers {
             /* Authoritative "proxy is up" signal: carries the port the
              * binary actually bound, unlike startProxy's optimistic
              * return. */
-            VsCodeSync.onProxyStarted(port, getMainWindow)
+            RouteSync.onProxyStarted(port, getMainWindow)
             pushProxyState(js.Dynamic.literal(state = "started", port = port), getMainWindow)
           case ProxyEvent.ProxyStopped =>
-            VsCodeSync.onProxyStopped(getMainWindow)
+            RouteSync.onProxyStopped(getMainWindow)
             pushProxyState(js.Dynamic.literal(state = "stopped"), getMainWindow)
           case ProxyEvent.ProxyError(message) =>
-            VsCodeSync.onProxyStopped(getMainWindow)
+            RouteSync.onProxyStopped(getMainWindow)
             pushProxyState(js.Dynamic.literal(state = "error", message = message), getMainWindow)
           case _: ProxyEvent.RequestCaptured | _: ProxyEvent.ResponseCaptured =>
             getMainWindow().foreach { win =>
@@ -249,7 +254,7 @@ object IpcHandlers {
 
   private def stopProxy(getMainWindow: () => Option[BrowserWindow]): js.Dynamic = {
     stopProxyIfRunning()
-    VsCodeSync.onProxyStopped(getMainWindow)
+    RouteSync.onProxyStopped(getMainWindow)
     js.Dynamic.literal(stopped = true)
   }
 
@@ -257,10 +262,10 @@ object IpcHandlers {
     val current = state.get()
     current.process match {
       case Some(child) if !child.killed =>
-        js.Dynamic.literal(running = true, port = current.port.getOrElse(0), vscodeSync = VsCodeSync.isEnabled)
+        js.Dynamic.literal(running = true, port = current.port.getOrElse(0), routeMode = RouteSync.mode.wire)
       case Some(_) | None =>
         state.updateAndGet(s => s.copy(process = none[ChildProcess], port = none[Int])): Unit
-        js.Dynamic.literal(running = false, vscodeSync = VsCodeSync.isEnabled)
+        js.Dynamic.literal(running = false, routeMode = RouteSync.mode.wire)
     }
   }
 }
