@@ -2,7 +2,6 @@ import scala.scalanative.build.*
 import sbtcrossproject.CrossProject
 
 ThisBuild / scalaVersion := props.ScalaVersion
-ThisBuild / version := props.ProjectVersion
 ThisBuild / organization := props.Org
 ThisBuild / organizationName := props.OrgName
 ThisBuild / developers := List(
@@ -214,11 +213,13 @@ generatePackageJson := {
   val templateFile = base / "project" / "package.json.template"
   val outputFile   = base / "electron-app" / "package.json"
 
+  val projectVersion = version.value
+
   val licenseId = props.licenses.headOption.map { case (name, _) => name }.getOrElse("MIT")
 
   val substitutions = List(
     "@NAME@"         -> props.ProjectName,
-    "@VERSION@"      -> props.ProjectVersion,
+    "@VERSION@"      -> projectVersion,
     "@DESCRIPTION@"  -> props.ProductDescription,
     "@LICENSE@"      -> licenseId,
     "@PRODUCT_NAME@" -> props.ProductName,
@@ -377,8 +378,6 @@ lazy val props = new {
 
   val Org     = "io.kevinlee"
   val OrgName = "Kevin's Code"
-
-  val ProjectVersion = "0.2.0"
 
   val ProductName = "Claude Proxymate"
 
