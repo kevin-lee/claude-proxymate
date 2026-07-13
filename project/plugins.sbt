@@ -14,3 +14,5 @@ addSbtPlugin("io.kevinlee" % "sbt-devoops-sbt-extra" % sbtDevOopsVersion)
 addSbtPlugin("io.kevinlee" % "sbt-devoops-github"    % sbtDevOopsVersion)
 
 addSbtPlugin("io.kevinlee" % "sbt-devoops-starter" % sbtDevOopsVersion)
+
+addSbtPlugin("com.github.sbt" % "sbt-dynver" % "5.1.1")
