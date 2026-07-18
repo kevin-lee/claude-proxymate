@@ -93,7 +93,7 @@ jobs:
           done
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: build-arm64
           path: electron-app/release/*-arm64.dmg
