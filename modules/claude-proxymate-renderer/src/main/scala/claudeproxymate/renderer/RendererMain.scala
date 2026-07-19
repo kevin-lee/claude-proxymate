@@ -194,8 +194,8 @@ object RendererMain {
               val routeMode = st.selectDynamic("routeMode")
               AppState.routeMode =
                 if (js.typeOf(routeMode) === "string") {
-                  RouteMode.parse(routeMode.asInstanceOf[String]).getOrElse(RouteMode.Manual)
-                } else RouteMode.Manual
+                  RouteMode.parse(routeMode.asInstanceOf[String]).getOrElse(RouteMode.default)
+                } else RouteMode.default
               RouteControl.render()
               if (st.running.asInstanceOf[Boolean]) {
                 AppState.proxyRunning = true

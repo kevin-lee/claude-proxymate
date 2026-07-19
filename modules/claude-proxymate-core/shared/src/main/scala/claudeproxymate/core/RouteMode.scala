@@ -28,6 +28,14 @@ enum RouteMode {
 }
 
 object RouteMode {
+
+  /* The product default Route Claude selection, surfaced as the active
+   * UI segment, the main process's first-launch state (when no
+   * `route-mode.json` is persisted), and the display fallback when an
+   * IPC mode string is missing or unparseable. Single source of truth:
+   * every default site references this rather than hard-coding a case. */
+  val default: RouteMode = RouteMode.Global
+
   given cats.Eq[RouteMode] = cats.Eq.fromUniversalEquals
 
   def parse(s: String): Option[RouteMode] = s match {

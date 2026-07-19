@@ -16,7 +16,7 @@ Inspired by an early version of [claude-inspector](https://github.com/kangraemin
   - verbose **correlation IDs** (`msg_…`, `toolu_…`) compacted to a short tag,
   - sensitive **URL query-string** values.
   - **Presenter mode** — one decisive global mask-all / reveal-all control: the **Mask secrets** switch in the status bar (or ⌘⇧M). **Copy is WYSIWYG**: the clipboard follows the on-screen mask state.
-- **Route Claude** — a Manual / VS Code / Global control that manages `ANTHROPIC_BASE_URL` for you: in VS Code-family `settings.json` or globally in `~/.claude/settings.json`, applied only while the proxy runs and cleaned up on stop/quit/crash.
+- **Route Claude** — a Global / VS Code / Manual control that manages `ANTHROPIC_BASE_URL` for you: globally in `~/.claude/settings.json` (the default) or in VS Code-family `settings.json`, applied only while the proxy runs and cleaned up on stop/quit/crash.
 - **Search** across request / response / analysis / messages with match navigation.
 - **Theme** — system / light / dark, with OS `prefers-color-scheme` tracking.
 - **i18n** — English and Korean, externalized to `.properties` files and loaded at runtime.
@@ -350,7 +350,7 @@ npm start
 Once the app is running:
 
 1. Click **▶ Start Proxy** in the address bar (defaults to port 8888; the port is remembered across launches)
-2. In a separate terminal, run the command shown in the address bar (the ⧉ button copies it) — or let **Route Claude** in the status bar set `ANTHROPIC_BASE_URL` for you:
+2. Let **Route Claude** in the status bar set `ANTHROPIC_BASE_URL` for you — it defaults to **Global**, which manages `~/.claude/settings.json` while the proxy runs. Or, to route it yourself, run the command shown in the address bar (the ⧉ button copies it) in a separate terminal:
    ```bash
    ANTHROPIC_BASE_URL=http://localhost:8888 claude
    ```
@@ -370,18 +370,19 @@ The UI visualizes:
 The **Route Claude** segmented control in the status bar manages
 `ANTHROPIC_BASE_URL` automatically, so you never edit a settings file by hand.
 Exactly one mode is active at a time — selecting one removes the entry from
-the other target:
+the other target. The control defaults to **Global**, so first launch (with no
+prior selection) starts there:
 
-- **Manual** — no settings file is touched; copy the command from the address
-  bar and run Claude yourself.
+- **Global** (default) — while the proxy runs, `"ANTHROPIC_BASE_URL": "http://localhost:<port>"`
+  is kept in the top-level `env` object of `~/.claude/settings.json` (the file
+  and `~/.claude/` are created if missing). Applies to all newly started
+  Claude sessions.
 - **VS Code** — while the proxy runs, `{"name": "ANTHROPIC_BASE_URL", "value": "http://localhost:<port>"}`
   is kept in `claudeCode.environmentVariables` of every detected editor
   (VS Code, VS Code Insiders, VSCodium, Cursor). Applies to newly started
   Claude Code sessions in those editors.
-- **Global** — while the proxy runs, `"ANTHROPIC_BASE_URL": "http://localhost:<port>"`
-  is kept in the top-level `env` object of `~/.claude/settings.json` (the file
-  and `~/.claude/` are created if missing). Applies to all newly started
-  Claude sessions.
+- **Manual** — no settings file is touched; copy the command from the address
+  bar and run Claude yourself.
 
 The selection is remembered across app restarts, but the env var itself only
 exists while the proxy actually runs: proxy stop, app quit, and a
