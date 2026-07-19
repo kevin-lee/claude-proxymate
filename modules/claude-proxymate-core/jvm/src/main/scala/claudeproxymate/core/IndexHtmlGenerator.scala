@@ -295,9 +295,9 @@ object IndexHtmlGenerator {
       span(cls := "sb-item")(
         span(i18n := "route.label")(tx(m, "route.label")),
         div(id := HtmlIds.RouteSeg, cls := "seg")(
-          routeSegBtn(m, "manual", active = true),
-          routeSegBtn(m, "vscode", active = false),
-          routeSegBtn(m, "global", active = false),
+          routeSegBtn(m, "global", active = "global" == RouteMode.default.wire),
+          routeSegBtn(m, "vscode", active = "vscode" == RouteMode.default.wire),
+          routeSegBtn(m, "manual", active = "manual" == RouteMode.default.wire),
         ),
       ),
     )

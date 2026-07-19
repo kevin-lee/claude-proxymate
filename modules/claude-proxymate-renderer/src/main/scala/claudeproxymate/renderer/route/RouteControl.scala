@@ -88,7 +88,7 @@ object RouteControl {
     setSegmentsDisabled(true)
 
     val onSuccess: js.Function1[js.Dynamic, Unit] = { (result: js.Dynamic) =>
-      val resolved = RouteMode.parse(asString(result.selectDynamic("mode"))).getOrElse(RouteMode.Manual)
+      val resolved = RouteMode.parse(asString(result.selectDynamic("mode"))).getOrElse(RouteMode.default)
       AppState.routeMode = resolved
       val detectedRaw = result.selectDynamic("detected")
       val detected    = if (js.typeOf(detectedRaw) === "number") detectedRaw.asInstanceOf[Int] else 0

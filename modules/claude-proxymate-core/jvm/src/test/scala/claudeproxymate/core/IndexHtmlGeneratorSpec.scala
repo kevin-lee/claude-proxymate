@@ -17,6 +17,7 @@ object IndexHtmlGeneratorSpec extends Properties {
     example("address bar carries the port lock", testProxyPortLockId),
     example("status bar elements have their ids", testStatusBarElementIds),
     example("route segments carry their data-route attributes", testRouteSegDataAttrs),
+    example("the Global route segment is the active default (and Manual is not)", testRouteSegDefaultActive),
     example("copy detail button has the CopyDetailBtn id", testCopyDetailBtnId),
     example("existing button ids are preserved", testExistingButtonIdsPreserved),
     example("dtab buttons carry their data-dtab attributes", testDtabDataAttrs),
@@ -169,6 +170,18 @@ object IndexHtmlGeneratorSpec extends Properties {
         .assert(rendered.contains(s"""data-route="$mode""""))
         .log(s"`data-route=\"$mode\"` missing from generated HTML")
     })
+
+  def testRouteSegDefaultActive: Result =
+    Result.all(
+      List(
+        Result
+          .assert(rendered.contains("""<button class="seg-btn active" data-route="global""""))
+          .log("the `global` route segment should be rendered active by default"),
+        Result
+          .assert(rendered.contains("""<button class="seg-btn" data-route="manual""""))
+          .log("the `manual` route segment should NOT be rendered active"),
+      )
+    )
 
   def testCopyDetailBtnId: Result =
     Result

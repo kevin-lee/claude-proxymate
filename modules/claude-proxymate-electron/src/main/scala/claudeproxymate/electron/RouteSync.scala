@@ -26,7 +26,7 @@ object RouteSync {
   final private case class State(mode: RouteMode, runningPort: Option[Int])
 
   private object State {
-    val initial: State = State(RouteMode.Manual, none[Int])
+    val initial: State = State(RouteMode.default, none[Int])
   }
 
   private val state = new AtomicReference[State](State.initial)

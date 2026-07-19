@@ -9,6 +9,7 @@ object RouteModeSpec extends Properties {
     property("wire/parse round-trip for every mode", testWireParseRoundTrip),
     property("parse of a non-wire string => None", testParseUnknownNone),
     example("wire strings are exactly manual/vscode/global", testWireStrings),
+    example("default route mode is Global", testDefaultIsGlobal),
   )
 
   private def genMode: Gen[RouteMode] =
@@ -37,4 +38,7 @@ object RouteModeSpec extends Properties {
         RouteMode.Global.wire ==== "global",
       )
     )
+
+  def testDefaultIsGlobal: Result =
+    RouteMode.default ==== RouteMode.Global
 }

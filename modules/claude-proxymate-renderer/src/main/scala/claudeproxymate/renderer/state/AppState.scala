@@ -26,7 +26,7 @@ object AppState {
   /* Route Claude selection (mirrors the main process's RouteSync state;
    * the authoritative value comes from proxyStatus() / routeModeSet()
    * results). */
-  var routeMode: RouteMode = RouteMode.Manual
+  var routeMode: RouteMode = RouteMode.default
 
   // Badge toggle
   var activeBadgeUid: Option[String] = none[String]
