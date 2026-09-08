@@ -41,9 +41,23 @@ final case class MsgCard(
   contents: List[MsgContent],
   userParts: List[MsgPart],
   rawIdx: Int,
+  removed: List[RemovedMark],
 )
 
+/** Something the request filter removed from this message before it was
+  * forwarded: shown as a struck-through ghost badge so the user can see the
+  * filter acting. `label` is the same text the live badge would have shown.
+  */
+final case class RemovedMark(label: String, tokens: Int)
+
 final case class FilterLabels(user: String, typed: String, assistant: String, all: String)
+
+/** Labels for the request-filter ghost rows; `removed` carries a `{tokens}` placeholder. */
+final case class GhostLabels(removed: String)
+
+object GhostLabels {
+  val default: GhostLabels = GhostLabels("removed · ~{tokens} tok")
+}
 final case class SearchLabels(placeholder: String, clear: String)
 
 /** Pure view for the messages tab. */
@@ -60,6 +74,9 @@ object MessageView {
 
   val BadgeClass: String    = "msg-badge"
   val BadgeDataAttr: String = "data-msg-badge-uid"
+
+  val GhostClass: String     = "filter-ghost"
+  val GhostMetaClass: String = "filter-ghost-meta"
 
   def buildEmptyFrag(noMessagesLabel: String): Frag =
     div(cls := "proxy-empty")(span(noMessagesLabel))
@@ -109,12 +126,25 @@ object MessageView {
   }
 
   def buildCardsFrag(cards: List[MsgCard], isUserFilter: Boolean, query: String): Frag =
-    frag(cards.map(c => buildCardFrag(c, isUserFilter, query)))
+    buildCardsFrag(cards, isUserFilter, query, GhostLabels.default)
 
-  private def buildCardFrag(card: MsgCard, isUserFilter: Boolean, query: String): Frag =
+  def buildCardsFrag(cards: List[MsgCard], isUserFilter: Boolean, query: String, ghostLabels: GhostLabels): Frag =
+    frag(cards.map(c => buildCardFrag(c, isUserFilter, query, ghostLabels)))
+
+  private def buildCardFrag(card: MsgCard, isUserFilter: Boolean, query: String, ghostLabels: GhostLabels): Frag =
     div(cls := s"msg-card msg-${card.role}")(
       div(cls := "msg-role")(card.role),
-      div(cls := "msg-body")(buildBodyFrag(card, isUserFilter, query)),
+      div(cls := "msg-body")(
+        frag(card.removed.map(m => buildGhostRowFrag(m, ghostLabels))),
+        buildBodyFrag(card, isUserFilter, query),
+      ),
+    )
+
+  /** A removed item: struck-through badge plus a short "removed · ~N tok" note. */
+  private def buildGhostRowFrag(mark: RemovedMark, ghostLabels: GhostLabels): Frag =
+    div(cls := "msg-injected-row")(
+      span(cls := s"$BadgeClass green $GhostClass")(mark.label),
+      span(cls := GhostMetaClass)(ghostLabels.removed.replace("{tokens}", mark.tokens.toString)),
     )
 
   private def buildBodyFrag(card: MsgCard, isUserFilter: Boolean, query: String): Frag = {

@@ -84,7 +84,7 @@ object RequestAnatomy {
     List("echo back", "verbatim", "every token", "print the", "repeat the")
 
   private val McpInstrMarker   = "MCP Server Instructions"
-  private val SkillsListMarker = "skills are available for use with the Skill tool"
+  private val SkillsListMarker = claudeproxymate.core.filter.SkillsList.Marker
 
   def estTokens(bytes: Int): Int =
     if (bytes <= 0) 0 else math.ceil(bytes / 3.5).toInt

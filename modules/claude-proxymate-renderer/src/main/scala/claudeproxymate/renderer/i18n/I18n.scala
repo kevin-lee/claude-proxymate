@@ -114,6 +114,7 @@ object I18n {
      * baseline. */
     claudeproxymate.renderer.proxy.ProxyControl.renderProxyStatus()
     claudeproxymate.renderer.state.PresenterMode.renderButton()
+    claudeproxymate.renderer.filter.RequestFilterSheet.rerenderIfOpen()
     claudeproxymate.renderer.theme.Theme.apply()
   }
 }

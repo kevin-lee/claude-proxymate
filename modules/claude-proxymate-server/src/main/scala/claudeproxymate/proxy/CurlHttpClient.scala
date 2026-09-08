@@ -45,9 +45,12 @@ object CurlHttpClient {
         ProxyErrorHttp4s.asResponse(ProxyError.CurlInitFailed)
       } else {
         val emptyList: LibCurl.SList = null.asInstanceOf[LibCurl.SList]
+        /* Content-Length and Transfer-Encoding are dropped so libcurl derives the
+         * length from CURLOPT_POSTFIELDSIZE: the request filter may have shortened
+         * the body, and a custom Content-Length header would override libcurl's. */
         val forwardedHeaders         = headers.headers.filterNot { h =>
           val name = h.name.toString.toLowerCase
-          name === "host" || name === "accept-encoding"
+          name === "host" || name === "accept-encoding" || name === "content-length" || name === "transfer-encoding"
         }
         val builtList                = forwardedHeaders.foldLeft(emptyList) { (acc, h) =>
           LibCurl.curl_slist_append(acc, toCString(s"${h.name}: ${h.value}"))

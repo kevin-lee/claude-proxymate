@@ -2,6 +2,7 @@ package claudeproxymate.renderer.state
 
 import cats.syntax.all.*
 import claudeproxymate.core.RouteMode
+import claudeproxymate.core.filter.FilterConfig
 
 import scala.collection.mutable
 import scala.scalajs.js
@@ -27,6 +28,10 @@ object AppState {
    * the authoritative value comes from proxyStatus() / routeModeSet()
    * results). */
   var routeMode: RouteMode = RouteMode.default
+
+  /* Request filter configuration (mirrors <userData>/request-filter.json; the
+   * authoritative value comes from filterConfigGet() / filterConfigSet() results). */
+  var filterConfig: FilterConfig = FilterConfig.default
 
   // Badge toggle
   var activeBadgeUid: Option[String] = none[String]

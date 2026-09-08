@@ -36,10 +36,10 @@ object MessageCopySpec extends Properties {
   )
 
   private def textCard(role: String, text: String): MsgCard =
-    MsgCard(role, contents = List(TextContent(text)), userParts = Nil, rawIdx = 0)
+    MsgCard(role, contents = List(TextContent(text)), userParts = Nil, rawIdx = 0, removed = Nil)
 
   private def userCard(parts: List[MsgPart]): MsgCard =
-    MsgCard("user", contents = Nil, userParts = parts, rawIdx = 0)
+    MsgCard("user", contents = Nil, userParts = parts, rawIdx = 0, removed = Nil)
 
   private val FakeAnthropic = "sk-ant-abcdefghijklmnopqrstuvwxyz12345"
   private val FakeMsgId     = "msg_01ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -81,7 +81,7 @@ object MessageCopySpec extends Properties {
   }
 
   def testToolUse: Result = {
-    val card = MsgCard("assistant", List(ToolUseContent("Read")), Nil, rawIdx = 0)
+    val card = MsgCard("assistant", List(ToolUseContent("Read")), Nil, rawIdx = 0, removed = Nil)
     val out  = MessageCopy.toPlainText(List(card), revealAll).text
     Result
       .assert(out.contains("[tool: Read]"))
@@ -89,7 +89,8 @@ object MessageCopySpec extends Properties {
   }
 
   def testToolResultTruncated: Result = {
-    val card = MsgCard("assistant", List(ToolResultContent("preview", truncated = true)), Nil, rawIdx = 0)
+    val card =
+      MsgCard("assistant", List(ToolResultContent("preview", truncated = true)), Nil, rawIdx = 0, removed = Nil)
     val out  = MessageCopy.toPlainText(List(card), revealAll).text
     Result.all(
       List(
@@ -100,7 +101,7 @@ object MessageCopySpec extends Properties {
   }
 
   def testToolResultNotTruncated: Result = {
-    val card = MsgCard("assistant", List(ToolResultContent("done", truncated = false)), Nil, rawIdx = 0)
+    val card = MsgCard("assistant", List(ToolResultContent("done", truncated = false)), Nil, rawIdx = 0, removed = Nil)
     val out  = MessageCopy.toPlainText(List(card), revealAll).text
     Result.all(
       List(
@@ -111,7 +112,7 @@ object MessageCopySpec extends Properties {
   }
 
   def testOtherContent: Result = {
-    val card = MsgCard("assistant", List(OtherContent("image")), Nil, rawIdx = 0)
+    val card = MsgCard("assistant", List(OtherContent("image")), Nil, rawIdx = 0, removed = Nil)
     val out  = MessageCopy.toPlainText(List(card), revealAll).text
     Result
       .assert(out.contains("[image]"))
@@ -158,7 +159,7 @@ object MessageCopySpec extends Properties {
     /* Even all-masked, tool names are emitted verbatim
      * (they're not secrets per PR 2 scope).
      */
-    val card = MsgCard("assistant", List(ToolUseContent("Read")), Nil, rawIdx = 0)
+    val card = MsgCard("assistant", List(ToolUseContent("Read")), Nil, rawIdx = 0, removed = Nil)
     val out  = MessageCopy.toPlainText(List(card), maskAll).text
     Result
       .assert(out.contains("[tool: Read]"))
@@ -200,7 +201,7 @@ object MessageCopySpec extends Properties {
   def testTextContentId: Result = {
     // Twin of MessageViewSpec.testTokenIdNamespace, which pins the
     // rendered id `m.7.text.0#0` for the same card shape.
-    val card = MsgCard("assistant", List(TextContent(FakeAnthropic)), Nil, rawIdx = 7)
+    val card = MsgCard("assistant", List(TextContent(FakeAnthropic)), Nil, rawIdx = 7, removed = Nil)
     val res  = MessageCopy.toPlainText(List(card), Set("m.7.text.0#0"))
     Result.all(
       List(
@@ -213,7 +214,7 @@ object MessageCopySpec extends Properties {
   }
 
   def testUserPartId: Result = {
-    val card = MsgCard("user", contents = Nil, userParts = List(TextMsgPart(FakeAnthropic)), rawIdx = 2)
+    val card = MsgCard("user", contents = Nil, userParts = List(TextMsgPart(FakeAnthropic)), rawIdx = 2, removed = Nil)
     val res  = MessageCopy.toPlainText(List(card), Set("m.2.user.0#0"))
     Result
       .assert(res.text.contains(FakeAnthropic) && res.revealed == 1)
@@ -228,6 +229,7 @@ object MessageCopySpec extends Properties {
       contents = Nil,
       userParts = List(TextMsgPart("x"), InjectedMsgPart("u999", "L", FakeAnthropic, "badge-x")),
       rawIdx = 3,
+      removed = Nil,
     )
     val res  = MessageCopy.toPlainText(List(card), Set("m.3.inj.1#0"))
     Result
@@ -237,7 +239,13 @@ object MessageCopySpec extends Properties {
 
   def testToolResultId: Result = {
     // "key " is 4 chars, so the token span starts at offset 4.
-    val card = MsgCard("assistant", List(ToolResultContent(s"key $FakeAnthropic", truncated = false)), Nil, rawIdx = 4)
+    val card = MsgCard(
+      "assistant",
+      List(ToolResultContent(s"key $FakeAnthropic", truncated = false)),
+      Nil,
+      rawIdx = 4,
+      removed = Nil
+    )
     val res  = MessageCopy.toPlainText(List(card), Set("m.4.tr.0#4"))
     Result
       .assert(res.text.contains(FakeAnthropic) && res.revealed == 1)
@@ -247,7 +255,7 @@ object MessageCopySpec extends Properties {
   def testCounts: Result = {
     val k1   = "sk-ant-abcdefghijklmnopqrstuvwxyz11111"
     val k2   = "AKIA0123456789ABCDEF"
-    val card = MsgCard("assistant", List(TextContent(s"$k1 and $k2")), Nil, rawIdx = 0)
+    val card = MsgCard("assistant", List(TextContent(s"$k1 and $k2")), Nil, rawIdx = 0, removed = Nil)
     val res  = MessageCopy.toPlainText(List(card), Set("m.0.text.0#0"))
     Result.all(
       List(
@@ -261,7 +269,8 @@ object MessageCopySpec extends Properties {
   }
 
   def testCountsSpanFree: Result = {
-    val cards = List(textCard("user", "hi"), MsgCard("assistant", List(ToolUseContent("Read")), Nil, rawIdx = 0))
+    val cards =
+      List(textCard("user", "hi"), MsgCard("assistant", List(ToolUseContent("Read")), Nil, rawIdx = 0, removed = Nil))
     val res   = MessageCopy.toPlainText(cards, maskAll)
     Result
       .assert(res.total == 0 && res.revealed == 0)
@@ -281,6 +290,7 @@ object MessageCopySpec extends Properties {
           InjectedMsgPart("u42", "system-reminder", s"injected $FakeAnthropic", "badge-x"),
         ),
         rawIdx = 1,
+        removed = Nil,
       ),
       MsgCard(
         "assistant",
@@ -291,6 +301,7 @@ object MessageCopySpec extends Properties {
         ),
         userParts = Nil,
         rawIdx = 2,
+        removed = Nil,
       ),
     )
 

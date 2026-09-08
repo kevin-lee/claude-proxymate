@@ -4,7 +4,7 @@ import cats.effect.IO
 import cats.syntax.all.*
 import org.http4s.*
 import org.http4s.client.Client
-import org.http4s.headers.Host
+import org.http4s.headers.{`Content-Length`, Host}
 import org.typelevel.ci.*
 
 /** Forwards requests to the Anthropic API (api.anthropic.com:443). */
@@ -14,10 +14,18 @@ object AnthropicForwarder {
   private val anthropicPort = 443
 
   def forward(client: Client[IO], req: Request[IO], bodyBytes: Array[Byte]): IO[Response[IO]] = {
-    // Build upstream request with modified headers
+    /* Build upstream request with modified headers. The body may have been
+     * rewritten by the request filter, so the client's Content-Length (and any
+     * Transfer-Encoding) is dropped and the real length is set explicitly:
+     * ember does not derive it for a raw byte stream. */
     val upstreamHeaders = Headers(
-      req.headers.headers.filterNot(_.name === ci"Accept-Encoding")
-    ).put(Host(anthropicHost, anthropicPort.some))
+      req
+        .headers
+        .headers
+        .filterNot(h =>
+          h.name === ci"Accept-Encoding" || h.name === ci"Content-Length" || h.name === ci"Transfer-Encoding"
+        )
+    ).put(Host(anthropicHost, anthropicPort.some), `Content-Length`.unsafeFromLong(bodyBytes.length.toLong))
 
     val upstreamUri = Uri(
       scheme = Uri.Scheme.https.some,

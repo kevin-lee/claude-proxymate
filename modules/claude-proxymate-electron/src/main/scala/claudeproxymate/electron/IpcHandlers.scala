@@ -64,6 +64,27 @@ object IpcHandlers {
         openExternal(urlArg)
       }: js.Function2[js.Dynamic, js.Dynamic, js.Any]
     )
+
+    IpcMain.handle(
+      IpcChannels.FilterConfigGet,
+      { (_: js.Dynamic, _: js.Dynamic) =>
+        RequestFilterStore.load()
+      }: js.Function2[js.Dynamic, js.Dynamic, js.Any]
+    )
+
+    IpcMain.handle(
+      IpcChannels.FilterConfigSet,
+      { (_: js.Dynamic, configArg: js.Dynamic) =>
+        RequestFilterStore.save(configArg)
+      }: js.Function2[js.Dynamic, js.Dynamic, js.Any]
+    )
+
+    IpcMain.handle(
+      IpcChannels.ClaudeInventoryScan,
+      { (_: js.Dynamic, _: js.Dynamic) =>
+        ClaudeInventoryScan.scan()
+      }: js.Function2[js.Dynamic, js.Dynamic, js.Any]
+    )
   }
 
   /** Validate a URL against the allowlist and forward to `shell.openExternal`.
@@ -125,9 +146,11 @@ object IpcHandlers {
 
         case None =>
           val binaryPath = Config.proxyBinaryPath
+          /* The filter config file must exist before the binary starts reading it per request. */
+          RequestFilterStore.ensureExists()
           val child      = ChildProcessModule.spawn(
             binaryPath,
-            js.Array("--port", port.toString),
+            js.Array("--port", port.toString, "--filter-config", RequestFilterStore.filePath),
             js.Dynamic
               .literal(
                 stdio = js.Array("pipe", "pipe", "pipe"),

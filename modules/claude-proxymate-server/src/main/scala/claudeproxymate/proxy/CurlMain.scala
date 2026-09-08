@@ -17,19 +17,24 @@ import claudeproxymate.core.ProxyEvent
 object CurlMain extends IOApp {
 
   override def run(args: List[String]): IO[ExitCode] = {
-    val port = Port.fromInt(PortArg.parse(args)).getOrElse(port"8888")
+    val port             = Port.fromInt(PortArg.parse(args)).getOrElse(port"8888")
+    val filterConfigPath = FilterConfigArg.parse(args)
 
-    EmberServerBuilder
-      .default[IO]
-      .withHost(ipv4"127.0.0.1")
-      .withPort(port)
-      .withHttpApp(ProxyServer.routes(CurlHttpClient.client))
-      .build
-      .use { server =>
-        for {
-          _ <- EventEmitter.emit(ProxyEvent.ProxyStarted(server.address.port.value))
-          _ <- IO.never[Unit]
-        } yield ()
+    FilterConfigLoader
+      .make(filterConfigPath)
+      .flatMap { loader =>
+        EmberServerBuilder
+          .default[IO]
+          .withHost(ipv4"127.0.0.1")
+          .withPort(port)
+          .withHttpApp(ProxyServer.routes(CurlHttpClient.client, loader))
+          .build
+          .use { server =>
+            for {
+              _ <- EventEmitter.emit(ProxyEvent.ProxyStarted(server.address.port.value))
+              _ <- IO.never[Unit]
+            } yield ()
+          }
       }
       .handleErrorWith { e =>
         /* Bind/startup failures must reach the Electron main process as a

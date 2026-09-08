@@ -15,6 +15,8 @@ object IndexHtmlGeneratorSpec extends Properties {
     example("proxy clear button has the ProxyClearBtn id", testProxyClearBtnId),
     example("header has the AppHeader id", testAppHeaderId),
     example("address bar carries the port lock", testProxyPortLockId),
+    example("address bar carries the request filter button and its count badge", testRequestFilterButtonIds),
+    example("request filter modal shell is emitted hidden", testRequestFilterModalIds),
     example("status bar elements have their ids", testStatusBarElementIds),
     example("route segments carry their data-route attributes", testRouteSegDataAttrs),
     example("the Global route segment is the active default (and Manual is not)", testRouteSegDefaultActive),
@@ -147,6 +149,35 @@ object IndexHtmlGeneratorSpec extends Properties {
     Result
       .assert(rendered.contains(s"""id="${HtmlIds.ProxyPortLock}""""))
       .log(s"`id=\"${HtmlIds.ProxyPortLock}\"` missing from generated HTML")
+
+  def testRequestFilterButtonIds: Result =
+    Result.all(
+      List(
+        Result
+          .assert(rendered.contains(s"""id="${HtmlIds.RequestFilterBtn}""""))
+          .log(s"`id=\"${HtmlIds.RequestFilterBtn}\"` missing from generated HTML"),
+        Result
+          .assert(rendered.contains(s"""id="${HtmlIds.RequestFilterCount}""""))
+          .log(s"`id=\"${HtmlIds.RequestFilterCount}\"` missing from generated HTML"),
+        Result
+          .assert(rendered.contains("""data-i18n="filter.button""""))
+          .log("filter button label should be translatable"),
+      )
+    )
+
+  def testRequestFilterModalIds: Result =
+    Result.all(
+      List(
+        Result
+          .assert(
+            rendered.contains(s"""id="${HtmlIds.RequestFilterModal}" class="onboard-overlay" style="display:none"""")
+          )
+          .log(s"hidden `${HtmlIds.RequestFilterModal}` overlay missing from generated HTML"),
+        Result
+          .assert(rendered.contains(s"""id="${HtmlIds.RequestFilterCard}""""))
+          .log(s"`id=\"${HtmlIds.RequestFilterCard}\"` missing from generated HTML"),
+      )
+    )
 
   def testStatusBarElementIds: Result =
     Result.all(
