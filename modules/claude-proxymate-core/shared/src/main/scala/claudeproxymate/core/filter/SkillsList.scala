@@ -1,5 +1,7 @@
 package claudeproxymate.core.filter
 
+import cats.syntax.all.*
+
 import scala.annotation.tailrec
 
 /** One `- name: description` entry of the skills reminder, as the half-open
@@ -44,7 +46,7 @@ object SkillsList {
     */
   private def nameOf(line: String): String = {
     val body = line.trim.drop(EntryPrefix.length)
-    val idx  = body.indices.find(i => body(i) == ':' && (i + 1 == body.length || body(i + 1) == ' '))
+    val idx  = body.indices.find(i => body(i) === ':' && (i + 1 === body.length || body(i + 1) === ' '))
     idx.fold(body.trim)(i => body.substring(0, i))
   }
 
@@ -59,9 +61,9 @@ object SkillsList {
       val (closed, open) = lines(inner, afterMarker).foldLeft((List.empty[SkillEntry], Option.empty[SkillEntry])) {
         case ((done, current), (start, end, line)) =>
           if (isEntryStart(line)) {
-            (current.fold(done)(_ :: done), Some(SkillEntry(nameOf(line), start, end)))
+            (current.fold(done)(_ :: done), SkillEntry(nameOf(line), start, end).some)
           } else if (isBlank(line)) {
-            (current.fold(done)(_ :: done), None)
+            (current.fold(done)(_ :: done), none[SkillEntry])
           } else {
             (done, current.map(_.copy(end = end)))
           }

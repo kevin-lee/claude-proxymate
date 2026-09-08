@@ -1,8 +1,8 @@
 package claudeproxymate.electron
 
 import cats.syntax.all.*
-import claudeproxymate.core.VsCodeEnv
-import claudeproxymate.electron.SyncFileOps.{RecordEntry, SettingsFile, SyncAction, SyncTarget, TargetResult}
+import claudeproxymate.core.{SyncAction, VsCodeEnv}
+import claudeproxymate.electron.SyncFileOps.{RecordEntry, SettingsFile, SyncTarget, TargetResult}
 import claudeproxymate.electron.facades._
 
 import scala.scalajs.js
@@ -213,8 +213,9 @@ object VsCodeSync {
           val entries = arr
             .zipWithIndex
             .toList
-            .flatMap { case (element, index) =>
-              extractEntry(element, index)
+            .flatMap {
+              case (element, index) =>
+                extractEntry(element, index)
             }
           ParsedSettings(entries, arr.length.some).asRight[String]
         }

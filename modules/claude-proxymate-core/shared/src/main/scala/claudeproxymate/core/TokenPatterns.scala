@@ -25,8 +25,12 @@ object TokenPatterns {
   /** Match against the source string. `start` and `end` are
     * substring offsets (the matched slice is `s.substring(start, end)`).
     */
-  final case class TokenMatch(start: Int, end: Int, name: String) {
-    def length: Int = end - start
+  final case class TokenMatch(start: Int, end: Int, name: String)
+
+  object TokenMatch {
+    extension (tokenMatch: TokenMatch) {
+      def length: Int = tokenMatch.end - tokenMatch.start
+    }
   }
 
   /** Pattern table. Order matters when prefixes overlap: longer /

@@ -10,8 +10,12 @@ final case class InventoryItem(category: FilterCategory, key: String, label: Str
   * exists only in the saved config (the file is not around right now); such
   * entries are kept and ignored, they may belong to another project.
   */
-final case class MergedItem(item: InventoryItem, onDisk: Boolean, inTraffic: Boolean) {
-  def absent: Boolean = !onDisk && !inTraffic
+final case class MergedItem(item: InventoryItem, onDisk: Boolean, inTraffic: Boolean)
+
+object MergedItem {
+  extension (merged: MergedItem) {
+    def absent: Boolean = !merged.onDisk && !merged.inTraffic
+  }
 }
 
 /** Builds the lists the Request Filter sheet shows. */

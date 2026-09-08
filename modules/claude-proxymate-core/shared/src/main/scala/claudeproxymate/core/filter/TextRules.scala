@@ -28,29 +28,34 @@ object TextRules {
 
   def compile(rule: TextRule): Either[String, CompiledRule] = rule.kind match {
     case TextRuleKind.Text =>
-      if (rule.pattern.isEmpty) Left("text: empty pattern")
-      else Right(CompiledRule(rule, literalMatches(rule.pattern, _)))
+      Either.cond(
+        rule.pattern.nonEmpty,
+        CompiledRule(rule, text => literalMatches(rule.pattern, text)),
+        "text: empty pattern",
+      )
 
     case TextRuleKind.Regex =>
-      if (rule.pattern.isEmpty) Left("regex: empty pattern")
+      if (rule.pattern.isEmpty) "regex: empty pattern".asLeft[CompiledRule]
       else {
         Try(rule.pattern.r)
           .toEither
-          .left
-          .map {
+          .leftMap {
             case e: PatternSyntaxException => s"regex ${rule.pattern}: ${e.getDescription}"
             case e => s"regex ${rule.pattern}: ${Option(e.getMessage).getOrElse(e.getClass.getName)}"
           }
-          .map(re => CompiledRule(rule, regexMatches(re, _)))
+          .map(re => CompiledRule(rule, text => regexMatches(re, text)))
       }
 
     case TextRuleKind.Tag =>
-      if (!TagNamePattern.matches(rule.pattern)) Left(s"tag ${rule.pattern}: invalid tag name")
-      else {
-        val q  = Regex.quote(rule.pattern)
-        val re = s"(?s)<$q(?:\\s[^>]*)?>.*?</$q>".r
-        Right(CompiledRule(rule, regexMatches(re, _)))
-      }
+      Either.cond(
+        TagNamePattern.matches(rule.pattern),
+        right = {
+          val quoted = Regex.quote(rule.pattern)
+          val re     = s"(?s)<$quoted(?:\\s[^>]*)?>.*?</$quoted>".r
+          CompiledRule(rule, text => regexMatches(re, text))
+        },
+        left = s"tag ${rule.pattern}: invalid tag name",
+      )
   }
 
   /** Applies the rules in order, each on the output of the previous one, and

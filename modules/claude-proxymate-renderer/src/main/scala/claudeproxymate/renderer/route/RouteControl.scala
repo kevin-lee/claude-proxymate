@@ -1,7 +1,7 @@
 package claudeproxymate.renderer.route
 
 import cats.syntax.all.*
-import claudeproxymate.core.{HtmlIds, RouteMode}
+import claudeproxymate.core.{HtmlIds, RouteMode, SyncAction}
 import claudeproxymate.renderer.facades.ElectronApi
 import claudeproxymate.renderer.i18n.I18n
 import claudeproxymate.renderer.state.AppState
@@ -22,8 +22,8 @@ import scala.scalajs.js
   */
 object RouteControl {
 
-  /** One per-target outcome from the main process (wire format). */
-  final case class SyncResult(target: String, action: String, reason: String)
+  /** One per-target outcome from the main process. */
+  final case class SyncResult(target: String, action: SyncAction, reason: String)
 
   // ── Pure helpers (unit-tested) ──
 
@@ -32,7 +32,7 @@ object RouteControl {
     */
   def alertKeys(results: List[SyncResult]): List[(String, Map[String, String])] = {
     val foreignTargets = results.collect {
-      case SyncResult(target, "skippedForeign", _) => target
+      case SyncResult(target, SyncAction.SkippedForeign, _) => target
     }
     val foreign        = Option
       .when(foreignTargets.nonEmpty)(
@@ -40,15 +40,20 @@ object RouteControl {
       )
       .toList
     val perTarget      = results.flatMap {
-      case SyncResult(target, "failed", reason) =>
+      case SyncResult(target, SyncAction.Failed, reason) =>
         ("route.alertFail", Map("target" -> target, "reason" -> reason)).some
-      case SyncResult(target, "restored", _) =>
+      case SyncResult(target, SyncAction.Restored, _) =>
         ("route.alertRestored", Map("target" -> target)).some
-      case SyncResult(target, "restoreFailed", path) =>
+      case SyncResult(target, SyncAction.RestoreFailed, path) =>
         ("route.alertRestoreFail", Map("target" -> target, "path" -> path)).some
-      case SyncResult(target, "concurrent", _) =>
+      case SyncResult(target, SyncAction.Concurrent, _) =>
         ("route.alertConcurrent", Map("target" -> target)).some
-      case SyncResult(_, _, _) =>
+      case SyncResult(
+             _,
+             SyncAction.Applied | SyncAction.Removed | SyncAction.Noop | SyncAction.AlreadyApplied |
+             SyncAction.SkippedForeign | SyncAction.NotDetected,
+             _,
+           ) =>
         none[(String, Map[String, String])]
     }
     foreign ++ perTarget
@@ -65,17 +70,12 @@ object RouteControl {
     }
   }
 
-  private def handleClick(e: dom.MouseEvent): Unit = {
-    val target = e.target.asInstanceOf[dom.Element]
-    if (target == null) return
-    val btn = target.closest(s"#${HtmlIds.RouteSeg} .seg-btn")
-    if (btn == null) return
-    val raw = btn.asInstanceOf[dom.html.Element].getAttribute("data-route")
-    if (raw == null) return
-    RouteMode.parse(raw).foreach { mode =>
-      if (mode =!= AppState.routeMode) setMode(mode) else ()
-    }
-  }
+  private def handleClick(e: dom.MouseEvent): Unit =
+    Option(e.target.asInstanceOf[dom.Element])
+      .flatMap(target => Option(target.closest(s"#${HtmlIds.RouteSeg} .seg-btn")))
+      .flatMap(btn => Option(btn.asInstanceOf[dom.html.Element].getAttribute("data-route")))
+      .flatMap(RouteMode.parse)
+      .foreach(mode => if (mode =!= AppState.routeMode) setMode(mode) else ())
 
   def setMode(requested: RouteMode): Unit = {
     ElectronApi.get match {
@@ -88,7 +88,7 @@ object RouteControl {
     setSegmentsDisabled(true)
 
     val onSuccess: js.Function1[js.Dynamic, Unit] = { (result: js.Dynamic) =>
-      val resolved = RouteMode.parse(asString(result.selectDynamic("mode"))).getOrElse(RouteMode.default)
+      val resolved    = RouteMode.parse(asString(result.selectDynamic("mode"))).getOrElse(RouteMode.default)
       AppState.routeMode = resolved
       val detectedRaw = result.selectDynamic("detected")
       val detected    = if (js.typeOf(detectedRaw) === "number") detectedRaw.asInstanceOf[Int] else 0
@@ -142,8 +142,9 @@ object RouteControl {
     segButtons.foreach(el => el.asInstanceOf[dom.html.Button].disabled = disabled)
 
   private def showAlerts(results: List[SyncResult]): Unit =
-    alertKeys(results).foreach { case (key, vars) =>
-      dom.window.alert(I18n.t(key, vars))
+    alertKeys(results).foreach {
+      case (key, vars) =>
+        dom.window.alert(I18n.t(key, vars))
     }
 
   private def extractResults(value: js.Dynamic): List[SyncResult] =
@@ -153,12 +154,17 @@ object RouteControl {
       value
         .asInstanceOf[js.Array[js.Dynamic]]
         .toList
-        .map { result =>
-          SyncResult(
-            asString(result.selectDynamic("target")),
-            asString(result.selectDynamic("action")),
-            asString(result.selectDynamic("reason")),
-          )
+        .flatMap { result =>
+          SyncAction
+            .parse(asString(result.selectDynamic("action")))
+            .map { action =>
+              SyncResult(
+                asString(result.selectDynamic("target")),
+                action,
+                asString(result.selectDynamic("reason")),
+              )
+            }
+            .toOption
         }
     }
 

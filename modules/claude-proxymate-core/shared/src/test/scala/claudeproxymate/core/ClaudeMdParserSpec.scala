@@ -7,7 +7,7 @@ object ClaudeMdParserSpec extends Properties {
 
   override def tests: List[Test] = List(
     property("global CLAUDE.md single section", testGlobalClaudeMd),
-    property("local CLAUDE.md single section", testLocalClaudeMd),
+    example("local CLAUDE.md single section", testLocalClaudeMd),
     property("global + local multiple sections", testMultipleSections),
     property("global rule file", testGlobalRule),
     property("memory file", testMemoryFile),
@@ -52,32 +52,29 @@ object ClaudeMdParserSpec extends Properties {
       )
     }
 
-  def testLocalClaudeMd: Property =
-    for {
-      _ <- Gen.constant(()).forAll
-    } yield {
-      val input    =
-        "Contents of /project/CLAUDE.md (project instructions, checked into the codebase):\n\n# Project Rules\ncontent"
-      val sections = ClaudeMdParser.parseClaudeMdSections(input)
+  def testLocalClaudeMd: Result = {
+    val input    =
+      "Contents of /project/CLAUDE.md (project instructions, checked into the codebase):\n\n# Project Rules\ncontent"
+    val sections = ClaudeMdParser.parseClaudeMdSections(input)
 
-      Result.all(
-        List(
-          (sections.length ==== 1)
-            .log(
-              s"sections.length should be 1 but got sections.length=${sections.length}"
-            ),
-          (sections.head.label ==== "\uD83D\uDCCB Local CLAUDE.md").log(
-            s"sections.head.label should be \uD83D\uDCCB Local CLAUDE.md but got sections.head.label=${sections.head.label}"
+    Result.all(
+      List(
+        (sections.length ==== 1)
+          .log(
+            s"sections.length should be 1 but got sections.length=${sections.length}"
           ),
-          (sections.head.scope ==== "local").log(
-            s"""sections.head.scope should be "local" but got sections.head.scope=${sections.head.scope}"""
-          ),
-          (sections.head.cls ==== "cyan").log(
-            s"""sections.head.cls should be "cyan" but got sections.head.cls=${sections.head.cls}"""
-          )
+        (sections.head.label ==== "\uD83D\uDCCB Local CLAUDE.md").log(
+          s"sections.head.label should be \uD83D\uDCCB Local CLAUDE.md but got sections.head.label=${sections.head.label}"
+        ),
+        (sections.head.scope ==== "local").log(
+          s"""sections.head.scope should be "local" but got sections.head.scope=${sections.head.scope}"""
+        ),
+        (sections.head.cls ==== "cyan").log(
+          s"""sections.head.cls should be "cyan" but got sections.head.cls=${sections.head.cls}"""
         )
       )
-    }
+    )
+  }
 
   def testMultipleSections: Property =
     for {

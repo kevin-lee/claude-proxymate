@@ -36,11 +36,12 @@ object RequestFilter {
             .partitionMap(TextRules.compile)
 
           val results = messages.zipWithIndex.map { case (msg, idx) => filterMessage(config, compiled, msg, idx) }
-          val removed = results.toList.flatMap(_._2)
+          val removed = results.toList.flatMap { case (_, removedItems) => removedItems }
 
           if (removed.isEmpty && skipped.isEmpty) FilterOutcome(body, none[FilterReport])
           else {
-            val newBody = body.mapObject(_.add("messages", Json.fromValues(results.map(_._1))))
+            val newBody =
+              body.mapObject(_.add("messages", Json.fromValues(results.map { case (filtered, _) => filtered })))
             val report  = FilterReport(
               originalBytes = TextRules.byteLen(body.noSpaces),
               filteredBytes = TextRules.byteLen(newBody.noSpaces),
@@ -95,7 +96,7 @@ object RequestFilter {
 
           case Some(_) | None => (msg, Nil)
         }
-      case _ => (msg, Nil)
+      case (Some(_), None) | (None, Some(_)) | (None, None) => (msg, Nil)
     }
   }
 

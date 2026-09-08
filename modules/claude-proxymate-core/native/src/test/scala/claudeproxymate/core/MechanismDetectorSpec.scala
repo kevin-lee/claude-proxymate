@@ -14,7 +14,7 @@ class MechanismDetectorSpec extends munit.FunSuite {
     val body = Json.obj(
       "messages" -> Json.arr(
         Json.obj(
-          "role"    -> "user".asJson,
+          "role" -> "user".asJson,
           "content" -> "<system-reminder>\nContents of /path/CLAUDE.md (desc):\n\ncontent\n</system-reminder>\nhello".asJson,
         )
       )
