@@ -17,6 +17,7 @@ Inspired by an early version of [claude-inspector](https://github.com/kangraemin
   - sensitive **URL query-string** values.
   - **Presenter mode** — one decisive global mask-all / reveal-all control: the **Mask secrets** switch in the status bar (or ⌘⇧M). **Copy is WYSIWYG**: the clipboard follows the on-screen mask state.
 - **Route Claude** — a Global / VS Code / Manual control that manages `ANTHROPIC_BASE_URL` for you: globally in `~/.claude/settings.json` (the default) or in VS Code-family `settings.json`, applied only while the proxy runs and cleaned up on stop/quit/crash.
+- **Request Filter** — strips injected content before a request is forwarded: some or all rule files, docs (`CLAUDE.md`, `MEMORY.md`, …) and skills, plus Text / Regex / Tag rules scoped to typed text, Claude's replies, or both. Configurable before the first capture, applied live, and reported per request as struck-through "removed" rows in the Messages tab.
 - **Search** across request / response / analysis / messages with match navigation.
 - **Theme** — system / light / dark, with OS `prefers-color-scheme` tracking.
 - **i18n** — English and Korean, externalized to `.properties` files and loaded at runtime.
@@ -316,6 +317,9 @@ Run the native proxy binary directly, without the Electron UI:
 
 # Custom port
 ./modules/claude-proxymate-server/target/scala-3.8.4/claude-proxymate-server-out --port 8080
+
+# With a request filter config (re-read on every request; see "Request Filter" below)
+./modules/claude-proxymate-server/target/scala-3.8.4/claude-proxymate-server-out --filter-config ~/request-filter.json
 ```
 
 The proxy emits JSON line events to stdout:
@@ -405,6 +409,41 @@ Limitations: only the default VS Code profile is managed (not
 `User/profiles/<id>`), snap/flatpak/`Code - OSS` install locations are not
 detected, running two app instances can fight over the entry, and already-open
 Claude sessions keep their environment until a new session starts.
+
+### Request Filter
+
+The **Filter** button in the address bar opens a sheet that decides what is
+stripped from a request before it is forwarded to Anthropic. Only `messages[]`
+is touched; `system`, `tools` and everything else pass through untouched.
+
+- **Rules**, **Docs**, **Skills** — each category has a *Keep all / Remove
+  selected / Remove all* switch and a checklist. Rules are the
+  `Contents of …/rules/*.md` sections Claude Code injects, Docs are every
+  other `Contents of <file>` section (global and project `CLAUDE.md`,
+  `MEMORY.md`, …), Skills are the entries of the "skills are available for use
+  with the Skill tool" reminder. The lists are read from `~/.claude` on disk
+  (rules, `CLAUDE.md`, `projects/*/memory/MEMORY.md`, `skills/*/SKILL.md`) so
+  the filter can be set up before the first capture; project-level files and
+  Claude Code's bundled skills appear once a request shows them. *Remove all*
+  is what catches items that have not been seen yet. A ticked file that is no
+  longer around is kept and ignored (it may belong to another project) and
+  shown as *not found*.
+- **Text rules** — *Text* (literal), *Regex* (RE2 syntax on the native proxy:
+  no lookahead, lookbehind or backreferences; a rule that fails to compile is
+  skipped and listed in the sheet) or *Tag* (removes `<name …>…</name>`
+  including the tag). Each rule has a scope: *Typed* (the user's own text,
+  never system-reminders or tool results), *Claude* (assistant text echoed as
+  history) or *Both*. A text block that becomes empty is dropped; a message
+  that becomes empty is replaced by `[filtered]` so the request stays valid.
+- The sheet previews the token change against the last captured request, and
+  every filtered capture carries a report: the Messages tab shows removed items
+  as struck-through "removed · ~N tok" rows, and the Request tab shows the body
+  that was actually sent.
+
+The config lives in `request-filter.json` under the app's `userData`
+directory and is passed to the proxy as `--filter-config <path>`; the proxy
+re-reads it on every request, so Save applies without a restart. Changing
+rules mid-session invalidates Claude Code's prompt cache once.
 
 ## Project Structure
 

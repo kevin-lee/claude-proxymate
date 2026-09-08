@@ -63,6 +63,7 @@ object IndexHtmlGenerator {
       ),
       body(
         onboardingModal(defaultLocale),
+        requestFilterModal,
         headerSection(defaultLocale),
         addressBar(defaultLocale),
         mainSection(defaultLocale),
@@ -261,6 +262,32 @@ object IndexHtmlGenerator {
           attr("title") := tx(m, "copy.copy"),
         )("\u29C9"),
       ),
+      requestFilterButton(m),
+    )
+
+  // ── Request Filter (address-bar button + modal shell filled at runtime) ──
+
+  /** Inline stroke funnel, 16px grid; recolors through `currentColor`. */
+  private val FunnelSvg: String =
+    """<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" """ +
+      """stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3h12L9.5 8.5V13l-3 1.2V8.5z"/></svg>"""
+
+  private def requestFilterButton(m: Map[String, String]): Frag =
+    button(
+      id := HtmlIds.RequestFilterBtn,
+      cls := "btn addr-filter",
+      i18nTitle := "filter.buttonTitle",
+      attr("title") := tx(m, "filter.buttonTitle"),
+    )(
+      raw(FunnelSvg),
+      span(i18n := "filter.button")(tx(m, "filter.button")),
+      span(id := HtmlIds.RequestFilterCount, cls := "addr-filter-count u-hide")("0"),
+    )
+
+  /** Empty overlay + card; `RequestFilterSheet` renders the card content when opened. */
+  private def requestFilterModal: Frag =
+    div(id := HtmlIds.RequestFilterModal, cls := "onboard-overlay", style := "display:none")(
+      div(id := HtmlIds.RequestFilterCard, cls := "onboard-card filter-card"),
     )
 
   // ── Status Bar (IDE-style bottom bar) ──

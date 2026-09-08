@@ -1,5 +1,6 @@
 package claudeproxymate.core
 
+import claudeproxymate.core.filter.{FilterReport, RemovedCategory, RemovedItem}
 import hedgehog.*
 import hedgehog.runner.*
 import io.circe.Json
@@ -9,6 +10,8 @@ object JsonLineProtocolSpec extends Properties {
   override def tests: List[Test] = List(
     /* encode => decode round-trips, one per ProxyEvent case */
     example("RequestCaptured round-trips through encode/decode", testRoundTripRequest),
+    example("RequestCaptured with a filter report round-trips", testRoundTripRequestWithReport),
+    example("RequestCaptured line without a filter field decodes to filter = None", testRequestWithoutFilterField),
     example("ResponseCaptured (Right body) round-trips", testRoundTripResponseJson),
     example("ResponseCaptured (Left raw body) round-trips", testRoundTripResponseRaw),
     example("ProxyStarted round-trips", testRoundTripStarted),
@@ -41,9 +44,45 @@ object JsonLineProtocolSpec extends Properties {
           method = "POST",
           path = "/v1/messages",
           body = Some(Json.obj("model" -> Json.fromString("claude"))),
+          filter = None,
         )
       )
     )
+
+  def testRoundTripRequestWithReport: Result =
+    roundTrip(
+      ProxyEvent.RequestCaptured(
+        ProxyRequest(
+          id = 1234L,
+          ts = "12:34:56",
+          method = "POST",
+          path = "/v1/messages",
+          body = Some(Json.obj("model" -> Json.fromString("claude"))),
+          filter = Some(
+            FilterReport(
+              originalBytes = 120,
+              filteredBytes = 80,
+              removed = List(
+                RemovedItem(RemovedCategory.Rule, "/u/.claude/rules/a.md", "📜 Global Rule: a.md", 0, 30),
+                RemovedItem(RemovedCategory.Text, "secret", "Text secret", 2, 10),
+              ),
+              skipped = List("regex (?=x: Unknown inline modifier"),
+            )
+          ),
+        )
+      )
+    )
+
+  def testRequestWithoutFilterField: Result = {
+    val line    =
+      """{"type":"request_captured","request":{"id":1,"ts":"00:00:00","method":"POST","path":"/v1/messages","body":null}}"""
+    val decoded = JsonLineProtocol.decode(line)
+    Result
+      .assert(
+        decoded == Right(ProxyEvent.RequestCaptured(ProxyRequest(1L, "00:00:00", "POST", "/v1/messages", None, None)))
+      )
+      .log(s"a line predating the filter field should decode with filter = None, got $decoded")
+  }
 
   def testRoundTripResponseJson: Result =
     roundTrip(

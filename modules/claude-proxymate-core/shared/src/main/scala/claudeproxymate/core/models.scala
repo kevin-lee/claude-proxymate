@@ -3,13 +3,19 @@ package claudeproxymate.core
 import cats.syntax.all.*
 import io.circe.Json
 
-/** Data sent to renderer on each intercepted request. */
+/** Data sent to renderer on each intercepted request.
+  *
+  * `body` is what was actually forwarded upstream. `filter` is present
+  * only when the request filter changed it (see
+  * [[claudeproxymate.core.filter.RequestFilter]]).
+  */
 final case class ProxyRequest(
   id: Long,
   ts: String,
   method: String,
   path: String,
   body: Option[Json],
+  filter: Option[claudeproxymate.core.filter.FilterReport],
 )
 
 /** Data sent to renderer on each intercepted response. */

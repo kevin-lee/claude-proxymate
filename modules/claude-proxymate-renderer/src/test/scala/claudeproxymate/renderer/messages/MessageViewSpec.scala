@@ -31,6 +31,8 @@ object MessageViewSpec extends Properties {
     example("TextMsgPart renders msg-typed", testTextMsgPart),
     example("InjectedMsgPart renders msg-injected-row + badge", testInjectedMsgPart),
     example("InjectedMsgPart badge has bb_/bc_ ids and data-msg-badge-uid", testInjectedMsgPartIds),
+    // Request filter ghost rows
+    example("removed marks render struck-through ghost rows before the parts", testGhostRows),
     // Search highlighting
     example("search query match wraps in mark", testSearchHighlightMatch),
     example("empty query produces no mark", testSearchHighlightEmpty),
@@ -80,10 +82,10 @@ object MessageViewSpec extends Properties {
     MessageView.buildCardsFrag(cards, isUserFilter, query).render
 
   private def textCard(role: String, text: String): MsgCard =
-    MsgCard(role, contents = List(TextContent(text)), userParts = Nil, rawIdx = 0)
+    MsgCard(role, contents = List(TextContent(text)), userParts = Nil, rawIdx = 0, removed = Nil)
 
   private def userCard(parts: List[MsgPart]): MsgCard =
-    MsgCard("user", contents = Nil, userParts = parts, rawIdx = 0)
+    MsgCard("user", contents = Nil, userParts = parts, rawIdx = 0, removed = Nil)
 
   // ── Empty / no-results ────────────────────────────────────────────────
 
@@ -181,7 +183,7 @@ object MessageViewSpec extends Properties {
   // ── Content types ─────────────────────────────────────────────────────
 
   def testToolUseContent: Result = {
-    val card = MsgCard("assistant", List(ToolUseContent("Read")), Nil, rawIdx = 0)
+    val card = MsgCard("assistant", List(ToolUseContent("Read")), Nil, rawIdx = 0, removed = Nil)
     val out  = renderCards(List(card))
     Result.all(
       List(
@@ -192,8 +194,10 @@ object MessageViewSpec extends Properties {
   }
 
   def testToolResultTruncated: Result = {
-    val card  = MsgCard("assistant", List(ToolResultContent("preview text", truncated = true)), Nil, rawIdx = 0)
-    val cardF = MsgCard("assistant", List(ToolResultContent("full preview", truncated = false)), Nil, rawIdx = 0)
+    val card  =
+      MsgCard("assistant", List(ToolResultContent("preview text", truncated = true)), Nil, rawIdx = 0, removed = Nil)
+    val cardF =
+      MsgCard("assistant", List(ToolResultContent("full preview", truncated = false)), Nil, rawIdx = 0, removed = Nil)
     val outT  = renderCards(List(card))
     val outF  = renderCards(List(cardF))
     Result.all(
@@ -206,7 +210,7 @@ object MessageViewSpec extends Properties {
   }
 
   def testOtherContent: Result = {
-    val card = MsgCard("assistant", List(OtherContent("image")), Nil, rawIdx = 0)
+    val card = MsgCard("assistant", List(OtherContent("image")), Nil, rawIdx = 0, removed = Nil)
     val out  = renderCards(List(card))
     Result.all(
       List(
@@ -217,7 +221,8 @@ object MessageViewSpec extends Properties {
   }
 
   def testMultiContentOrder: Result = {
-    val card      = MsgCard("assistant", List(TextContent("first"), ToolUseContent("second")), Nil, rawIdx = 0)
+    val card      =
+      MsgCard("assistant", List(TextContent("first"), ToolUseContent("second")), Nil, rawIdx = 0, removed = Nil)
     val out       = renderCards(List(card))
     val firstIdx  = out.indexOf("first")
     val secondIdx = out.indexOf("second")
@@ -301,7 +306,8 @@ object MessageViewSpec extends Properties {
         "assistant",
         List(ToolUseContent(payload), ToolResultContent(payload, truncated = false)),
         Nil,
-        rawIdx = 0
+        rawIdx = 0,
+        removed = Nil,
       )
       val out     = renderCards(List(card))
       Result
@@ -341,7 +347,7 @@ object MessageViewSpec extends Properties {
   private val FakeAnthropic = "sk-ant-abcdefghijklmnopqrstuvwxyz12345"
 
   def testTokenMaskInTextContent: Result = {
-    val card = MsgCard("assistant", List(TextContent(s"prefix $FakeAnthropic suffix")), Nil, rawIdx = 0)
+    val card = MsgCard("assistant", List(TextContent(s"prefix $FakeAnthropic suffix")), Nil, rawIdx = 0, removed = Nil)
     val out  = renderCards(List(card))
     Result.all(
       List(
@@ -356,7 +362,7 @@ object MessageViewSpec extends Properties {
   }
 
   def testTokenMaskNoLeakInTextContent: Result = {
-    val card = MsgCard("assistant", List(TextContent(s"prefix $FakeAnthropic suffix")), Nil, rawIdx = 0)
+    val card = MsgCard("assistant", List(TextContent(s"prefix $FakeAnthropic suffix")), Nil, rawIdx = 0, removed = Nil)
     val out  = renderCards(List(card))
     Result
       .assert(!out.contains(FakeAnthropic))
@@ -376,7 +382,13 @@ object MessageViewSpec extends Properties {
 
   def testTokenMaskInToolResult: Result = {
     val card =
-      MsgCard("assistant", List(ToolResultContent(s"result: $FakeAnthropic", truncated = false)), Nil, rawIdx = 0)
+      MsgCard(
+        "assistant",
+        List(ToolResultContent(s"result: $FakeAnthropic", truncated = false)),
+        Nil,
+        rawIdx = 0,
+        removed = Nil
+      )
     val out  = renderCards(List(card))
     Result.all(
       List(
@@ -393,6 +405,7 @@ object MessageViewSpec extends Properties {
       contents = List(TextContent(FakeAnthropic)),
       userParts = Nil,
       rawIdx = 7,
+      removed = Nil,
     )
     val out  = renderCards(List(card))
     Result
@@ -409,6 +422,7 @@ object MessageViewSpec extends Properties {
       contents = Nil,
       userParts = List(TextMsgPart("x"), InjectedMsgPart("u9", "L", FakeAnthropic, "badge-x")),
       rawIdx = 3,
+      removed = Nil,
     )
     val out  = renderCards(List(card))
     Result.all(
@@ -428,7 +442,7 @@ object MessageViewSpec extends Properties {
   private val FakeMsgId = "msg_01ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
   def testCorrMaskInTextContent: Result = {
-    val card = MsgCard("assistant", List(TextContent(s"response id: $FakeMsgId done")), Nil, rawIdx = 0)
+    val card = MsgCard("assistant", List(TextContent(s"response id: $FakeMsgId done")), Nil, rawIdx = 0, removed = Nil)
     val out  = renderCards(List(card))
     Result.all(
       List(
@@ -443,7 +457,7 @@ object MessageViewSpec extends Properties {
   }
 
   def testCorrMaskNoLeakInTextContent: Result = {
-    val card = MsgCard("assistant", List(TextContent(s"id=$FakeMsgId")), Nil, rawIdx = 0)
+    val card = MsgCard("assistant", List(TextContent(s"id=$FakeMsgId")), Nil, rawIdx = 0, removed = Nil)
     val out  = renderCards(List(card))
     Result
       .assert(!out.contains(FakeMsgId))
@@ -457,10 +471,38 @@ object MessageViewSpec extends Properties {
       contents = List(TextContent(FakeMsgId)),
       userParts = Nil,
       rawIdx = 5,
+      removed = Nil,
     )
     val out  = renderCards(List(card))
     Result
       .assert(out.contains("data-corr-id=\"corr:m.5.text.0#0\""))
       .log(s"expected `data-corr-id=\"corr:m.5.text.0#0\"` in: $out")
+  }
+
+  def testGhostRows: Result = {
+    val card = MsgCard(
+      "user",
+      contents = Nil,
+      userParts = List(TextMsgPart("typed")),
+      rawIdx = 0,
+      removed = List(RemovedMark("📜 Global Rule: X.md", 410)),
+    )
+    val out  = MessageView
+      .buildCardsFrag(List(card), isUserFilter = false, query = "", GhostLabels("removed · ~{tokens} tok"))
+      .render
+    Result.all(
+      List(
+        Result
+          .assert(out.contains(s"""class="msg-badge green ${MessageView.GhostClass}""""))
+          .log(s"ghost badge missing: $out"),
+        Result.assert(out.contains("📜 Global Rule: X.md")).log("ghost label"),
+        Result
+          .assert(out.contains(s"""<span class="${MessageView.GhostMetaClass}">removed · ~410 tok</span>"""))
+          .log(s"ghost meta: $out"),
+        Result
+          .assert(out.indexOf(MessageView.GhostClass) < out.indexOf("msg-typed"))
+          .log("ghost row should precede the parts"),
+      )
+    )
   }
 }

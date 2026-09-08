@@ -1,5 +1,6 @@
 package claudeproxymate.core
 
+import claudeproxymate.core.filter.{FilterReport, RemovedCategory, RemovedItem}
 import io.circe.Json
 
 /* munit port of the shared hedgehog JsonLineProtocolSpec for Scala
@@ -24,8 +25,45 @@ class JsonLineProtocolSpec extends munit.FunSuite {
           method = "POST",
           path = "/v1/messages",
           body = Some(Json.obj("model" -> Json.fromString("claude"))),
+          filter = None,
         )
       )
+    )
+  }
+
+  test("RequestCaptured with a filter report round-trips") {
+    roundTrip(
+      ProxyEvent.RequestCaptured(
+        ProxyRequest(
+          id = 1234L,
+          ts = "12:34:56",
+          method = "POST",
+          path = "/v1/messages",
+          body = Some(Json.obj("model" -> Json.fromString("claude"))),
+          filter = Some(
+            FilterReport(
+              originalBytes = 120,
+              filteredBytes = 80,
+              removed = List(
+                RemovedItem(RemovedCategory.Rule, "/u/.claude/rules/a.md", "📜 Global Rule: a.md", 0, 30),
+                RemovedItem(RemovedCategory.Text, "secret", "Text secret", 2, 10),
+              ),
+              skipped = List("regex (?=x: Unknown inline modifier"),
+            )
+          ),
+        )
+      )
+    )
+  }
+
+  test("RequestCaptured line without a filter field decodes to filter = None") {
+    val line    =
+      """{"type":"request_captured","request":{"id":1,"ts":"00:00:00","method":"POST","path":"/v1/messages","body":null}}"""
+    val decoded = JsonLineProtocol.decode(line)
+    assertEquals(
+      decoded,
+      Right(ProxyEvent.RequestCaptured(ProxyRequest(1L, "00:00:00", "POST", "/v1/messages", None, None))),
+      s"a line predating the filter field should decode with filter = None, got $decoded",
     )
   }
 

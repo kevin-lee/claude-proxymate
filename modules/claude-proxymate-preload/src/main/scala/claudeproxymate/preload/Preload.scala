@@ -71,6 +71,15 @@ object Preload {
             }: js.Function2[js.Dynamic, js.Dynamic, Unit]
           )
         }: js.Function1[js.Function1[js.Dynamic, Unit], Unit],
+        filterConfigGet = { () =>
+          IpcRenderer.invoke(IpcChannels.FilterConfigGet)
+        }: js.Function0[js.Promise[js.Any]],
+        filterConfigSet = { (config: js.Any) =>
+          IpcRenderer.invoke(IpcChannels.FilterConfigSet, config)
+        }: js.Function1[js.Any, js.Promise[js.Any]],
+        claudeInventoryScan = { () =>
+          IpcRenderer.invoke(IpcChannels.ClaudeInventoryScan)
+        }: js.Function0[js.Promise[js.Any]],
       )
 
     ContextBridge.exposeInMainWorld(IpcChannels.BridgeName, api.asInstanceOf[js.Object])

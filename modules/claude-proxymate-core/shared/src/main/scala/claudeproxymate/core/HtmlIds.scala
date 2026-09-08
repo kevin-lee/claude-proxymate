@@ -27,6 +27,12 @@ object HtmlIds {
   val ProxyClearBtn: String   = "proxyClearBtn"
   val ProxyPortLock: String   = "proxyPortLock"
 
+  // ── Request Filter ──
+  val RequestFilterBtn: String   = "requestFilterBtn"
+  val RequestFilterCount: String = "requestFilterCount"
+  val RequestFilterModal: String = "requestFilterModal"
+  val RequestFilterCard: String  = "requestFilterCard"
+
   // ── Status Bar ──
   val StatusBar: String      = "statusBar"
   val StatusPort: String     = "statusPort"
@@ -57,4 +63,5 @@ object HtmlIds {
   val SearchCounter: String          = "searchCounter"
   val MsgSearchInput: String         = "msgSearchInput"
   val MsgCountEl: String             = "msgCountEl"
+  val RequestFilterPreview: String   = "requestFilterPreview"
 }

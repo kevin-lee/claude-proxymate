@@ -1,7 +1,7 @@
 package claudeproxymate.renderer.messages
 
 import cats.syntax.all.*
-import claudeproxymate.core.HtmlIds
+import claudeproxymate.core.{HtmlIds, RequestAnatomy}
 import claudeproxymate.renderer.i18n.I18n
 import claudeproxymate.renderer.state.AppState
 import claudeproxymate.renderer.util.Debounce
@@ -236,7 +236,8 @@ object MessageRenderer {
       }
 
       if (!shouldSkip) {
-        val card = buildCard(role, contents, typedOnly).copy(rawIdx = rawIdx)
+        val removed = if (typedOnly) Nil else removedMarks(entry, rawIdx)
+        val card    = buildCard(role, contents, typedOnly).copy(rawIdx = rawIdx, removed = removed)
         if (cardIsNonEmpty(card) && cardMatchesQuery(card, q)) cards += card
       }
     }
@@ -279,7 +280,7 @@ object MessageRenderer {
 
     val body2: Frag =
       if (cards.isEmpty) MessageView.buildNoResultsFrag(I18n.t("proxy.noResults"))
-      else MessageView.buildCardsFrag(cards, isUserFilter, q)
+      else MessageView.buildCardsFrag(cards, isUserFilter, q, GhostLabels(I18n.t("filter.ghostRemoved")))
 
     val full = frag(
       div(style := "position:sticky;top:0;z-index:1;background:var(--bg)")(header),
@@ -301,6 +302,35 @@ object MessageRenderer {
       inputEl.focus()
       val len     = inputEl.value.length
       inputEl.setSelectionRange(len, len)
+    }
+  }
+
+  /** The request filter's removed items for message `rawIdx` (from the capture's
+    * `filter.removed`, emitted by the proxy), as ghost-row marks. The appended
+    * response message never has any.
+    */
+  private def removedMarks(entry: js.Dynamic, rawIdx: Int): List[RemovedMark] = {
+    val filter = entry.selectDynamic("filter")
+    if (js.isUndefined(filter) || filter == null) Nil
+    else {
+      val removed = filter.selectDynamic("removed")
+      if (!js.Array.isArray(removed)) Nil
+      else
+        removed
+          .asInstanceOf[js.Array[js.Dynamic]]
+          .toList
+          .filter { r =>
+            val idx = r.selectDynamic("messageIndex")
+            !js.isUndefined(idx) && idx != null && idx.asInstanceOf[Int] === rawIdx
+          }
+          .map { r =>
+            val label = r.selectDynamic("label")
+            val bytes = r.selectDynamic("bytes")
+            RemovedMark(
+              if (js.isUndefined(label) || label == null) "" else label.toString,
+              if (js.isUndefined(bytes) || bytes == null) 0 else RequestAnatomy.estTokens(bytes.asInstanceOf[Int]),
+            )
+          }
     }
   }
 
@@ -331,7 +361,7 @@ object MessageRenderer {
           }
         }
       }
-      MsgCard(role, contents = Nil, userParts = parts.toList, rawIdx = 0)
+      MsgCard(role, contents = Nil, userParts = parts.toList, rawIdx = 0, removed = Nil)
     } else {
       val msgContents = contents.toList.map { c =>
         val cType = c.selectDynamic("type").asInstanceOf[String]
@@ -363,7 +393,7 @@ object MessageRenderer {
             MsgContent.OtherContent(other)
         }
       }
-      MsgCard(role, contents = msgContents, userParts = Nil, rawIdx = 0)
+      MsgCard(role, contents = msgContents, userParts = Nil, rawIdx = 0, removed = Nil)
     }
   }
 
