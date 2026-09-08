@@ -90,8 +90,9 @@ object RequestFilterSheet {
 
   /** Update only the preview line (keeps the focused pattern input alive). */
   private def refreshPreview(): Unit = {
-    val el = dom.document.getElementById(HtmlIds.RequestFilterPreview)
-    if (el != null) el.textContent = RequestFilterView.buildPreviewText(labels(), previewOf(draft)._1) else ()
+    val (preview, _, _) = previewOf(draft)
+    Option(dom.document.getElementById(HtmlIds.RequestFilterPreview))
+      .foreach(el => el.textContent = RequestFilterView.buildPreviewText(labels(), preview))
   }
 
   /** Paint the address-bar button: rule count badge and active state. */
@@ -219,11 +220,16 @@ object RequestFilterSheet {
     */
   private def diskLabel(cat: FilterCategory, key: String, scanLabel: String): String =
     cat match {
-      case FilterCategory.Rules => ClaudeMdParser.label(key, GlobalDesc)._1
+      case FilterCategory.Rules => globalLabel(key)
       case FilterCategory.Docs =>
-        if (key.endsWith("CLAUDE.md")) ClaudeMdParser.label(key, GlobalDesc)._1 else s"🧠 Memory: $scanLabel"
+        if (key.endsWith("CLAUDE.md")) globalLabel(key) else s"🧠 Memory: $scanLabel"
       case FilterCategory.Skills => s"🔧 $scanLabel"
     }
+
+  private def globalLabel(key: String): String = {
+    val (label, _, _) = ClaudeMdParser.label(key, GlobalDesc)
+    label
+  }
 
   private def parseDisk(result: js.Dynamic): List[InventoryItem] = {
     def items(field: String, cat: FilterCategory): List[InventoryItem] = {
@@ -299,26 +305,23 @@ object RequestFilterSheet {
     if (v == null) "" else v
   }
 
-  private def handleClick(e: dom.MouseEvent): Unit = {
-    val target   = e.target.asInstanceOf[dom.Element]
-    if (target == null) return
-    if (target.closest(s"#${HtmlIds.RequestFilterBtn}") != null) {
-      open()
-      return
+  private def handleClick(e: dom.MouseEvent): Unit =
+    Option(e.target.asInstanceOf[dom.Element]).foreach { target =>
+      if (target.closest(s"#${HtmlIds.RequestFilterBtn}") != null) open()
+      else if (!isOpen) ()
+      else if (modalEl.exists(_ eq target)) close()
+      else {
+        Option(target.closest(s"[${RequestFilterView.ActionAttr}]"))
+          .foreach(actionEl => dispatchAction(actionEl.asInstanceOf[dom.html.Element]))
+      }
     }
-    if (!isOpen) return
-    if (modalEl.exists(_ eq target)) {
-      close()
-      return
-    }
-    val actionEl = target.closest(s"[${RequestFilterView.ActionAttr}]")
-    if (actionEl == null) return
-    val el       = actionEl.asInstanceOf[dom.html.Element]
-    val action   = attrOf(el, RequestFilterView.ActionAttr)
-    val cat      = FilterCategory.parse(attrOf(el, RequestFilterView.CatAttr))
-    val key      = attrOf(el, RequestFilterView.KeyAttr)
-    val idx      = attrOf(el, RequestFilterView.IdxAttr).toIntOption
-    val value    = attrOf(el, RequestFilterView.ValueAttr)
+
+  private def dispatchAction(el: dom.html.Element): Unit = {
+    val action = attrOf(el, RequestFilterView.ActionAttr)
+    val cat    = FilterCategory.parse(attrOf(el, RequestFilterView.CatAttr))
+    val key    = attrOf(el, RequestFilterView.KeyAttr)
+    val idx    = attrOf(el, RequestFilterView.IdxAttr).toIntOption
+    val value  = attrOf(el, RequestFilterView.ValueAttr)
 
     import RequestFilterView.Action
     action match {
@@ -326,7 +329,7 @@ object RequestFilterSheet {
       case Action.Mode =>
         (cat, CategoryMode.parse(value)) match {
           case (Some(c), Some(m)) => update(FilterConfigEdits.setMode(c, m))
-          case _ => ()
+          case (Some(_), None) | (None, Some(_)) | (None, None) => ()
         }
       case Action.ToggleItem =>
         cat.foreach(c => if (key.nonEmpty) update(FilterConfigEdits.toggleKey(c, key)) else ())
@@ -336,12 +339,12 @@ object RequestFilterSheet {
       case Action.RuleKind =>
         (idx, TextRuleKind.parse(value)) match {
           case (Some(i), Some(k)) => update(FilterConfigEdits.setRuleKind(i, k))
-          case _ => ()
+          case (Some(_), None) | (None, Some(_)) | (None, None) => ()
         }
       case Action.RuleScope =>
         (idx, TextRuleScope.parse(value)) match {
           case (Some(i), Some(s)) => update(FilterConfigEdits.setRuleScope(i, s))
-          case _ => ()
+          case (Some(_), None) | (None, Some(_)) | (None, None) => ()
         }
       case Action.RuleEnabled =>
         idx.foreach { i =>
@@ -354,17 +357,18 @@ object RequestFilterSheet {
     }
   }
 
-  private def handleInput(e: dom.Event): Unit = {
-    if (!isOpen) return
-    val target = e.target.asInstanceOf[dom.Element]
-    if (target == null) return
-    val el     = target.asInstanceOf[dom.html.Element]
-    if (attrOf(el, RequestFilterView.ActionAttr) =!= RequestFilterView.Action.RulePattern) return
-    attrOf(el, RequestFilterView.IdxAttr).toIntOption.foreach { i =>
-      draft = FilterConfigEdits.setRulePattern(i, el.asInstanceOf[dom.html.Input].value)(draft)
-      refreshPreview()
-    }
-  }
+  private def handleInput(e: dom.Event): Unit =
+    if (isOpen) {
+      Option(e.target.asInstanceOf[dom.Element])
+        .map(_.asInstanceOf[dom.html.Element])
+        .filter(el => attrOf(el, RequestFilterView.ActionAttr) === RequestFilterView.Action.RulePattern)
+        .foreach { el =>
+          attrOf(el, RequestFilterView.IdxAttr).toIntOption.foreach { i =>
+            draft = FilterConfigEdits.setRulePattern(i, el.asInstanceOf[dom.html.Input].value)(draft)
+            refreshPreview()
+          }
+        }
+    } else ()
 
   private def handleKeydown(e: dom.KeyboardEvent): Unit =
     if (isOpen && e.key === "Escape") {

@@ -16,7 +16,7 @@ object Analytics {
     Option(AnalyticsConfig.measurementId)
       .filter(_.nonEmpty)
       .getOrElse(sys.env.getOrElse("GA_MEASUREMENT_ID", ""))
-  private val ApiSecret =
+  private val ApiSecret     =
     Option(AnalyticsConfig.apiSecret)
       .filter(_.nonEmpty)
       .getOrElse(sys.env.getOrElse("GA_API_SECRET", ""))

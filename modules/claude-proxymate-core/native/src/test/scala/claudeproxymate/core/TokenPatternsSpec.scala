@@ -165,7 +165,9 @@ class TokenPatternsSpec extends munit.FunSuite {
     assert(TokenPatterns.scan(s).isEmpty, s"digit string should not match: $s")
   }
 
-  test("random alphanumeric of length 50 with no recognized prefix produces zero matches (example: digits with spaces)") {
+  test(
+    "random alphanumeric of length 50 with no recognized prefix produces zero matches (example: digits with spaces)"
+  ) {
     val s = "1234 5678 9012 3456 7890"
     assert(TokenPatterns.scan(s).isEmpty, s"digit/space string should not match: $s")
   }

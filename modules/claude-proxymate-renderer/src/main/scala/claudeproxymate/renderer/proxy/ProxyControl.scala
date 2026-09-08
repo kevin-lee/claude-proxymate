@@ -65,7 +65,7 @@ object ProxyControl {
     val stored = dom.window.localStorage.getItem(PortStorageKey)
     if (stored != null) {
       parsePort(stored).foreach { port =>
-        val portEl = dom.document.getElementById(HtmlIds.ProxyPort)
+        val portEl     = dom.document.getElementById(HtmlIds.ProxyPort)
         if (portEl != null) portEl.asInstanceOf[dom.html.Input].value = port.toString
         val statusPort = dom.document.getElementById(HtmlIds.StatusPort)
         if (statusPort != null) statusPort.textContent = port.toString
@@ -85,15 +85,16 @@ object ProxyControl {
 
   private def armWatchdog(): Unit = {
     cancelWatchdog()
-    watchdogId = Some(
-      dom.window.setTimeout(
+    watchdogId = dom
+      .window
+      .setTimeout(
         () => {
           watchdogId = none[Int]
           reconcileViaStatus()
         },
         10000,
       )
-    )
+      .some
   }
 
   private def cancelWatchdog(): Unit = {
@@ -165,7 +166,7 @@ object ProxyControl {
     * running): mirror the value into the status bar and persist it.
     */
   private def handleInput(e: dom.Event): Unit = {
-    val target = e.target.asInstanceOf[dom.Element]
+    val target     = e.target.asInstanceOf[dom.Element]
     if (target == null || target.id =!= HtmlIds.ProxyPort) return
     val value      = target.asInstanceOf[dom.html.Input].value
     val statusPort = dom.document.getElementById(HtmlIds.StatusPort)
@@ -179,8 +180,9 @@ object ProxyControl {
     * VS Code settings sync so the two can never drift.
     */
   private def commandText(port: String): String = {
-    val parsedPort = try port.toInt
-    catch { case _: Throwable => 8888 }
+    val parsedPort =
+      try port.toInt
+      catch { case _: Throwable => 8888 }
     s"${VsCodeEnv.EnvVarName}=${VsCodeEnv.baseUrl(parsedPort)} claude"
   }
 
@@ -249,7 +251,7 @@ object ProxyControl {
     } else ()
     renderReqCount()
 
-    val cmdBox = dom.document.getElementById(HtmlIds.ProxyCmdBox)
+    val cmdBox  = dom.document.getElementById(HtmlIds.ProxyCmdBox)
     if (cmdBox != null) {
       if (running) {
         locally { val _ = cmdBox.classList.add("running") }
@@ -257,7 +259,7 @@ object ProxyControl {
         locally { val _ = cmdBox.classList.remove("running") }
       }
     } else ()
-    val cmdEl  = dom.document.getElementById(HtmlIds.ProxyCmdText)
+    val cmdEl   = dom.document.getElementById(HtmlIds.ProxyCmdText)
     if (cmdEl != null) {
       cmdEl.textContent =
         if (running) commandText(AppState.proxyActualPort.toString)

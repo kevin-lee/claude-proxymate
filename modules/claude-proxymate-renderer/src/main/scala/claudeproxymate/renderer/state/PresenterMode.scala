@@ -62,10 +62,10 @@ object PresenterMode {
     * so a later `applyI18n` (locale switch) keeps the tooltip truthful.
     */
   def renderButton(): Unit = {
-    val btn = dom.document.getElementById(HtmlIds.MaskToggleBtn)
+    val btn      = dom.document.getElementById(HtmlIds.MaskToggleBtn)
     if (btn == null) return
-    val el  = btn.asInstanceOf[dom.html.Element]
-    val on  = AppState.presenterMaskAll
+    val el       = btn.asInstanceOf[dom.html.Element]
+    val on       = AppState.presenterMaskAll
     if (on) {
       locally { val _ = el.classList.add("on") }
     } else {

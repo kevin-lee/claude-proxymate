@@ -1,6 +1,7 @@
 package claudeproxymate.electron
 
 import cats.syntax.all.*
+import claudeproxymate.core.SyncAction
 import claudeproxymate.electron.facades._
 
 import scala.scalajs.js
@@ -28,37 +29,6 @@ object SyncFileOps {
 
   /** A settings file we manage `ANTHROPIC_BASE_URL` in. */
   final case class SyncTarget(id: String, displayName: String, settingsPath: String, backupPath: String)
-
-  enum SyncAction {
-    case Applied
-    case Removed
-    case Noop
-    case AlreadyApplied
-    case SkippedForeign
-    case Failed
-    case Restored
-    case RestoreFailed
-    case Concurrent
-    case NotDetected
-
-    def wire: String = this match {
-      case Applied => "applied"
-      case Removed => "removed"
-      case Noop => "noop"
-      case AlreadyApplied => "alreadyApplied"
-      case SkippedForeign => "skippedForeign"
-      case Failed => "failed"
-      case Restored => "restored"
-      case RestoreFailed => "restoreFailed"
-      case Concurrent => "concurrent"
-      case NotDetected => "notDetected"
-    }
-
-    def isFailure: Boolean = this match {
-      case SkippedForeign | Failed | Restored | RestoreFailed | Concurrent => true
-      case Applied | Removed | Noop | AlreadyApplied | NotDetected => false
-    }
-  }
 
   final case class TargetResult(target: SyncTarget, action: SyncAction, reason: Option[String])
 
@@ -281,10 +251,11 @@ object SyncFileOps {
   private def writeRecord(record: Map[String, RecordEntry]): Unit =
     try {
       val editors = js.Dictionary.empty[js.Any]
-      record.foreach { case (targetId, entry) =>
-        editors(targetId) = js.Dynamic.literal(value = entry.value, dirty = entry.dirty, backup = entry.backup)
+      record.foreach {
+        case (targetId, entry) =>
+          editors(targetId) = js.Dynamic.literal(value = entry.value, dirty = entry.dirty, backup = entry.backup)
       }
-      val root = js.Dynamic.literal(editors = editors.asInstanceOf[js.Any])
+      val root    = js.Dynamic.literal(editors = editors.asInstanceOf[js.Any])
       NodeFs.writeFileSync(recordPath, JSON.stringify(root))
     } catch {
       case e: Throwable =>

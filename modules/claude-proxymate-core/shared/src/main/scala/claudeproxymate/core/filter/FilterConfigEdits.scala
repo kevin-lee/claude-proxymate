@@ -1,5 +1,7 @@
 package claudeproxymate.core.filter
 
+import cats.syntax.all.*
+
 /** Pure edits the Request Filter sheet applies to its draft config.
   * Out-of-range rule indices are no-ops.
   */
@@ -14,7 +16,7 @@ object FilterConfigEdits {
   def toggleKey(cat: FilterCategory, key: String): FilterConfig => FilterConfig =
     cfg => {
       val current = cfg.category(cat)
-      val keys    = if (current.keys.contains(key)) current.keys.filterNot(_ == key) else current.keys :+ key
+      val keys    = if current.keys.contains(key) then current.keys.filterNot(_ === key) else current.keys :+ key
       cfg.withCategory(cat, current.copy(keys = keys))
     }
 

@@ -58,6 +58,7 @@ lazy val core =
     .settings(
       libraryDependencies ++= List(
         libs.catsCore.value,
+        libs.kittens.value,
         libs.circeCore.value,
         libs.circeParser.value,
         libs.circeGeneric.value,
@@ -73,7 +74,9 @@ lazy val core =
     .nativeSettings(
       libraryDependencies ++= libs.tests.munitNative.value,
       /* The shared specs are hedgehog-based, so they are excluded on Native. */
-      Test / unmanagedSourceDirectories := (Test / unmanagedSourceDirectories).value.filterNot(_.getPath.contains("shared")),
+      Test / unmanagedSourceDirectories := (Test / unmanagedSourceDirectories)
+        .value
+        .filterNot(_.getPath.contains("shared")),
     )
 
 lazy val coreJvm    = core.jvm
@@ -123,11 +126,11 @@ lazy val electron = (project in file("modules/claude-proxymate-electron"))
       def escape(s: String): String =
         s.flatMap {
           case '\\' => "\\\\"
-          case '"'  => "\\\""
-          case c    => c.toString
+          case '"' => "\\\""
+          case c => c.toString
         }
-      val measurementId = sys.env.getOrElse("GA_MEASUREMENT_ID", "")
-      val apiSecret     = sys.env.getOrElse("GA_API_SECRET", "")
+      val measurementId             = sys.env.getOrElse("GA_MEASUREMENT_ID", "")
+      val apiSecret                 = sys.env.getOrElse("GA_API_SECRET", "")
       val file = (Compile / sourceManaged).value / "claudeproxymate" / "electron" / "AnalyticsConfig.scala"
       IO.write(
         file,
@@ -393,6 +396,8 @@ lazy val props = new {
 
   val CatsEffectVersion = "3.7.0"
 
+  val KittensVersion = "3.5.0"
+
   val Http4sVersion = "0.23.34"
 
   val Fs2Version = "3.13.0"
@@ -424,6 +429,8 @@ lazy val libs = new {
 
   lazy val catsEffect =
     Def.setting("org.typelevel" %%% "cats-effect" % props.CatsEffectVersion)
+
+  lazy val kittens = Def.setting("org.typelevel" %%% "kittens" % props.KittensVersion)
 
   lazy val http4sEmberServer =
     Def.setting("org.http4s" %%% "http4s-ember-server" % props.Http4sVersion)

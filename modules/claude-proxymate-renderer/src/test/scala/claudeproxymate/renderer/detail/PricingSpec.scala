@@ -78,15 +78,15 @@ object PricingSpec extends Properties {
   def testEmptyUnknown: Result     = ModelTier.forModel("") ==== Unknown
   def testArbitraryUnknown: Result = ModelTier.forModel("gpt-4") ==== Unknown
 
-  def testRatesFable5: Result         = Fable5.ratesAt(afterCutoff) ==== Rates(10.0, 50.0, 1.0, 12.5)
-  def testRatesOpusPremium: Result    = OpusPremium.ratesAt(afterCutoff) ==== Rates(5.0, 25.0, 0.5, 6.25)
-  def testRatesOpusLegacy: Result     = OpusLegacy.ratesAt(afterCutoff) ==== Rates(15.0, 75.0, 1.5, 18.75)
-  def testRatesSonnet5Intro: Result   = Sonnet5.ratesAt(beforeCutoff) ==== Rates(2.0, 10.0, 0.2, 2.5)
+  def testRatesFable5: Result          = Fable5.ratesAt(afterCutoff) ==== Rates(10.0, 50.0, 1.0, 12.5)
+  def testRatesOpusPremium: Result     = OpusPremium.ratesAt(afterCutoff) ==== Rates(5.0, 25.0, 0.5, 6.25)
+  def testRatesOpusLegacy: Result      = OpusLegacy.ratesAt(afterCutoff) ==== Rates(15.0, 75.0, 1.5, 18.75)
+  def testRatesSonnet5Intro: Result    = Sonnet5.ratesAt(beforeCutoff) ==== Rates(2.0, 10.0, 0.2, 2.5)
   def testRatesSonnet5Standard: Result = Sonnet5.ratesAt(afterCutoff) ==== Rates(3.0, 15.0, 0.3, 3.75)
-  def testRatesSonnet: Result         = Sonnet.ratesAt(afterCutoff) ==== Rates(3.0, 15.0, 0.3, 3.75)
-  def testRatesHaiku4_5: Result       = Haiku4_5.ratesAt(afterCutoff) ==== Rates(1.0, 5.0, 0.1, 1.25)
-  def testRatesHaiku3_5: Result       = Haiku3_5.ratesAt(afterCutoff) ==== Rates(0.8, 4.0, 0.08, 1.0)
-  def testRatesHaiku3: Result         = Haiku3.ratesAt(afterCutoff) ==== Rates(0.25, 1.25, 0.03, 0.3)
+  def testRatesSonnet: Result          = Sonnet.ratesAt(afterCutoff) ==== Rates(3.0, 15.0, 0.3, 3.75)
+  def testRatesHaiku4_5: Result        = Haiku4_5.ratesAt(afterCutoff) ==== Rates(1.0, 5.0, 0.1, 1.25)
+  def testRatesHaiku3_5: Result        = Haiku3_5.ratesAt(afterCutoff) ==== Rates(0.8, 4.0, 0.08, 1.0)
+  def testRatesHaiku3: Result          = Haiku3.ratesAt(afterCutoff) ==== Rates(0.25, 1.25, 0.03, 0.3)
 
   def testUnknownFallback: Result = Unknown.ratesAt(afterCutoff) ==== Sonnet.ratesAt(afterCutoff)
 }

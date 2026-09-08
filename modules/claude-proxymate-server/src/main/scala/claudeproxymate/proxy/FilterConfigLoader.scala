@@ -29,7 +29,7 @@ final class FilterConfigLoader(path: Option[String], cache: Ref[IO, Option[(Stri
           case Some(text) =>
             cache.get.flatMap {
               case Some((cachedText, cachedConfig)) if cachedText === text => IO.pure(cachedConfig)
-              case _ =>
+              case Some(_) | None =>
                 val config = FilterConfigLoader.parse(text) match {
                   case Right(cfg) => IO.pure(cfg)
                   case Left(err) =>

@@ -70,7 +70,7 @@ class RequestAnatomySpec extends munit.FunSuite {
   test("structure counts system blocks + cached") {
     val body = Json.obj(
       "system"   -> Json.arr(
-        Json.obj("type" -> "text".asJson, "text" -> "billing".asJson),
+        Json.obj("type"   -> "text".asJson, "text" -> "billing".asJson),
         Json.obj(
           "type"          -> "text".asJson,
           "text"          -> "id".asJson,

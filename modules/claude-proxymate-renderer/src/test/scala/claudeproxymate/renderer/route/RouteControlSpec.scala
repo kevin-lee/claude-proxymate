@@ -1,5 +1,6 @@
 package claudeproxymate.renderer.route
 
+import claudeproxymate.core.SyncAction
 import hedgehog.*
 import hedgehog.runner.*
 
@@ -14,19 +15,19 @@ object RouteControlSpec extends Properties {
 
   def testAlertKeysOkActions: Result = {
     val results = List(
-      RouteControl.SyncResult("VS Code", "applied", ""),
-      RouteControl.SyncResult("Cursor", "removed", ""),
-      RouteControl.SyncResult("VSCodium", "noop", ""),
-      RouteControl.SyncResult("~/.claude/settings.json", "alreadyApplied", ""),
-      RouteControl.SyncResult("VS Code Insiders", "notDetected", ""),
+      RouteControl.SyncResult("VS Code", SyncAction.Applied, ""),
+      RouteControl.SyncResult("Cursor", SyncAction.Removed, ""),
+      RouteControl.SyncResult("VSCodium", SyncAction.Noop, ""),
+      RouteControl.SyncResult("~/.claude/settings.json", SyncAction.AlreadyApplied, ""),
+      RouteControl.SyncResult("VS Code Insiders", SyncAction.NotDetected, ""),
     )
     RouteControl.alertKeys(results) ==== Nil
   }
 
   def testAlertKeysForeignCollapsed: Result = {
     val results = List(
-      RouteControl.SyncResult("VS Code", "skippedForeign", "https://gw.example.com"),
-      RouteControl.SyncResult("~/.claude/settings.json", "skippedForeign", "https://gw.example.com"),
+      RouteControl.SyncResult("VS Code", SyncAction.SkippedForeign, "https://gw.example.com"),
+      RouteControl.SyncResult("~/.claude/settings.json", SyncAction.SkippedForeign, "https://gw.example.com"),
     )
     RouteControl.alertKeys(results) ==== List(
       ("route.alertForeign", Map("targets" -> "VS Code, ~/.claude/settings.json"))
@@ -35,10 +36,10 @@ object RouteControlSpec extends Properties {
 
   def testAlertKeysFailures: Result = {
     val results = List(
-      RouteControl.SyncResult("VS Code", "failed", "disk full"),
-      RouteControl.SyncResult("Cursor", "restored", ""),
-      RouteControl.SyncResult("VSCodium", "restoreFailed", "/backups/b.json"),
-      RouteControl.SyncResult("~/.claude/settings.json", "concurrent", ""),
+      RouteControl.SyncResult("VS Code", SyncAction.Failed, "disk full"),
+      RouteControl.SyncResult("Cursor", SyncAction.Restored, ""),
+      RouteControl.SyncResult("VSCodium", SyncAction.RestoreFailed, "/backups/b.json"),
+      RouteControl.SyncResult("~/.claude/settings.json", SyncAction.Concurrent, ""),
     )
     RouteControl.alertKeys(results) ==== List(
       ("route.alertFail", Map("target" -> "VS Code", "reason" -> "disk full")),
@@ -51,7 +52,15 @@ object RouteControlSpec extends Properties {
   def testAlertKeysNeverForOk: Property =
     for {
       target <- Gen.string(Gen.alphaNum, Range.linear(1, 12)).log("target")
-      action <- Gen.element1("applied", "removed", "noop", "alreadyApplied", "notDetected").log("action")
+      action <- Gen
+                  .element1(
+                    SyncAction.Applied,
+                    SyncAction.Removed,
+                    SyncAction.Noop,
+                    SyncAction.AlreadyApplied,
+                    SyncAction.NotDetected,
+                  )
+                  .log("action")
     } yield {
       RouteControl.alertKeys(List(RouteControl.SyncResult(target, action, ""))) ==== Nil
     }

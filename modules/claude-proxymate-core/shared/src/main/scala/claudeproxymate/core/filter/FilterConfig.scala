@@ -1,24 +1,28 @@
 package claudeproxymate.core.filter
 
+import cats.*
 import cats.syntax.all.*
+import cats.derived.strict.*
 import io.circe.{Decoder, Encoder, Json}
 import io.circe.syntax.*
 
 /** How a category (rule files, docs, skills) is filtered. */
-enum CategoryMode {
+enum CategoryMode derives CanEqual, Eq, Hash, Show {
   case KeepAll
   case RemoveSelected
   case RemoveAll
-
-  def wire: String = this match {
-    case CategoryMode.KeepAll => "keepAll"
-    case CategoryMode.RemoveSelected => "removeSelected"
-    case CategoryMode.RemoveAll => "removeAll"
-  }
 }
-
 object CategoryMode {
-  given cats.Eq[CategoryMode] = cats.Eq.fromUniversalEquals
+
+  extension (categoryMode: CategoryMode) {
+
+    def wire: String = categoryMode match {
+      case CategoryMode.KeepAll => "keepAll"
+      case CategoryMode.RemoveSelected => "removeSelected"
+      case CategoryMode.RemoveAll => "removeAll"
+    }
+
+  }
 
   def parse(s: String): Option[CategoryMode] = s match {
     case "keepAll" => CategoryMode.KeepAll.some
@@ -32,20 +36,22 @@ object CategoryMode {
 }
 
 /** One filtered category: the mode plus the keys that `RemoveSelected` removes. */
-final case class CategoryFilter(mode: CategoryMode, keys: List[String]) {
-
-  def remove(key: String): Boolean =
-    mode === CategoryMode.RemoveAll || (mode === CategoryMode.RemoveSelected && keys.contains(key))
-
-  def activeCount: Int = mode match {
-    case CategoryMode.KeepAll => 0
-    case CategoryMode.RemoveSelected => keys.size
-    case CategoryMode.RemoveAll => 1
-  }
-}
-
+final case class CategoryFilter(mode: CategoryMode, keys: List[String]) derives CanEqual, Eq, Hash, Show
 object CategoryFilter {
   val keepAll: CategoryFilter = CategoryFilter(CategoryMode.KeepAll, Nil)
+
+  extension (filter: CategoryFilter) {
+
+    def remove(key: String): Boolean =
+      filter.mode === CategoryMode.RemoveAll ||
+        (filter.mode === CategoryMode.RemoveSelected && filter.keys.contains(key))
+
+    def activeCount: Int = filter.mode match {
+      case CategoryMode.KeepAll => 0
+      case CategoryMode.RemoveSelected => filter.keys.size
+      case CategoryMode.RemoveAll => 1
+    }
+  }
 
   given Encoder[CategoryFilter] = Encoder.instance { f =>
     Json.obj("mode" -> f.mode.asJson, "keys" -> f.keys.asJson)
@@ -59,20 +65,22 @@ object CategoryFilter {
   }
 }
 
-enum TextRuleKind {
+enum TextRuleKind derives CanEqual, Eq, Hash, Show {
   case Text
   case Regex
   case Tag
-
-  def wire: String = this match {
-    case TextRuleKind.Text => "text"
-    case TextRuleKind.Regex => "regex"
-    case TextRuleKind.Tag => "tag"
-  }
 }
-
 object TextRuleKind {
-  given cats.Eq[TextRuleKind] = cats.Eq.fromUniversalEquals
+
+  extension (textRuleKind: TextRuleKind) {
+
+    def wire: String = textRuleKind match {
+      case TextRuleKind.Text => "text"
+      case TextRuleKind.Regex => "regex"
+      case TextRuleKind.Tag => "tag"
+    }
+
+  }
 
   def parse(s: String): Option[TextRuleKind] = s match {
     case "text" => TextRuleKind.Text.some
@@ -86,20 +94,22 @@ object TextRuleKind {
 }
 
 /** Which message text a text rule applies to. */
-enum TextRuleScope {
+enum TextRuleScope derives CanEqual, Eq, Hash, Show {
   case UserTyped
   case Assistant
   case Both
-
-  def wire: String = this match {
-    case TextRuleScope.UserTyped => "userTyped"
-    case TextRuleScope.Assistant => "assistant"
-    case TextRuleScope.Both => "both"
-  }
 }
-
 object TextRuleScope {
-  given cats.Eq[TextRuleScope] = cats.Eq.fromUniversalEquals
+
+  extension (textRuleScope: TextRuleScope) {
+
+    def wire: String = textRuleScope match {
+      case TextRuleScope.UserTyped => "userTyped"
+      case TextRuleScope.Assistant => "assistant"
+      case TextRuleScope.Both => "both"
+    }
+
+  }
 
   def parse(s: String): Option[TextRuleScope] = s match {
     case "userTyped" => TextRuleScope.UserTyped.some
@@ -113,7 +123,10 @@ object TextRuleScope {
 }
 
 final case class TextRule(kind: TextRuleKind, pattern: String, scope: TextRuleScope, enabled: Boolean)
-
+    derives CanEqual,
+      Eq,
+      Hash,
+      Show
 object TextRule {
   val default: TextRule = TextRule(TextRuleKind.Text, "", TextRuleScope.Both, enabled = true)
 
@@ -136,20 +149,22 @@ object TextRule {
   }
 }
 
-enum FilterCategory {
+enum FilterCategory derives CanEqual, Eq, Hash, Show {
   case Rules
   case Docs
   case Skills
-
-  def wire: String = this match {
-    case FilterCategory.Rules => "rules"
-    case FilterCategory.Docs => "docs"
-    case FilterCategory.Skills => "skills"
-  }
 }
-
 object FilterCategory {
-  given cats.Eq[FilterCategory] = cats.Eq.fromUniversalEquals
+
+  extension (filterCategory: FilterCategory) {
+
+    def wire: String = filterCategory match {
+      case FilterCategory.Rules => "rules"
+      case FilterCategory.Docs => "docs"
+      case FilterCategory.Skills => "skills"
+    }
+
+  }
 
   def parse(s: String): Option[FilterCategory] = s match {
     case "rules" => FilterCategory.Rules.some
@@ -174,29 +189,33 @@ final case class FilterConfig(
   docs: CategoryFilter,
   skills: CategoryFilter,
   textRules: List[TextRule],
-) {
-
-  def category(c: FilterCategory): CategoryFilter = c match {
-    case FilterCategory.Rules => rules
-    case FilterCategory.Docs => docs
-    case FilterCategory.Skills => skills
-  }
-
-  def withCategory(c: FilterCategory, f: CategoryFilter): FilterConfig = c match {
-    case FilterCategory.Rules => copy(rules = f)
-    case FilterCategory.Docs => copy(docs = f)
-    case FilterCategory.Skills => copy(skills = f)
-  }
-
-  def activeRuleCount: Int =
-    rules.activeCount + docs.activeCount + skills.activeCount +
-      textRules.count(r => r.enabled && r.pattern.nonEmpty)
-
-  def isNoOp: Boolean = !enabled || activeRuleCount === 0
-}
-
+) derives CanEqual,
+      Eq,
+      Hash,
+      Show
 object FilterConfig {
   val CurrentVersion: Int = 1
+
+  extension (config: FilterConfig) {
+
+    def category(c: FilterCategory): CategoryFilter = c match {
+      case FilterCategory.Rules => config.rules
+      case FilterCategory.Docs => config.docs
+      case FilterCategory.Skills => config.skills
+    }
+
+    def withCategory(c: FilterCategory, f: CategoryFilter): FilterConfig = c match {
+      case FilterCategory.Rules => config.copy(rules = f)
+      case FilterCategory.Docs => config.copy(docs = f)
+      case FilterCategory.Skills => config.copy(skills = f)
+    }
+
+    def activeRuleCount: Int =
+      config.rules.activeCount + config.docs.activeCount + config.skills.activeCount +
+        config.textRules.count(r => r.enabled && r.pattern.nonEmpty)
+
+    def isNoOp: Boolean = !config.enabled || config.activeRuleCount === 0
+  }
 
   val default: FilterConfig = FilterConfig(
     version = CurrentVersion,

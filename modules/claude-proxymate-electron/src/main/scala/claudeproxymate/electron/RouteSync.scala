@@ -117,16 +117,17 @@ object RouteSync {
     * the backup first.
     */
   def sweepOnLaunch(): Unit =
-    SyncFileOps.readRecord().foreach { case (targetId, entry) =>
-      if (targetId === ClaudeSettingsSync.TargetId) {
-        SyncFileOps.restoreIfDirtyAndBroken(ClaudeSettingsSync.target, entry, ClaudeSettingsSync.stillParseable)
-        val _ = ClaudeSettingsSync.removeEnv(none[String])
-      } else {
-        VsCodeSync.targetForId(targetId).foreach { target =>
-          SyncFileOps.restoreIfDirtyAndBroken(target, entry, VsCodeSync.stillParseable)
+    SyncFileOps.readRecord().foreach {
+      case (targetId, entry) =>
+        if (targetId === ClaudeSettingsSync.TargetId) {
+          SyncFileOps.restoreIfDirtyAndBroken(ClaudeSettingsSync.target, entry, ClaudeSettingsSync.stillParseable)
+          val _ = ClaudeSettingsSync.removeEnv(none[String])
+        } else {
+          VsCodeSync.targetForId(targetId).foreach { target =>
+            SyncFileOps.restoreIfDirtyAndBroken(target, entry, VsCodeSync.stillParseable)
+          }
+          val _ = VsCodeSync.removeById(targetId, none[String])
         }
-        val _ = VsCodeSync.removeById(targetId, none[String])
-      }
     }
 
   /** App launch (after [[sweepOnLaunch]]) — restore the persisted route

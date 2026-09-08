@@ -1,8 +1,8 @@
 package claudeproxymate.electron
 
 import cats.syntax.all.*
-import claudeproxymate.core.{ClaudeEnv, VsCodeEnv}
-import claudeproxymate.electron.SyncFileOps.{RecordEntry, SyncAction, SyncTarget, TargetResult}
+import claudeproxymate.core.{ClaudeEnv, SyncAction, VsCodeEnv}
+import claudeproxymate.electron.SyncFileOps.{RecordEntry, SyncTarget, TargetResult}
 import claudeproxymate.electron.facades._
 
 import scala.scalajs.js

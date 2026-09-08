@@ -22,8 +22,12 @@ object CorrelationIds {
     * `end` are substring offsets; `name` is the pattern prefix
     * (`"msg"`, `"toolu"`, `"srvtoolu"`).
     */
-  final case class CorrMatch(start: Int, end: Int, name: String) {
-    def length: Int = end - start
+  final case class CorrMatch(start: Int, end: Int, name: String)
+
+  object CorrMatch {
+    extension (corrMatch: CorrMatch) {
+      def length: Int = corrMatch.end - corrMatch.start
+    }
   }
 
   /** Pattern table. Order matters when prefixes overlap: longer

@@ -1,5 +1,7 @@
 package claudeproxymate.proxy
 
+import cats.syntax.all.*
+
 import scala.annotation.tailrec
 
 /** `--filter-config <path>` command-line parsing, shared by [[CurlMain]] and [[Main]].
@@ -12,8 +14,8 @@ object FilterConfigArg {
   @tailrec
   def parse(args: List[String]): Option[String] =
     args match {
-      case "--filter-config" :: path :: _ => Some(path)
+      case "--filter-config" :: path :: _ => path.some
       case _ :: rest => parse(rest)
-      case Nil => None
+      case Nil => none[String]
     }
 }
