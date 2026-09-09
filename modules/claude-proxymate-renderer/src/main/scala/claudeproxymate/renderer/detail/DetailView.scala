@@ -24,8 +24,6 @@ import scala.scalajs.js
   */
 object DetailView {
 
-  private val PricingDate = "2026-07-10"
-
   def renderProxyDetail(): Unit = {
     val entry  = AppState.proxyCaptures.find(e => e.id == AppState.selectedProxyId.map(_.asInstanceOf[js.Any]).orNull)
     val detail = dom.document.getElementById(HtmlIds.ProxyDetailView)
@@ -272,8 +270,31 @@ object DetailView {
     val cacheRead   = intField("cache_read_input_tokens")
     val cacheWrite  = intField("cache_creation_input_tokens")
     val outTok      = intField("output_tokens")
-    val totalIn     = inputTokens + cacheRead + cacheWrite
-    val cachePct    = if (totalIn > 0) Math.round(cacheRead.toDouble / totalIn * 100).toInt else 0
+
+    /* `cache_creation` splits the write by time-to-live (TTL) bucket, and its
+     * two fields sum to `cache_creation_input_tokens`. When the breakdown is
+     * absent - older captures, or a response that never wrote to cache - the
+     * whole aggregate is billed at the 5-minute rate, which is what this view
+     * did before the split was read. */
+    val (cacheWrite5m, cacheWrite1h) = {
+      val breakdown = usage.selectDynamic("cache_creation")
+      if (js.isUndefined(breakdown) || breakdown == null) (cacheWrite, 0)
+      else {
+        def bucket(name: String): Int = {
+          val v = breakdown.selectDynamic(name)
+          if (!js.isUndefined(v) && v != null)
+            try v.asInstanceOf[Int]
+            catch { case _: Throwable => 0 }
+          else 0
+        }
+        val w5m                       = bucket("ephemeral_5m_input_tokens")
+        val w1h                       = bucket("ephemeral_1h_input_tokens")
+        if (w5m + w1h === 0) (cacheWrite, 0) else (w5m, w1h)
+      }
+    }
+
+    val totalIn  = inputTokens + cacheRead + cacheWrite
+    val cachePct = if (totalIn > 0) Math.round(cacheRead.toDouble / totalIn * 100).toInt else 0
 
     val model = {
       val reqBody       = entry.selectDynamic("body")
@@ -291,10 +312,69 @@ object DetailView {
     val inP   = rates.input
     val outP  = rates.output
     val crP   = rates.cacheRead
-    val cwP   = rates.cacheWrite5m
+    val cw5P  = rates.cacheWrite5m
+    val cw1P  = rates.cacheWrite1h
 
-    val cost    = (inputTokens * inP + cacheRead * crP + cacheWrite * cwP + outTok * outP) / 1000000.0
+    val cost    =
+      (inputTokens * inP + cacheRead * crP + cacheWrite5m * cw5P + cacheWrite1h * cw1P + outTok * outP) / 1000000.0
     val costStr = fmtCost(cost)
+
+    /* Without a 1h write there is nothing to disambiguate, so the row keeps
+     * the plain "Cache Write" label it has always had. */
+    val cacheWriteRows: List[js.Dynamic] =
+      if (cacheWrite1h > 0)
+        List(
+          js.Dynamic
+            .literal(
+              "label"  -> I18n.t("token.cacheWrite5m"),
+              "tokens" -> fmtTok(cacheWrite5m),
+              "price"  -> cw5P,
+              "cost"   -> fmtCost(cacheWrite5m * cw5P / 1000000.0)
+            ),
+          js.Dynamic
+            .literal(
+              "label"  -> I18n.t("token.cacheWrite1h"),
+              "tokens" -> fmtTok(cacheWrite1h),
+              "price"  -> cw1P,
+              "cost"   -> fmtCost(cacheWrite1h * cw1P / 1000000.0)
+            ),
+        )
+      else
+        List(
+          js.Dynamic
+            .literal(
+              "label"  -> I18n.t("token.cacheWrite"),
+              "tokens" -> fmtTok(cacheWrite),
+              "price"  -> cw5P,
+              "cost"   -> fmtCost(cacheWrite * cw5P / 1000000.0)
+            )
+        )
+
+    val rows: List[js.Dynamic] =
+      js.Dynamic
+        .literal(
+          "label"  -> I18n.t("token.cacheRead"),
+          "tokens" -> fmtTok(cacheRead),
+          "price"  -> crP,
+          "cost"   -> fmtCost(cacheRead * crP / 1000000.0)
+        ) ::
+        cacheWriteRows :::
+        List(
+          js.Dynamic
+            .literal(
+              "label"  -> I18n.t("token.uncachedInput"),
+              "tokens" -> fmtTok(inputTokens),
+              "price"  -> inP,
+              "cost"   -> fmtCost(inputTokens * inP / 1000000.0)
+            ),
+          js.Dynamic
+            .literal(
+              "label"  -> I18n.t("token.output"),
+              "tokens" -> fmtTok(outTok),
+              "price"  -> outP,
+              "cost"   -> fmtCost(outTok * outP / 1000000.0)
+            ),
+        )
 
     val popData = js
       .JSON
@@ -303,37 +383,8 @@ object DetailView {
           .literal(
             "model"       -> (if (model.nonEmpty) model else I18n.t("token.unknown")),
             "kb"          -> kb,
-            "pricingDate" -> PricingDate,
-            "rows"        -> js.Array(
-              js.Dynamic
-                .literal(
-                  "label"  -> I18n.t("token.cacheRead"),
-                  "tokens" -> fmtTok(cacheRead),
-                  "price"  -> crP,
-                  "cost"   -> fmtCost(cacheRead * crP / 1000000.0)
-                ),
-              js.Dynamic
-                .literal(
-                  "label"  -> I18n.t("token.cacheWrite"),
-                  "tokens" -> fmtTok(cacheWrite),
-                  "price"  -> cwP,
-                  "cost"   -> fmtCost(cacheWrite * cwP / 1000000.0)
-                ),
-              js.Dynamic
-                .literal(
-                  "label"  -> I18n.t("token.uncachedInput"),
-                  "tokens" -> fmtTok(inputTokens),
-                  "price"  -> inP,
-                  "cost"   -> fmtCost(inputTokens * inP / 1000000.0)
-                ),
-              js.Dynamic
-                .literal(
-                  "label"  -> I18n.t("token.output"),
-                  "tokens" -> fmtTok(outTok),
-                  "price"  -> outP,
-                  "cost"   -> fmtCost(outTok * outP / 1000000.0)
-                ),
-            ),
+            "pricingDate" -> ModelTier.PricingDate,
+            "rows"        -> js.Array(rows*),
             "total"       -> costStr,
             "cachePct"    -> cachePct,
           )

@@ -122,16 +122,18 @@ object AnalysisRenderer {
     val model    = anatomy.model.getOrElse("")
 
     val cost =
-      if (responseCaptured)
+      if (responseCaptured) {
+        val (cacheWrite5m, cacheWrite1h) = splitCacheWrite(usage)
         AnatomyCost.fromUsage(
           model = model,
           reqKb = reqKb,
           inputTokens = usageInt(usage, "input_tokens"),
           cacheRead = usageInt(usage, "cache_read_input_tokens"),
-          cacheWrite = usageInt(usage, "cache_creation_input_tokens"),
+          cacheWrite5m = cacheWrite5m,
+          cacheWrite1h = cacheWrite1h,
           outputTokens = usageInt(usage, "output_tokens"),
         )
-      else
+      } else
         AnatomyCost.estimateOnly(model, reqKb, RequestAnatomy.estTokens(reqBytes))
 
     val labels    = buildAnatomyLabels()
@@ -164,6 +166,23 @@ object AnalysisRenderer {
     else {
       val sr = respBody.selectDynamic("stop_reason")
       Option.unless(js.isUndefined(sr) || sr == null)(sr.toString)
+    }
+  }
+
+  /** Split `cache_creation_input_tokens` into its 5-minute and 1-hour
+    * time-to-live (TTL) buckets, which sum to the aggregate. When the
+    * `cache_creation` breakdown is absent - older captures, or a response
+    * that never wrote to cache - the whole aggregate is treated as a
+    * 5-minute write, which is what this view did before the split was read.
+    */
+  private def splitCacheWrite(usage: js.Dynamic): (Int, Int) = {
+    val aggregate = usageInt(usage, "cache_creation_input_tokens")
+    val breakdown = usage.selectDynamic("cache_creation")
+    if (js.isUndefined(breakdown) || breakdown == null) (aggregate, 0)
+    else {
+      val w5m = usageInt(breakdown, "ephemeral_5m_input_tokens")
+      val w1h = usageInt(breakdown, "ephemeral_1h_input_tokens")
+      if (w5m + w1h === 0) (aggregate, 0) else (w5m, w1h)
     }
   }
 

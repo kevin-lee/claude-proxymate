@@ -48,7 +48,7 @@ final case class TokenPopoverLabels(
 object TokenPopoverView {
 
   val DocsHref: String =
-    "https://docs.anthropic.com/en/docs/about-claude/models#model-comparison"
+    "https://platform.claude.com/docs/en/about-claude/pricing"
 
   /** Build the human-readable multi-line text that the Copy button places
     * on the clipboard. Pure function; no DOM access.

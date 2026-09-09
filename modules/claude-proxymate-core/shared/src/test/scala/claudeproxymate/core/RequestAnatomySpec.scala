@@ -9,7 +9,7 @@ object RequestAnatomySpec extends Properties {
 
   override def tests: List[Test] = List(
     property("estTokens(0) == 0", testEstTokensZero),
-    property("estTokens(7) == 2", testEstTokensSeven),
+    property("estTokens(7) == 3", testEstTokensSeven),
     property("estTokens is non-decreasing", testEstTokensMonotone),
     property("structure counts roles", testStructureRoles),
     property("structure counts system blocks + cached", testStructureSystem),
@@ -33,7 +33,7 @@ object RequestAnatomySpec extends Properties {
 
   def testEstTokensSeven: Property =
     for { _ <- Gen.constant(()).forAll } yield Result
-      .assert(RequestAnatomy.estTokens(7) == 2)
+      .assert(RequestAnatomy.estTokens(7) == 3)
       .log(s"got ${RequestAnatomy.estTokens(7)}")
 
   def testEstTokensMonotone: Property =

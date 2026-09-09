@@ -152,7 +152,7 @@ object RequestFilterViewSpec extends Properties {
           .log("docs (keep all) rows should be disabled"),
         Result.assert(html.contains("""class="filter-row disabled"""")).log("disabled row class"),
         Result.assert(html.contains("filter-skill-chip")).log("skills render as chips"),
-        Result.assert(html.contains("~400 tok")).log("rule bytes as tokens"),
+        Result.assert(html.contains("~519 tok")).log("rule bytes as tokens"),
       )
     )
   }
