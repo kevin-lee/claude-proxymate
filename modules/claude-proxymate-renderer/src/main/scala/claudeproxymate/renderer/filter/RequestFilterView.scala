@@ -5,6 +5,17 @@ import claudeproxymate.core.HtmlIds
 import claudeproxymate.core.filter.*
 import scalatags.Text.all.*
 
+/** What the address-bar Filter button renders.
+  *
+  * The count badge shows only in [[FilterButtonState.Active]], which holds
+  * exactly when `FilterConfig.isNoOp` is false.
+  */
+enum FilterButtonState {
+  case Off
+  case Paused(count: Int)
+  case Active(count: Int)
+}
+
 /** Every string the Request Filter sheet shows, resolved by the DOM sibling
   * from `I18n.t` so this view stays pure and unit-testable.
   */
@@ -93,10 +104,15 @@ object RequestFilterView {
     """<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" """ +
       """stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3h12L9.5 8.5V13l-3 1.2V8.5z"/></svg>"""
 
-  /** `(active rule count, show the button as active)`. */
-  def buttonState(config: FilterConfig): (Int, Boolean) = {
+  /** `Off` when nothing is configured, `Active` with the rule count when the
+    * filter applies, and `Paused` with the rule count when rules are configured
+    * but filtering is switched off.
+    */
+  def buttonState(config: FilterConfig): FilterButtonState = {
     val count = config.activeRuleCount
-    (count, config.enabled && count > 0)
+    if (count === 0) FilterButtonState.Off
+    else if (config.enabled) FilterButtonState.Active(count)
+    else FilterButtonState.Paused(count)
   }
 
   def formatInt(n: Int): String = {

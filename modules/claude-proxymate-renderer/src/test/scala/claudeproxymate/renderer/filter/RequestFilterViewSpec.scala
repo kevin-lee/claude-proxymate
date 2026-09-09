@@ -16,7 +16,7 @@ object RequestFilterViewSpec extends Properties {
     example("preview text formats tokens and the percentage", testPreviewText),
     example("preview text with no drop reads 0%", testPreviewNoDrop),
     example("preview text without a capture shows the placeholder", testPreviewNone),
-    example("buttonState counts active rules and is inactive when filtering is off", testButtonState),
+    example("buttonState names off / paused / active so only an applying filter shows a badge", testButtonState),
     example("footer carries the preview id and save / cancel actions", testFooter),
     property("<script> in labels, keys or patterns never leaks raw", testNoScriptLeak),
   )
@@ -224,9 +224,14 @@ object RequestFilterViewSpec extends Properties {
   def testButtonState: Result =
     Result.all(
       List(
-        (RequestFilterView.buttonState(draft) ==== ((4, true))).log("2 keys + remove-all + 1 enabled rule"),
-        (RequestFilterView.buttonState(draft.copy(enabled = false)) ==== ((4, false))).log("disabled keeps the count"),
-        (RequestFilterView.buttonState(FilterConfig.default) ==== ((0, false))).log("default"),
+        (RequestFilterView.buttonState(draft) ==== FilterButtonState.Active(4))
+          .log("2 keys + remove-all + 1 enabled rule"),
+        (RequestFilterView.buttonState(draft.copy(enabled = false)) ==== FilterButtonState.Paused(4))
+          .log("filtering off hides the badge but keeps the count for the tooltip (#39)"),
+        (RequestFilterView.buttonState(FilterConfig.default) ==== FilterButtonState.Off)
+          .log("no rules configured"),
+        (RequestFilterView.buttonState(FilterConfig.disabled) ==== FilterButtonState.Off)
+          .log("disabled with no rules is still just off"),
       )
     )
 
