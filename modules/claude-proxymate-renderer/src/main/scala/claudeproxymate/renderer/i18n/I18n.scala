@@ -110,10 +110,12 @@ object I18n {
     /* Re-render the state-dependent chrome the generic data-i18n loops
      * above cannot get right: the status bar / address bar reflect
      * proxyRunning (renderProxyStatus also refreshes the request
-     * counter), and the mask switch's tooltip depends on the current
-     * baseline. */
+     * counter), the mask switch's tooltip depends on the current
+     * baseline, and the filter button's badge and tooltip depend on the
+     * current FilterConfig. */
     claudeproxymate.renderer.proxy.ProxyControl.renderProxyStatus()
     claudeproxymate.renderer.state.PresenterMode.renderButton()
+    claudeproxymate.renderer.filter.RequestFilterSheet.renderButton()
     claudeproxymate.renderer.filter.RequestFilterSheet.rerenderIfOpen()
     claudeproxymate.renderer.theme.Theme.apply()
   }

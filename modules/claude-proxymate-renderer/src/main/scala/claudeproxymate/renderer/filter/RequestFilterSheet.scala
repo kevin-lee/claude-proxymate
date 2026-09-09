@@ -95,17 +95,26 @@ object RequestFilterSheet {
       .foreach(el => el.textContent = RequestFilterView.buildPreviewText(labels(), preview))
   }
 
-  /** Paint the address-bar button: rule count badge and active state. */
+  /** Paint the address-bar button: rule count badge, active state and tooltip. */
   def renderButton(): Unit = {
-    val (count, active) = RequestFilterView.buttonState(AppState.filterConfig)
-    val btn             = dom.document.getElementById(HtmlIds.RequestFilterBtn)
-    val countEl         = dom.document.getElementById(HtmlIds.RequestFilterCount)
+    val (countText, active, title) =
+      RequestFilterView.buttonState(AppState.filterConfig) match {
+        case FilterButtonState.Off =>
+          ("0", false, I18n.t("filter.buttonTitle"))
+        case FilterButtonState.Paused(count) =>
+          (count.toString, false, I18n.t("filter.buttonTitlePaused", Map("count" -> count.toString)))
+        case FilterButtonState.Active(count) =>
+          (count.toString, true, I18n.t("filter.buttonTitle"))
+      }
+    val btn     = dom.document.getElementById(HtmlIds.RequestFilterBtn)
+    val countEl = dom.document.getElementById(HtmlIds.RequestFilterCount)
     if (btn != null) {
       locally { val _ = btn.classList.toggle("active", active) }
+      btn.setAttribute("title", title)
     } else ()
     if (countEl != null) {
-      countEl.textContent = count.toString
-      locally { val _ = countEl.classList.toggle("u-hide", count === 0) }
+      countEl.textContent = countText
+      locally { val _ = countEl.classList.toggle("u-hide", !active) }
     } else ()
   }
 
