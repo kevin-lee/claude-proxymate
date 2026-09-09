@@ -31,6 +31,11 @@ jobs:
     env:
       SBT_OPTS: "-Xms1G -Xmx4G -XX:+UseG1GC -XX:ReservedCodeCacheSize=512m"
     strategy:
+      # One arch failing must not cancel the other: the surviving job's log is
+      # what tells us whether a failure is arch-specific (a runner image, a
+      # native binary) or common to both. v0.4.0's first attempt cancelled the
+      # x64 job mid-build, leaving only the arm64 signing failure to go on.
+      fail-fast: false
       matrix:
         include:
           # Apple Silicon runner → arm64 build
@@ -92,6 +97,19 @@ jobs:
       # with NO credentials set, electron-builder ad-hoc signs and skips
       # notarization with a warning (downloaders then need the Gatekeeper
       # workaround in the README); with PARTIAL credentials it fails the build.
+      #
+      # electron-builder must be >= 26.16.1 (pinned in
+      # project/package.json.template). Up to 26.15.3 it passed the .p12
+      # password to `security set-key-partition-list -k`, which wants the
+      # temporary keychain's own password. That mismatch was harmless while
+      # macos-latest was macOS 15 or older, because SecKeychainUnlock returned
+      # success on an already-unlocked keychain, and became fatal the moment
+      # macos-latest moved to macOS 26 ("SecKeychainUnlock: The user name or
+      # passphrase you entered is not correct", v0.4.0's first attempt).
+      # Beware the version range: npm prefers the version tagged `latest` over
+      # any higher one that also satisfies the range, and 26.16.x shipped under
+      # the `v26` tag while `latest` stayed on the broken 26.15.3, so `^26.8.1`
+      # resolved to 26.15.3. The floor has to sit above `latest` to win.
       #
       # The template's mac.target deliberately has NO "arch" list: an explicit
       # arch list in config overrides the CLI --arm64/--x64 flag, which made
