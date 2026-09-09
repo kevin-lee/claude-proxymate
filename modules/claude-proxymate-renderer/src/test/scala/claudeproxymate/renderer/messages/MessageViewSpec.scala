@@ -2,6 +2,7 @@ package claudeproxymate.renderer.messages
 
 import claudeproxymate.renderer.messages.MsgContent.*
 import claudeproxymate.renderer.messages.MsgPart.*
+import claudeproxymate.renderer.state.AppState
 import hedgehog.*
 import hedgehog.runner.*
 
@@ -75,11 +76,26 @@ object MessageViewSpec extends Properties {
       )
       .render
 
+  /* Every mask span's class comes from AppState.isRevealed, which reads the
+   * global presenter-mode baseline. AppState is a single object shared by all
+   * suites in one Scala.js run, and both AppStateSpec and PresenterModeSpec
+   * end with presenterMaskAll = false, so either of them scheduled ahead of
+   * this spec would flip every mask here to its revealed form. Pin the
+   * "default = all masked" baseline these tests were written for, the same
+   * way JsonTreeViewSpec does.
+   */
+  private def reset(): Unit = {
+    AppState.maskOverrides.clear()
+    AppState.presenterMaskAll = true
+  }
+
   private def renderCards(cards: List[MsgCard]): String =
     renderCards(cards, isUserFilter = false, query = "")
 
-  private def renderCards(cards: List[MsgCard], isUserFilter: Boolean, query: String): String =
+  private def renderCards(cards: List[MsgCard], isUserFilter: Boolean, query: String): String = {
+    reset()
     MessageView.buildCardsFrag(cards, isUserFilter, query).render
+  }
 
   private def textCard(role: String, text: String): MsgCard =
     MsgCard(role, contents = List(TextContent(text)), userParts = Nil, rawIdx = 0, removed = Nil)
