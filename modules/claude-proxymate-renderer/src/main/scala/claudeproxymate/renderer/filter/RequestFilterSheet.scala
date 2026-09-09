@@ -106,8 +106,8 @@ object RequestFilterSheet {
         case FilterButtonState.Active(count) =>
           (count.toString, true, I18n.t("filter.buttonTitle"))
       }
-    val btn     = dom.document.getElementById(HtmlIds.RequestFilterBtn)
-    val countEl = dom.document.getElementById(HtmlIds.RequestFilterCount)
+    val btn                        = dom.document.getElementById(HtmlIds.RequestFilterBtn)
+    val countEl                    = dom.document.getElementById(HtmlIds.RequestFilterCount)
     if (btn != null) {
       locally { val _ = btn.classList.toggle("active", active) }
       btn.setAttribute("title", title)

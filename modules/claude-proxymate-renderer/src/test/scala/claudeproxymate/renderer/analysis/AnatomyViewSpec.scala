@@ -80,7 +80,7 @@ object AnatomyViewSpec extends Properties {
   }
 
   def testCostFromUsage: Result = {
-    val out = render(AnatomyCost.fromUsage("claude-haiku-4-5-20251001", "10.0", 1000, 2000, 500, 400))
+    val out = render(AnatomyCost.fromUsage("claude-haiku-4-5-20251001", "10.0", 1000, 2000, 500, 0, 400))
     Result.all(
       List(
         Result.assert(out.contains("cache hit")).log("cache hit missing"),
@@ -154,7 +154,7 @@ object AnatomyViewSpec extends Properties {
 
   def testNoInlineHandlers: Result = {
     val out = render(
-      AnatomyCost.fromUsage("claude-haiku-4-5-20251001", "1.0", 100, 100, 100, 100),
+      AnatomyCost.fromUsage("claude-haiku-4-5-20251001", "1.0", 100, 100, 100, 0, 100),
       segments = List(SegmentRow("s", 1, 1)),
       inventory = List(InventoryDisplay("i", 1, 1)),
       anomalies = List(AnomalyDisplay(AnomalyKind.Warn, "w")),

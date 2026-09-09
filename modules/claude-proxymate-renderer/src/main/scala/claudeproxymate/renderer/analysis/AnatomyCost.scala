@@ -32,26 +32,38 @@ object AnatomyCost {
     reqKb: String,
     inputTokens: Int,
     cacheRead: Int,
-    cacheWrite: Int,
+    cacheWrite5m: Int,
+    cacheWrite1h: Int,
     outputTokens: Int,
   ): CostCard = {
     val rates    = ModelTier.forModel(model).rates
-    val totalIn  = inputTokens + cacheRead + cacheWrite
+    val totalIn  = inputTokens + cacheRead + cacheWrite5m + cacheWrite1h
     val cachePct = if (totalIn > 0) math.round(cacheRead.toDouble / totalIn * 100).toInt else 0
 
     def cost(tokens: Int, rate: Double): Double = tokens * rate / 1000000.0
 
-    val uncachedCost   = cost(inputTokens, rates.input)
-    val cacheReadCost  = cost(cacheRead, rates.cacheRead)
-    val cacheWriteCost = cost(cacheWrite, rates.cacheWrite5m)
-    val outputCost     = cost(outputTokens, rates.output)
+    val uncachedCost     = cost(inputTokens, rates.input)
+    val cacheReadCost    = cost(cacheRead, rates.cacheRead)
+    val cacheWrite5mCost = cost(cacheWrite5m, rates.cacheWrite5m)
+    val cacheWrite1hCost = cost(cacheWrite1h, rates.cacheWrite1h)
+    val outputCost       = cost(outputTokens, rates.output)
 
-    val segments = List(
-      CostSegment("token.uncachedInput", inputTokens, uncachedCost, "var(--blue)"),
-      CostSegment("token.cacheRead", cacheRead, cacheReadCost, "var(--green)"),
-      CostSegment("token.cacheWrite", cacheWrite, cacheWriteCost, "var(--orange)"),
-      CostSegment("token.output", outputTokens, outputCost, "var(--yellow)"),
-    )
+    /* Without a 1h write there is nothing to disambiguate, so the segment
+     * keeps the plain "Cache Write" label it has always had. */
+    val cacheWriteSegments =
+      if (cacheWrite1h > 0)
+        List(
+          CostSegment("token.cacheWrite5m", cacheWrite5m, cacheWrite5mCost, "var(--orange)"),
+          CostSegment("token.cacheWrite1h", cacheWrite1h, cacheWrite1hCost, "var(--purple)"),
+        )
+      else
+        List(CostSegment("token.cacheWrite", cacheWrite5m, cacheWrite5mCost, "var(--orange)"))
+
+    val segments =
+      CostSegment("token.uncachedInput", inputTokens, uncachedCost, "var(--blue)") ::
+        CostSegment("token.cacheRead", cacheRead, cacheReadCost, "var(--green)") ::
+        cacheWriteSegments :::
+        List(CostSegment("token.output", outputTokens, outputCost, "var(--yellow)"))
 
     CostCard(
       model = model,
@@ -61,7 +73,7 @@ object AnatomyCost {
       outputTokens = outputTokens,
       cacheHitPct = cachePct,
       segments = segments,
-      totalCostUsd = uncachedCost + cacheReadCost + cacheWriteCost + outputCost,
+      totalCostUsd = uncachedCost + cacheReadCost + cacheWrite5mCost + cacheWrite1hCost + outputCost,
       estTokens = 0,
     )
   }

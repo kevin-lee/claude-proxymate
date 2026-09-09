@@ -6,8 +6,11 @@ import hedgehog.runner.*
 object PricingSpec extends Properties {
 
   override def tests: List[Test] = List(
-    example("Fable 5 alias -> Fable5", testFable5),
-    example("Mythos 5 alias -> Fable5", testMythos5),
+    example("Fable 5.1 alias -> Fable5_1", testFable5_1),
+    example("Mythos 5.1 alias -> Fable5_1", testMythos5_1),
+    example("Fable 5 alias -> Fable5 (not Fable5_1)", testFable5),
+    example("Mythos 5 alias -> Fable5 (not Fable5_1)", testMythos5),
+    example("Opus 5 alias -> OpusPremium", testOpus5),
     example("Opus 4.8 alias -> OpusPremium", testOpus4_8),
     example("Opus 4.7 alias -> OpusPremium", testOpus4_7),
     example("Opus 4.6 alias -> OpusPremium", testOpus4_6),
@@ -30,29 +33,31 @@ object PricingSpec extends Properties {
     example("Haiku 4.5 full ID -> Haiku4_5", testHaiku4_5FullId),
     example("Haiku 3.5 full ID -> Haiku3_5", testHaiku3_5),
     example("Haiku 3 full ID -> Haiku3", testHaiku3),
+    example("unreleased Fable -> Fable5_1 (family fallback)", testFutureFable),
+    example("unreleased Opus -> OpusPremium (family fallback)", testFutureOpus),
+    example("unreleased Sonnet -> Sonnet5 (family fallback)", testFutureSonnet),
+    example("unreleased Haiku -> Haiku4_5 (family fallback)", testFutureHaiku),
     example("empty model -> Unknown", testEmptyUnknown),
     example("arbitrary string -> Unknown", testArbitraryUnknown),
+    example("Fable5_1 rates match pricing doc", testRatesFable5_1),
     example("Fable5 rates match pricing doc", testRatesFable5),
     example("OpusPremium rates match pricing doc", testRatesOpusPremium),
     example("OpusLegacy rates match pricing doc", testRatesOpusLegacy),
-    example("Sonnet5 intro rates (<= cutoff)", testRatesSonnet5Intro),
-    example("Sonnet5 standard rates (> cutoff)", testRatesSonnet5Standard),
+    example("Sonnet5 rates match pricing doc", testRatesSonnet5),
     example("Sonnet rates match pricing doc", testRatesSonnet),
     example("Haiku4_5 rates match pricing doc", testRatesHaiku4_5),
     example("Haiku3_5 rates match pricing doc", testRatesHaiku3_5),
     example("Haiku3 rates match pricing doc", testRatesHaiku3),
-    example("Unknown rates equal Sonnet rates (fallback)", testUnknownFallback),
+    example("Unknown rates equal OpusPremium rates (fallback)", testUnknownFallback),
   )
 
   import ModelTier.*
 
-  /* A fixed instant just after the Sonnet 5 intro window, for deterministic
-   * rate assertions independent of the wall clock. */
-  private val afterCutoff: Double  = Sonnet5IntroEndMillis + 1.0
-  private val beforeCutoff: Double = Sonnet5IntroEndMillis - 1.0
-
+  def testFable5_1: Result         = ModelTier.forModel("claude-fable-5-1") ==== Fable5_1
+  def testMythos5_1: Result        = ModelTier.forModel("claude-mythos-5-1") ==== Fable5_1
   def testFable5: Result           = ModelTier.forModel("claude-fable-5") ==== Fable5
   def testMythos5: Result          = ModelTier.forModel("claude-mythos-5") ==== Fable5
+  def testOpus5: Result            = ModelTier.forModel("claude-opus-5") ==== OpusPremium
   def testOpus4_8: Result          = ModelTier.forModel("claude-opus-4-8") ==== OpusPremium
   def testOpus4_7: Result          = ModelTier.forModel("claude-opus-4-7") ==== OpusPremium
   def testOpus4_6: Result          = ModelTier.forModel("claude-opus-4-6") ==== OpusPremium
@@ -75,18 +80,22 @@ object PricingSpec extends Properties {
   def testHaiku4_5FullId: Result   = ModelTier.forModel("claude-haiku-4-5-20251001") ==== Haiku4_5
   def testHaiku3_5: Result         = ModelTier.forModel("claude-3-5-haiku-20241022") ==== Haiku3_5
   def testHaiku3: Result           = ModelTier.forModel("claude-3-haiku-20240307") ==== Haiku3
+  def testFutureFable: Result      = ModelTier.forModel("claude-fable-6") ==== Fable5_1
+  def testFutureOpus: Result       = ModelTier.forModel("claude-opus-6") ==== OpusPremium
+  def testFutureSonnet: Result     = ModelTier.forModel("claude-sonnet-6") ==== Sonnet5
+  def testFutureHaiku: Result      = ModelTier.forModel("claude-haiku-5") ==== Haiku4_5
   def testEmptyUnknown: Result     = ModelTier.forModel("") ==== Unknown
   def testArbitraryUnknown: Result = ModelTier.forModel("gpt-4") ==== Unknown
 
-  def testRatesFable5: Result          = Fable5.ratesAt(afterCutoff) ==== Rates(10.0, 50.0, 1.0, 12.5)
-  def testRatesOpusPremium: Result     = OpusPremium.ratesAt(afterCutoff) ==== Rates(5.0, 25.0, 0.5, 6.25)
-  def testRatesOpusLegacy: Result      = OpusLegacy.ratesAt(afterCutoff) ==== Rates(15.0, 75.0, 1.5, 18.75)
-  def testRatesSonnet5Intro: Result    = Sonnet5.ratesAt(beforeCutoff) ==== Rates(2.0, 10.0, 0.2, 2.5)
-  def testRatesSonnet5Standard: Result = Sonnet5.ratesAt(afterCutoff) ==== Rates(3.0, 15.0, 0.3, 3.75)
-  def testRatesSonnet: Result          = Sonnet.ratesAt(afterCutoff) ==== Rates(3.0, 15.0, 0.3, 3.75)
-  def testRatesHaiku4_5: Result        = Haiku4_5.ratesAt(afterCutoff) ==== Rates(1.0, 5.0, 0.1, 1.25)
-  def testRatesHaiku3_5: Result        = Haiku3_5.ratesAt(afterCutoff) ==== Rates(0.8, 4.0, 0.08, 1.0)
-  def testRatesHaiku3: Result          = Haiku3.ratesAt(afterCutoff) ==== Rates(0.25, 1.25, 0.03, 0.3)
+  def testRatesFable5_1: Result    = Fable5_1.rates ==== Rates(10.0, 50.0, 0.25, 12.5, 20.0)
+  def testRatesFable5: Result      = Fable5.rates ==== Rates(10.0, 50.0, 1.0, 12.5, 20.0)
+  def testRatesOpusPremium: Result = OpusPremium.rates ==== Rates(5.0, 25.0, 0.5, 6.25, 10.0)
+  def testRatesOpusLegacy: Result  = OpusLegacy.rates ==== Rates(15.0, 75.0, 1.5, 18.75, 30.0)
+  def testRatesSonnet5: Result     = Sonnet5.rates ==== Rates(2.0, 10.0, 0.2, 2.5, 4.0)
+  def testRatesSonnet: Result      = Sonnet.rates ==== Rates(3.0, 15.0, 0.3, 3.75, 6.0)
+  def testRatesHaiku4_5: Result    = Haiku4_5.rates ==== Rates(1.0, 5.0, 0.1, 1.25, 2.0)
+  def testRatesHaiku3_5: Result    = Haiku3_5.rates ==== Rates(0.8, 4.0, 0.08, 1.0, 1.6)
+  def testRatesHaiku3: Result      = Haiku3.rates ==== Rates(0.25, 1.25, 0.03, 0.3, 0.5)
 
-  def testUnknownFallback: Result = Unknown.ratesAt(afterCutoff) ==== Sonnet.ratesAt(afterCutoff)
+  def testUnknownFallback: Result = Unknown.rates ==== OpusPremium.rates
 }

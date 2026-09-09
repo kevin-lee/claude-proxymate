@@ -47,7 +47,8 @@ final case class RequestAnatomy(
 /** Builds a [[RequestAnatomy]] from an Anthropic Messages API request body
   * plus minimal response signals. Pure: operates on `io.circe.Json` only.
   *
-  * All token counts are estimates via [[estTokens]] (`ceil(bytes / 3.5)`),
+  * All token counts are estimates via [[estTokens]]
+  * (`ceil(bytes / BytesPerToken)`),
   * matching the estimate path in the renderer's token pill. Labels for
   * segments / inventory / anomalies are i18n KEY strings; the renderer
   * resolves them.
@@ -86,8 +87,14 @@ object RequestAnatomy {
   private val McpInstrMarker   = "MCP Server Instructions"
   private val SkillsListMarker = claudeproxymate.core.filter.SkillsList.Marker
 
+  /* Bytes per token for the tokenizer introduced with Claude Opus 4.7 and
+   * used by every current model. It yields roughly 30% more tokens for the
+   * same text than the Claude Sonnet 4.6-and-earlier tokenizer, which this
+   * estimate previously assumed at 3.5 bytes per token. */
+  val BytesPerToken: Double = 2.7
+
   def estTokens(bytes: Int): Int =
-    if (bytes <= 0) 0 else math.ceil(bytes / 3.5).toInt
+    if (bytes <= 0) 0 else math.ceil(bytes / BytesPerToken).toInt
 
   private def byteLen(s: String): Int = s.getBytes("UTF-8").length
   private def jsonBytes(j: Json): Int = byteLen(j.noSpaces)

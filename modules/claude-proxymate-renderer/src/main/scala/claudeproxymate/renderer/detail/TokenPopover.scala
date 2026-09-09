@@ -104,6 +104,8 @@ object TokenPopover {
     val descriptions = Map(
       I18n.t("token.cacheRead")     -> I18n.t("token.descCacheRead"),
       I18n.t("token.cacheWrite")    -> I18n.t("token.descCacheWrite"),
+      I18n.t("token.cacheWrite5m")  -> I18n.t("token.descCacheWrite"),
+      I18n.t("token.cacheWrite1h")  -> I18n.t("token.descCacheWrite1h"),
       I18n.t("token.uncachedInput") -> I18n.t("token.descUncached"),
       I18n.t("token.output")        -> I18n.t("token.descOutput"),
     )

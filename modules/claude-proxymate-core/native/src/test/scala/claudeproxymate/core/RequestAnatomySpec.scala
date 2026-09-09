@@ -28,8 +28,8 @@ class RequestAnatomySpec extends munit.FunSuite {
     assertEquals(RequestAnatomy.estTokens(0), 0)
   }
 
-  test("estTokens(7) == 2") {
-    assertEquals(RequestAnatomy.estTokens(7), 2)
+  test("estTokens(7) == 3") {
+    assertEquals(RequestAnatomy.estTokens(7), 3)
   }
 
   /* Property: estTokens is non-decreasing. Representative pairs cover
