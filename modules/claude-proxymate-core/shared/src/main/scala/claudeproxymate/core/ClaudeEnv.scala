@@ -25,6 +25,11 @@ object ClaudeEnv {
   val EnvVarName: String  = VsCodeEnv.EnvVarName
   val SettingsKey: String = "env"
 
+  /** Used only when the file itself has no indentation to detect: the
+    * Claude Code command line interface (CLI) writes it with 2 spaces.
+    */
+  val DefaultIndent: JsonIndent = JsonIndent.Spaces(2)
+
   /** What to do to `env.ANTHROPIC_BASE_URL` to apply the proxy base URL. */
   enum ApplyDecision {
     case Set

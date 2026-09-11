@@ -1,7 +1,7 @@
 package claudeproxymate.electron
 
 import cats.syntax.all.*
-import claudeproxymate.core.{ClaudeEnv, SyncAction, VsCodeEnv}
+import claudeproxymate.core.{ClaudeEnv, JsonIndent, SyncAction, VsCodeEnv}
 import claudeproxymate.electron.SyncFileOps.{RecordEntry, SyncTarget, TargetResult}
 import claudeproxymate.electron.facades._
 
@@ -71,6 +71,7 @@ object ClaudeSettingsSync {
                   js.Array[js.Any](ClaudeEnv.SettingsKey, ClaudeEnv.EnvVarName),
                   url,
                   sf.eol,
+                  indentOf(sf),
                   isArrayInsertion = false,
                 )
               } else {
@@ -81,6 +82,7 @@ object ClaudeSettingsSync {
                   js.Array[js.Any](ClaudeEnv.SettingsKey),
                   envValue,
                   sf.eol,
+                  indentOf(sf),
                   isArrayInsertion = false,
                 )
               }
@@ -114,6 +116,7 @@ object ClaudeSettingsSync {
               js.Array[js.Any](ClaudeEnv.SettingsKey, ClaudeEnv.EnvVarName),
               js.undefined,
               sf.eol,
+              indentOf(sf),
               isArrayInsertion = false,
             )
             val dirtyValue = recorded.orElse(fallbackUrl).getOrElse("")
@@ -126,6 +129,12 @@ object ClaudeSettingsSync {
   /** Shape check for [[SyncFileOps]]'s verify/sweep plumbing. */
   def stillParseable(text: String): Boolean =
     JsoncParser.get.exists(mod => parseSettings(mod, text).isRight)
+
+  /** The file's own indentation, or the 2 spaces the Claude Code CLI writes
+    * when the file has none to detect.
+    */
+  private def indentOf(sf: SyncFileOps.SettingsFile): JsonIndent =
+    sf.detectedIndent.getOrElse(ClaudeEnv.DefaultIndent)
 
   // ── Settings parsing (Claude global shape) ─────────────────────────
 
