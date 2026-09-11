@@ -80,8 +80,11 @@ object VsCodeEnvSpec extends Properties {
   def testDuplicatesHandled: Property =
     for {
       port  <- genPort.log("port")
-      port2 <- genPort.log("port2")
+      delta <- Gen.int(Range.linear(1, 100)).log("delta")
     } yield {
+      /* port2 is derived from port so the two can never be equal. Equal ports would make
+       * all three entries the recorded URL, and decideRemove would then rightly remove all three. */
+      val port2   = if (port + delta <= 65535) port + delta else port - delta
       val url     = VsCodeEnv.baseUrl(port)
       val entries = List(
         VsCodeEnv.EnvEntry(0, VsCodeEnv.EnvVarName, url),
