@@ -21,6 +21,17 @@ object VsCodeEnv {
   val EnvVarName: String  = "ANTHROPIC_BASE_URL"
   val SettingsKey: String = "claudeCode.environmentVariables"
 
+  /** The editor setting deciding tabs versus spaces, read from the very file being edited. */
+  val InsertSpacesKey: String = "editor.insertSpaces"
+
+  /** The editor setting deciding the indentation width, read from the very file being edited. */
+  val TabSizeKey: String = "editor.tabSize"
+
+  /** Last resort when neither the content nor the `editor.*` settings say
+    * anything: VS Code's own `editor.tabSize` default.
+    */
+  val DefaultIndent: JsonIndent = JsonIndent.Spaces(4)
+
   /** A VS Code-family editor whose user settings.json we can manage.
     * `dirName` is the product directory under the per-OS `appData` root.
     */

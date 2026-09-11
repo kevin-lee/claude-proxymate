@@ -12,6 +12,9 @@ trait JsoncParserModule extends js.Object {
     js.native
   def applyEdits(text: String, edits: js.Array[js.Dynamic]): String                                         = js.native
   def stripComments(text: String, replaceCh: String): String                                                = js.native
+  def parseTree(text: String, errors: js.Array[js.Dynamic], options: js.Object): js.Dynamic                 = js.native
+  def findNodeAtLocation(root: js.Dynamic, path: js.Array[js.Any]): js.Dynamic                              = js.native
+  def format(text: String, range: js.Object, options: js.Object): js.Array[js.Dynamic]                      = js.native
 }
 
 /** `jsonc-parser` loaded via a dynamic `require` in try/catch.

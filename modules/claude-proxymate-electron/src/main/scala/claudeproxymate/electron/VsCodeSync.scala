@@ -1,7 +1,7 @@
 package claudeproxymate.electron
 
 import cats.syntax.all.*
-import claudeproxymate.core.{SyncAction, VsCodeEnv}
+import claudeproxymate.core.{JsonIndent, SyncAction, VsCodeEnv}
 import claudeproxymate.electron.SyncFileOps.{RecordEntry, SettingsFile, SyncTarget, TargetResult}
 import claudeproxymate.electron.facades._
 
@@ -19,10 +19,16 @@ import scala.scalajs.js
   */
 object VsCodeSync {
 
-  /** Parsed settings content: env entries and the raw array length
-    * (`None` when the settings key is absent).
+  /** Parsed settings content: env entries, the raw array length (`None`
+    * when the settings key is absent) and the indentation implied by the
+    * file's own `editor.insertSpaces` and `editor.tabSize`, used only when
+    * the content itself says nothing.
     */
-  final private case class ParsedSettings(entries: List[VsCodeEnv.EnvEntry], rawLength: Option[Int])
+  final private case class ParsedSettings(
+    entries: List[VsCodeEnv.EnvEntry],
+    rawLength: Option[Int],
+    editorIndent: Option[JsonIndent],
+  )
 
   // ── Editor detection and paths ─────────────────────────────────────
 
@@ -69,6 +75,12 @@ object VsCodeSync {
   def stillParseable(text: String): Boolean =
     JsoncParser.get.exists(mod => parseSettings(mod, text).isRight)
 
+  /** Content first, then the editor's own settings, then VS Code's default -
+    * mirroring `editor.detectIndentation`, which defaults to true.
+    */
+  private def indentOf(sf: SettingsFile, parsed: ParsedSettings): JsonIndent =
+    sf.detectedIndent.orElse(parsed.editorIndent).getOrElse(VsCodeEnv.DefaultIndent)
+
   // ── Apply / remove one editor ──────────────────────────────────────
 
   private def applyOne(editor: VsCodeEnv.Editor, port: Int): TargetResult =
@@ -76,6 +88,7 @@ object VsCodeSync {
       val target   = targetOf(editor)
       val recorded = SyncFileOps.readRecord().get(editor.id).map(entry => entry.value)
       val url      = VsCodeEnv.baseUrl(port)
+      val indent   = indentOf(sf, parsed)
       VsCodeEnv.decideApply(parsed.entries, port, recorded) match {
         case VsCodeEnv.ApplyDecision.SkipForeign(values) =>
           TargetResult(target, SyncAction.SkippedForeign, values.mkString(", ").some)
@@ -83,16 +96,17 @@ object VsCodeSync {
           SyncFileOps.setRecord(editor.id, RecordEntry(url, dirty = false, target.backupPath))
           TargetResult(target, SyncAction.AlreadyApplied, none[String])
         case VsCodeEnv.ApplyDecision.AlreadyApplied(dropIndices) =>
-          val newText = dropElements(mod, sf, dropIndices)
+          val newText = dropElements(mod, sf, dropIndices, indent)
           SyncFileOps.writeProtocol(target, sf, newText, url, url.some, SyncAction.Applied, stillParseable)
         case VsCodeEnv.ApplyDecision.Update(index, dropIndices) =>
-          val afterDrops = dropElements(mod, sf, dropIndices)
+          val afterDrops = dropElements(mod, sf, dropIndices, indent)
           val newText    = SyncFileOps.applyModify(
             mod,
             afterDrops,
             js.Array[js.Any](VsCodeEnv.SettingsKey, index, "value"),
             url,
             sf.eol,
+            indent,
             isArrayInsertion = false,
           )
           SyncFileOps.writeProtocol(target, sf, newText, url, url.some, SyncAction.Applied, stillParseable)
@@ -106,6 +120,7 @@ object VsCodeSync {
                 js.Array[js.Any](VsCodeEnv.SettingsKey),
                 js.Array[js.Any](entryValue),
                 sf.eol,
+                indent,
                 isArrayInsertion = false,
               )
             case Some(length) =>
@@ -115,6 +130,7 @@ object VsCodeSync {
                 js.Array[js.Any](VsCodeEnv.SettingsKey, length),
                 entryValue,
                 sf.eol,
+                indent,
                 isArrayInsertion = true,
               )
           }
@@ -133,6 +149,7 @@ object VsCodeSync {
     } else {
       withParsedSettings(editor) { (mod, sf, parsed) =>
         val recorded = SyncFileOps.readRecord().get(editor.id).map(entry => entry.value)
+        val indent   = indentOf(sf, parsed)
         VsCodeEnv.decideRemove(parsed.entries, recorded, fallbackUrl) match {
           case VsCodeEnv.RemoveDecision.NoOp =>
             SyncFileOps.clearRecord(editor.id)
@@ -142,7 +159,7 @@ object VsCodeSync {
              * `claudeCode.environmentVariables` property itself is never
              * deleted — it may be user-authored and may carry other
              * entries; if we created it, an empty array remains. */
-            val newText    = dropElements(mod, sf, indices)
+            val newText    = dropElements(mod, sf, indices, indent)
             val dirtyValue = recorded.orElse(fallbackUrl).getOrElse("")
             SyncFileOps.writeProtocol(target, sf, newText, dirtyValue, none[String], SyncAction.Removed, stillParseable)
         }
@@ -193,19 +210,21 @@ object VsCodeSync {
           try mod.stripComments(text, " ").trim.isEmpty
           catch { case _: Throwable => false }
         if (effectivelyEmpty) {
-          ParsedSettings(Nil, none[Int]).asRight[String]
+          ParsedSettings(Nil, none[Int], none[JsonIndent]).asRight[String]
         } else {
           "unparseable settings.json".asLeft[ParsedSettings]
         }
       } else if (js.isUndefined(parsed) || parsed == null) {
         /* Empty or comments-only document — nothing set yet. */
-        ParsedSettings(Nil, none[Int]).asRight[String]
+        ParsedSettings(Nil, none[Int], none[JsonIndent]).asRight[String]
       } else if (js.typeOf(parsed) =!= "object" || js.Array.isArray(parsed)) {
         "unexpected settings shape (root is not an object)".asLeft[ParsedSettings]
       } else {
-        val env = parsed.asInstanceOf[js.Dynamic].selectDynamic(VsCodeEnv.SettingsKey)
+        val root         = parsed.asInstanceOf[js.Dynamic]
+        val editorIndent = extractEditorIndent(root)
+        val env          = root.selectDynamic(VsCodeEnv.SettingsKey)
         if (js.isUndefined(env) || env == null) {
-          ParsedSettings(Nil, none[Int]).asRight[String]
+          ParsedSettings(Nil, none[Int], editorIndent).asRight[String]
         } else if (!js.Array.isArray(env)) {
           s"unexpected settings shape (${VsCodeEnv.SettingsKey} is not an array)".asLeft[ParsedSettings]
         } else {
@@ -217,12 +236,25 @@ object VsCodeSync {
               case (element, index) =>
                 extractEntry(element, index)
             }
-          ParsedSettings(entries, arr.length.some).asRight[String]
+          ParsedSettings(entries, arr.length.some, editorIndent).asRight[String]
         }
       }
     } catch {
       case e: Throwable => s"cannot parse settings.json: ${e.getMessage}".asLeft[ParsedSettings]
     }
+
+  /** The indentation implied by the file's own `editor.*` settings. Values
+    * of the wrong type are ignored; the range check lives in
+    * [[claudeproxymate.core.JsonIndent.fromEditorSettings]].
+    */
+  private def extractEditorIndent(root: js.Dynamic): Option[JsonIndent] = {
+    val insertSpacesValue = root.selectDynamic(VsCodeEnv.InsertSpacesKey)
+    val tabSizeValue      = root.selectDynamic(VsCodeEnv.TabSizeKey)
+    val insertSpaces      =
+      Option.when(js.typeOf(insertSpacesValue) === "boolean")(insertSpacesValue.asInstanceOf[Boolean])
+    val tabSize           = Option.when(js.typeOf(tabSizeValue) === "number")(tabSizeValue.asInstanceOf[Double])
+    JsonIndent.fromEditorSettings(insertSpaces, tabSize)
+  }
 
   private def extractEntry(element: js.Dynamic, index: Int): Option[VsCodeEnv.EnvEntry] = {
     val isObject = !js.isUndefined(element) && element != null && js.typeOf(element) === "object"
@@ -238,7 +270,7 @@ object VsCodeSync {
   }
 
   /** Remove array elements by index, descending so offsets stay valid. */
-  private def dropElements(mod: JsoncParserModule, sf: SettingsFile, indices: List[Int]): String =
+  private def dropElements(mod: JsoncParserModule, sf: SettingsFile, indices: List[Int], indent: JsonIndent): String =
     indices
       .sorted
       .reverse
@@ -249,6 +281,7 @@ object VsCodeSync {
           js.Array[js.Any](VsCodeEnv.SettingsKey, index),
           js.undefined,
           sf.eol,
+          indent,
           isArrayInsertion = false,
         )
       }

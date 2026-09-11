@@ -1,7 +1,7 @@
 package claudeproxymate.electron
 
 import cats.syntax.all.*
-import claudeproxymate.core.SyncAction
+import claudeproxymate.core.{JsonIndent, SyncAction}
 import claudeproxymate.electron.facades._
 
 import scala.scalajs.js
@@ -21,6 +21,11 @@ import scala.scalajs.js.JSON
   *      parseable → someone else wrote concurrently, leave the file
   *      alone; unparseable or the write threw → restore the backup.
   *
+  * Every edit is formatted with the file's own indentation and EOL, and
+  * the top-level property it edits is then re-seated at one level and
+  * re-formatted, so a key line damaged by an earlier release is repaired
+  * on the next write while nothing outside that property is touched.
+  *
   * The applied-state record (`vscode-sync-state.json` in `userData`,
   * name kept for compatibility with records left by previous releases)
   * is the ownership authority, keyed by target id.
@@ -35,8 +40,18 @@ object SyncFileOps {
   /** One entry of the applied-state record file. */
   final case class RecordEntry(value: String, dirty: Boolean, backup: String)
 
-  /** Settings file as read from disk, normalized for editing. */
-  final case class SettingsFile(originalFull: String, text: String, hasBom: Boolean, eol: String)
+  /** Settings file as read from disk, normalized for editing.
+    *
+    * `detectedIndent` is what the text itself indents with - `None` means
+    * nothing was detectable and the caller applies its target's default.
+    */
+  final case class SettingsFile(
+    originalFull: String,
+    text: String,
+    hasBom: Boolean,
+    eol: String,
+    detectedIndent: Option[JsonIndent],
+  )
 
   val Bom: String = "\uFEFF"
 
@@ -50,14 +65,26 @@ object SyncFileOps {
   def readSettingsFile(path: String): Either[String, SettingsFile] =
     try {
       if (!NodeFs.existsSync(path)) {
-        SettingsFile(originalFull = "{}", text = "{}", hasBom = false, eol = "\n").asRight[String]
+        SettingsFile(
+          originalFull = "{}",
+          text = "{}",
+          hasBom = false,
+          eol = "\n",
+          detectedIndent = none[JsonIndent],
+        ).asRight[String]
       } else {
         val raw      = NodeFs.readFileSync(path, "utf8")
         val hasBom   = raw.startsWith(Bom)
         val stripped = if (hasBom) raw.substring(1) else raw
         val eol      = if (stripped.contains("\r\n")) "\r\n" else "\n"
         val text     = if (stripped.trim.isEmpty) "{}" else stripped
-        SettingsFile(originalFull = raw, text = text, hasBom = hasBom, eol = eol).asRight[String]
+        SettingsFile(
+          originalFull = raw,
+          text = text,
+          hasBom = hasBom,
+          eol = eol,
+          detectedIndent = JsonIndent.detect(text),
+        ).asRight[String]
       }
     } catch {
       case e: Throwable => s"cannot read settings.json: ${e.getMessage}".asLeft[SettingsFile]
@@ -65,23 +92,80 @@ object SyncFileOps {
 
   // ── JSONC editing ──────────────────────────────────────────────────
 
+  /** Apply one `jsonc-parser` edit, then re-seat the top-level property the
+    * path starts at (see [[reseatTopLevelProperty]]).
+    */
   def applyModify(
     mod: JsoncParserModule,
     text: String,
     path: js.Array[js.Any],
     value: js.Any,
     eol: String,
+    indent: JsonIndent,
     isArrayInsertion: Boolean,
   ): String = {
     val options = js
       .Dynamic
       .literal(
-        formattingOptions = js.Dynamic.literal(insertSpaces = true, tabSize = 4, eol = eol),
+        formattingOptions =
+          js.Dynamic.literal(insertSpaces = indent.insertSpaces, tabSize = indent.tabSize, eol = eol),
         isArrayInsertion = isArrayInsertion,
       )
       .asInstanceOf[js.Object]
     val edits   = mod.modify(text, path, value, options)
-    mod.applyEdits(text, edits)
+    val edited  = mod.applyEdits(text, edits)
+    path.headOption.filter(segment => js.typeOf(segment) === "string") match {
+      case Some(key) => reseatTopLevelProperty(mod, edited, key.asInstanceOf[String], indent, eol)
+      case None => edited
+    }
+  }
+
+  /** Re-seat the top-level property `key` at one indentation level and
+    * re-format its range.
+    *
+    * `jsonc-parser` re-formats an edited range relative to the indentation
+    * its first line already has, so a key line damaged by an earlier
+    * release (`"env": {` pushed to column 0) anchors every later edit to
+    * the damage. Both managed keys are top-level, so their key line belongs
+    * at exactly one level: resetting it first gives the formatter a correct
+    * anchor for the rest of the property. Nothing outside the property is
+    * touched, and any failure returns the edit unrepaired.
+    */
+  private def reseatTopLevelProperty(
+    mod: JsoncParserModule,
+    text: String,
+    key: String,
+    indent: JsonIndent,
+    eol: String,
+  ): String =
+    try {
+      propertyRange(mod, text, key) match {
+        case None => text
+        case Some((keyOffset, _)) =>
+          val reseated = JsonIndent.reindentLine(text, keyOffset, indent, level = 1)
+          propertyRange(mod, reseated, key) match {
+            case None => text
+            case Some((offset, length)) =>
+              val range   = js.Dynamic.literal(offset = offset, length = length).asInstanceOf[js.Object]
+              val options = js
+                .Dynamic
+                .literal(insertSpaces = indent.insertSpaces, tabSize = indent.tabSize, eol = eol, keepLines = true)
+                .asInstanceOf[js.Object]
+              mod.applyEdits(reseated, mod.format(reseated, range, options))
+          }
+      }
+    } catch {
+      case _: Throwable => text
+    }
+
+  /** Offset and length of the top-level property `key`, key through value. */
+  private def propertyRange(mod: JsoncParserModule, text: String, key: String): Option[(Int, Int)] = {
+    val parseOptions = js.Dynamic.literal(allowTrailingComma = true).asInstanceOf[js.Object]
+    for {
+      root     <- Option(mod.parseTree(text, js.Array[js.Dynamic](), parseOptions)).filterNot(node => js.isUndefined(node))
+      value    <- Option(mod.findNodeAtLocation(root, js.Array[js.Any](key))).filterNot(node => js.isUndefined(node))
+      property <- Option(value.selectDynamic("parent")).filterNot(node => js.isUndefined(node))
+    } yield (property.selectDynamic("offset").asInstanceOf[Int], property.selectDynamic("length").asInstanceOf[Int])
   }
 
   // ── Write / verify / restore protocol ──────────────────────────────
