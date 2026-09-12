@@ -12,6 +12,10 @@ object ElectronMain {
 
   private val mainWindow = new AtomicReference[Option[BrowserWindow]](none[BrowserWindow])
 
+  /* Set once the proxy child is confirmed gone and the quit may proceed, so
+   * the re-issued `app.quit()` is not deferred a second time. */
+  private val quitConfirmed = new AtomicReference[Boolean](false)
+
   private val process  = js.Dynamic.global.process
   private val platform = process.platform.asInstanceOf[String]
 
@@ -61,14 +65,31 @@ object ElectronMain {
       }
     )
 
+    /* Quitting waits for the proxy child to actually die. SIGTERM alone is
+     * not enough: the app can be gone before the child has processed it, and
+     * the child then outlives the app still holding its port. So the first
+     * pass defers the quit, stops the child, and re-issues the quit once the
+     * child's `exit` event arrives (or the escalation deadline forces it). */
     ElectronApp.on(
       "before-quit",
-      { () =>
-        /* Reset + remove first so the child-exit event from the kill
-         * below finds the route already off and no-ops. */
-        RouteSync.onQuit()
-        IpcHandlers.stopProxyIfRunning()
-      }
+      { (event: js.Dynamic) =>
+        if (quitConfirmed.get()) ()
+        else {
+          /* Reset + remove first so the child-exit event from the kill
+           * below finds the route already off and no-ops. */
+          RouteSync.onQuit()
+          IpcHandlers.stopProxy { () =>
+            quitConfirmed.set(true)
+            ElectronApp.quit()
+          } match {
+            case StopOutcome.Deferred =>
+              /* Only reached with a live child, so the callback above is
+               * always asynchronous and never re-enters this handler. */
+              val _ = event.preventDefault()
+            case StopOutcome.NothingToStop => ()
+          }
+        }
+      }: js.Function1[js.Dynamic, Unit]
     )
 
     IpcHandlers.register(() => mainWindow.get())
