@@ -1,5 +1,7 @@
 package claudeproxymate.core
 
+import cats.*
+import cats.derived.strict.*
 import cats.syntax.all.*
 
 /** The Electron main process's view of the native proxy child process.
@@ -18,15 +20,13 @@ import cats.syntax.all.*
   * port, so the next start failed with `Address already in use`. Only the
   * child's own `exit` event may move the state back to [[Idle]].
   */
-enum ProxyLifecycle {
+enum ProxyLifecycle derives CanEqual, Eq, Hash, Show {
   case Idle
   case Running
   case Stopping
 }
 
 object ProxyLifecycle {
-
-  given cats.Eq[ProxyLifecycle] = cats.Eq.fromUniversalEquals
 
   /** A spawn is allowed only from [[Idle]]. Spawning on top of a [[Stopping]]
     * child races the dying process for the port, which is precisely the

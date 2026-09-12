@@ -13,7 +13,7 @@ import cats.derived.strict.*
   *     usable standalone from a terminal, where stdin may be a TTY,
   *     `/dev/null`, or closed, none of which mean "the parent is gone".
   */
-enum ParentLink derives CanEqual, Eq, Hash {
+enum ParentLink derives CanEqual, Eq, Hash, Show {
   case WatchStdin
   case Detached
 }
