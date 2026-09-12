@@ -6,12 +6,15 @@ import scala.scalajs.js.annotation.*
 @js.native
 @JSImport("electron", "app")
 object ElectronApp extends js.Object {
-  def whenReady(): js.Promise[Unit]                   = js.native
-  def on(event: String, cb: js.Function0[Unit]): Unit = js.native
-  def quit(): Unit                                    = js.native
-  def getPath(name: String): String                   = js.native
-  def getAppPath(): String                            = js.native
-  val isPackaged: Boolean                             = js.native
+  def whenReady(): js.Promise[Unit]                               = js.native
+  def on(event: String, cb: js.Function0[Unit]): Unit             = js.native
+  /* `before-quit` needs the event object so the quit can be deferred with
+   * `preventDefault()` until the proxy child is confirmed dead. */
+  def on(event: String, cb: js.Function1[js.Dynamic, Unit]): Unit = js.native
+  def quit(): Unit                                                = js.native
+  def getPath(name: String): String                               = js.native
+  def getAppPath(): String                                        = js.native
+  val isPackaged: Boolean                                         = js.native
 }
 
 @js.native

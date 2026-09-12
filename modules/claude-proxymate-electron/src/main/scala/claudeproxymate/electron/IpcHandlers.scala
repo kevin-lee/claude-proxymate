@@ -1,7 +1,7 @@
 package claudeproxymate.electron
 
 import cats.syntax.all.*
-import claudeproxymate.core.{IpcChannels, JsonLineProtocol, ProxyEvent, RouteMode, UrlScheme}
+import claudeproxymate.core.{IpcChannels, JsonLineProtocol, ProxyEvent, ProxyLifecycle, RouteMode, UrlScheme}
 import claudeproxymate.electron.facades._
 
 import java.util.concurrent.atomic.AtomicReference
@@ -15,13 +15,40 @@ object IpcHandlers {
     process: Option[ChildProcess],
     port: Option[Int],
     buffer: String,
+    lifecycle: ProxyLifecycle,
   )
 
   private object ProxyState {
-    val empty: ProxyState = ProxyState(none[ChildProcess], none[Int], "")
+    val empty: ProxyState = ProxyState(none[ChildProcess], none[Int], "", ProxyLifecycle.Idle)
+  }
+
+  /** Handles for the two timers armed by [[stopProxy]], so the child's `exit`
+    * event can cancel them.
+    */
+  final private case class PendingTimers(
+    kill: Option[js.Dynamic],
+    deadline: Option[js.Dynamic],
+  )
+
+  private object PendingTimers {
+    val none: PendingTimers = PendingTimers(scala.None, scala.None)
   }
 
   private val state = new AtomicReference[ProxyState](ProxyState.empty)
+
+  /* Callbacks waiting for the child to actually be gone. `before-quit` parks
+   * the app quit in here. */
+  private val whenGoneCallbacks = new AtomicReference[List[() => Unit]](List.empty[() => Unit])
+
+  private val pendingTimers = new AtomicReference[PendingTimers](PendingTimers.none)
+
+  /** How long the child gets to honour SIGTERM before SIGKILL follows. */
+  private val KillGraceMs: Int = 3000
+
+  /** Hard cap: the waiters run at this point whatever the child is doing, so
+    * a deferred app quit can never hang.
+    */
+  private val QuitDeadlineMs: Int = 4000
 
   def register(getMainWindow: () => Option[BrowserWindow]): Unit = {
     IpcMain.handle(
@@ -116,13 +143,82 @@ object IpcHandlers {
     }
   }
 
-  /** Kill the proxy child process if running. Called on app quit. */
-  def stopProxyIfRunning(): Unit = {
-    state.get().process.foreach { child =>
-      try { child.kill("SIGTERM") }
-      catch { case _: Throwable => () }
+  private def clearPendingTimers(): Unit = {
+    val timers = pendingTimers.getAndSet(PendingTimers.none)
+    timers.kill.foreach { handle =>
+      val _ = js.Dynamic.global.clearTimeout(handle)
     }
-    state.set(ProxyState.empty)
+    timers.deadline.foreach { handle =>
+      val _ = js.Dynamic.global.clearTimeout(handle)
+    }
+  }
+
+  private def drainWhenGone(): Unit = {
+    /* Taken atomically and reversed: callbacks are prepended, and a waiter
+     * must never run twice (the app quit is one of them). */
+    val callbacks = whenGoneCallbacks.getAndSet(List.empty[() => Unit])
+    callbacks.reverse.foreach(callback => callback())
+  }
+
+  private def signal(child: ChildProcess, name: String): Unit =
+    try { child.kill(name): Unit }
+    catch { case _: Throwable => () }
+
+  /** Arm the escalation: SIGKILL when SIGTERM has not been honoured in time,
+    * then an unconditional drain so nothing waits on this child forever.
+    */
+  private def armEscalation(): Unit = {
+    val killTimer     = js
+      .Dynamic
+      .global
+      .setTimeout(
+        { () =>
+          state.get().process.foreach(child => signal(child, "SIGKILL"))
+        }: js.Function0[Unit],
+        KillGraceMs,
+      )
+    val deadlineTimer = js
+      .Dynamic
+      .global
+      .setTimeout(
+        { () =>
+          clearPendingTimers()
+          drainWhenGone()
+        }: js.Function0[Unit],
+        QuitDeadlineMs,
+      )
+    pendingTimers.set(PendingTimers(killTimer.some, deadlineTimer.some))
+  }
+
+  /** Stop the proxy child process, running `whenGone` once it is actually
+    * gone. Called by the `proxy-stop` IPC handler and by `before-quit`.
+    *
+    * The child's handle deliberately stays in [[state]] until its `exit`
+    * event arrives: Node's `child.killed` only reports that a signal was
+    * *sent*, so dropping the handle on the send is what previously left a
+    * surviving child unreachable and still holding the port.
+    */
+  def stopProxy(whenGone: () => Unit): StopOutcome = {
+    whenGoneCallbacks.updateAndGet(callbacks => whenGone :: callbacks): Unit
+    val current = state.get()
+    ProxyLifecycle.onStopRequested(current.lifecycle) match {
+      case Some(next) =>
+        current.process.foreach(child => signal(child, "SIGTERM"))
+        state.set(current.copy(lifecycle = next))
+        armEscalation()
+        StopOutcome.Deferred
+
+      case None =>
+        current.lifecycle match {
+          case ProxyLifecycle.Stopping =>
+            /* Already winding down; the timers are armed and this waiter
+             * joins the queue. */
+            StopOutcome.Deferred
+          case ProxyLifecycle.Idle | ProxyLifecycle.Running =>
+            drainWhenGone()
+            StopOutcome.NothingToStop
+        }
+    }
   }
 
   private def startProxy(
@@ -140,17 +236,34 @@ object IpcHandlers {
       js.Dynamic.literal(error = "Invalid port: must be 1024\u201365535")
     } else {
       val current = state.get()
-      current.process match {
-        case Some(_) =>
-          js.Dynamic.literal(running = true, port = current.port.getOrElse(port))
-
+      ProxyLifecycle.onSpawn(current.lifecycle) match {
         case None =>
+          current.lifecycle match {
+            case ProxyLifecycle.Running =>
+              js.Dynamic.literal(running = true, port = current.port.getOrElse(port))
+            case ProxyLifecycle.Idle | ProxyLifecycle.Stopping =>
+              /* Spawning on top of a dying child races it for the port and
+               * loses with `Address already in use`. The renderer surfaces
+               * this through `proxy.startFail` (see ProxyControl). */
+              js.Dynamic.literal(error = "The previous proxy is still shutting down. Try again in a moment.")
+          }
+
+        case Some(nextLifecycle) =>
           val binaryPath = Config.proxyBinaryPath
           /* The filter config file must exist before the binary starts reading it per request. */
           RequestFilterStore.ensureExists()
           val child      = ChildProcessModule.spawn(
             binaryPath,
-            js.Array("--port", port.toString, "--filter-config", RequestFilterStore.filePath),
+            js.Array(
+              "--port",
+              port.toString,
+              "--filter-config",
+              RequestFilterStore.filePath,
+              /* Tie the binary's lifetime to this stdin pipe: whatever kills
+               * the main process - Force Quit, a crash, SIGKILL - closes it,
+               * and the child exits rather than outliving the app. */
+              "--exit-on-stdin-close",
+            ),
             js.Dynamic
               .literal(
                 stdio = js.Array("pipe", "pipe", "pipe"),
@@ -158,7 +271,7 @@ object IpcHandlers {
               .asInstanceOf[js.Object],
           )
 
-          state.set(ProxyState(child.some, port.some, ""))
+          state.set(ProxyState(child.some, port.some, "", nextLifecycle))
 
           child.stdout.setEncoding("utf8")
 
@@ -181,21 +294,28 @@ object IpcHandlers {
           child.on(
             "exit",
             { (_: js.Any) =>
+              /* The only authority on the child being gone. */
+              clearPendingTimers()
               state.set(ProxyState.empty)
               RouteSync.onProxyStopped(getMainWindow)
               pushProxyState(js.Dynamic.literal(state = "stopped"), getMainWindow)
+              drainWhenGone()
             }: js.Function1[js.Any, Unit]
           )
 
           child.on(
             "error",
             { (_: js.Any) =>
-              state.updateAndGet(s => s.copy(process = none[ChildProcess], port = none[Int])): Unit
+              clearPendingTimers()
+              state.updateAndGet(s =>
+                s.copy(process = none[ChildProcess], port = none[Int], lifecycle = ProxyLifecycle.Idle)
+              ): Unit
               RouteSync.onProxyStopped(getMainWindow)
               pushProxyState(
                 js.Dynamic.literal(state = "error", message = "failed to launch proxy binary"),
                 getMainWindow,
               )
+              drainWhenGone()
             }: js.Function1[js.Any, Unit]
           )
 
@@ -276,19 +396,21 @@ object IpcHandlers {
   }
 
   private def stopProxy(getMainWindow: () => Option[BrowserWindow]): js.Dynamic = {
-    stopProxyIfRunning()
+    stopProxy(() => ()): Unit
     RouteSync.onProxyStopped(getMainWindow)
     js.Dynamic.literal(stopped = true)
   }
 
+  /* Reports the lifecycle, never `child.killed`: that flag only says a signal
+   * was sent, so trusting it used to drop the handle of a child that was still
+   * alive and still holding the port. */
   private def getStatus: js.Dynamic = {
     val current = state.get()
-    current.process match {
-      case Some(child) if !child.killed =>
-        js.Dynamic.literal(running = true, port = current.port.getOrElse(0), routeMode = RouteSync.mode.wire)
-      case Some(_) | None =>
-        state.updateAndGet(s => s.copy(process = none[ChildProcess], port = none[Int])): Unit
-        js.Dynamic.literal(running = false, routeMode = RouteSync.mode.wire)
-    }
+    js.Dynamic
+      .literal(
+        running = ProxyLifecycle.reportsRunning(current.lifecycle),
+        port = current.port.getOrElse(0),
+        routeMode = RouteSync.mode.wire,
+      )
   }
 }
