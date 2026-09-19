@@ -9,6 +9,8 @@ import claudeproxymate.renderer.state.AppState
 import claudeproxymate.renderer.view.ViewHelpers
 import org.scalajs.dom
 
+import scala.scalajs.js
+
 /** DOM sibling of [[MessageFilterView]]: opens the badge popover, tracks a
   * text selection inside a typed part, and dispatches every inline filter
   * action to [[RequestFilterSheet.applyAndSave]].
@@ -63,6 +65,7 @@ object MessageFilterMenu {
         val menu     = holder.firstElementChild
         if (menu != null && badgeEl.parentNode != null) {
           locally { val _ = badgeEl.parentNode.appendChild(menu) }
+          revealMenu(menu)
           openMenuUid = uid.some
         }
     }
@@ -195,8 +198,18 @@ object MessageFilterMenu {
       menu.style.left = s"${left}px"
       menu.style.top = s"${top}px"
       locally { val _ = typedEl.appendChild(menu) }
+      revealMenu(menu)
     }
   }
+
+  /* The card no longer clips popovers, but a menu below the last card can
+   * still sit under the visible edge of the scrolling list. `nearest` brings
+   * it into view without moving the list when it is already visible.
+   */
+  private def revealMenu(menu: dom.Element): Unit =
+    locally {
+      val _ = menu.asInstanceOf[js.Dynamic].scrollIntoView(js.Dynamic.literal("block" -> "nearest", "inline" -> "nearest"))
+    }
 
   private def rerenderSelectionMenu(): Unit = {
     val existing = dom.document.getElementById(HtmlIds.SelectionMenu)

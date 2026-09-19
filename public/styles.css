@@ -326,12 +326,13 @@
     .mf-btn.active { background: var(--surface2); border-color: var(--blue); color: var(--text); }
     .msg-count { font-size: 10px; color: var(--dim); margin-left: auto; }
     .msgs-list { display: flex; flex-direction: column; gap: 8px; padding: 12px; overflow-y: auto; }
-    .msg-card { border-radius: 6px; border: 1px solid var(--border); overflow: hidden; font-size: 12px; }
+    .msg-card { border-radius: 6px; border: 1px solid var(--border); overflow: visible; font-size: 12px; }
     .msg-card.msg-user { border-color: color-mix(in srgb, var(--blue) 40%, transparent); }
     .msg-card.msg-assistant { border-color: var(--border); opacity: .65; }
     .msg-role {
       padding: 4px 10px; font-size: 10px; font-weight: 700;
       text-transform: uppercase; letter-spacing: .6px; border-bottom: 1px solid var(--border);
+      border-radius: 5px 5px 0 0;
     }
     .msg-card.msg-user .msg-role { color: var(--blue); background: color-mix(in srgb, var(--blue) 12%, transparent); }
     .msg-card.msg-assistant .msg-role { color: var(--dim); background: var(--surface2); }
