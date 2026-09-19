@@ -45,8 +45,13 @@ object MessageTokenView {
     (tokens ++ corrs).sortBy(_.start)
   }
 
-  /** Build the rendered fragment for a piece of message text. */
-  def buildTextFrag(text: String, query: String, idPrefix: String): Frag = {
+  /** Build the rendered fragment for a piece of message text.
+    *
+    * `offset` is added to every mask id's character offset, so a text that
+    * was split into slices (the skills reminder rendered entry by entry)
+    * keeps the ids it would have had as one piece.
+    */
+  def buildTextFrag(text: String, query: String, idPrefix: String, offset: Int = 0): Frag = {
     val hits = collectHits(text)
     if (hits.isEmpty) HtmlUtil.highlightSearchFrag(text, query)
     else {
@@ -59,7 +64,7 @@ object MessageTokenView {
         val raw = text.substring(h.start, h.end)
         h match {
           case TokHit(_, _) =>
-            val tid = s"$idPrefix#${h.start}"
+            val tid = s"$idPrefix#${offset + h.start}"
             if (AppState.isRevealed(tid)) {
               parts += span(
                 cls := JsonTreeView.TokenMaskRevealedClass,
@@ -72,7 +77,7 @@ object MessageTokenView {
               )(TokenPatterns.fingerprint(raw))
             }
           case CorrHit(_, _, name) =>
-            val cid = s"corr:$idPrefix#${h.start}"
+            val cid = s"corr:$idPrefix#${offset + h.start}"
             if (AppState.isRevealed(cid)) {
               parts += span(
                 cls := JsonTreeView.CorrMaskRevealedClass,

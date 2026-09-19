@@ -1,5 +1,6 @@
 package claudeproxymate.renderer.messages
 
+import claudeproxymate.core.filter.{CategoryFilter, CategoryMode, FilterCategory, FilterConfig}
 import claudeproxymate.renderer.messages.MsgContent.*
 import claudeproxymate.renderer.messages.MsgPart.*
 import claudeproxymate.renderer.state.AppState
@@ -34,6 +35,14 @@ object MessageViewSpec extends Properties {
     example("InjectedMsgPart badge has bb_/bc_ ids and data-msg-badge-uid", testInjectedMsgPartIds),
     // Request filter ghost rows
     example("removed marks render struck-through ghost rows before the parts", testGhostRows),
+    // Request filter inline (Option B)
+    example("keyed badge carries filter, cat, key and part attrs; keyless badge carries none", testBadgeFilterAttrs),
+    example("badge removed by RemoveSelected renders the ghost look with a token note", testBadgeGhostSelected),
+    example("RemoveAll on docs strikes a docs badge but not a rules badge", testBadgeGhostAll),
+    example("filter disabled renders no ghost", testBadgeGhostDisabled),
+    example("skills content renders one entry row with a ✕ per skill, removed ones marked", testSkillsRows),
+    property("mask ids inside split skills content equal the whole-text ids", testSkillsMaskIdsStable),
+    property("<script> in a skill name never leaks raw", testNoScriptLeakInSkillName),
     // Search highlighting
     example("search query match wraps in mark", testSearchHighlightMatch),
     example("empty query produces no mark", testSearchHighlightEmpty),
@@ -102,6 +111,32 @@ object MessageViewSpec extends Properties {
 
   private def userCard(parts: List[MsgPart]): MsgCard =
     MsgCard("user", contents = Nil, userParts = parts, rawIdx = 0, removed = Nil)
+
+  private def renderCardsWith(cards: List[MsgCard], config: FilterConfig): String = {
+    reset()
+    MessageView.buildCardsFrag(cards, isUserFilter = false, query = "", GhostLabels.default, config).render
+  }
+
+  private val rulePath    = "/u/.claude/rules/A.md"
+  private val ruleBadge   =
+    InjectedMsgPart(
+      "u1",
+      "📜 Global Rule: A.md",
+      "rule body",
+      "green",
+      Some(BadgeFilter.Item(FilterCategory.Rules, rulePath))
+    )
+  private val docBadge    =
+    InjectedMsgPart(
+      "u2",
+      "📋 Global CLAUDE.md",
+      "doc body",
+      "green",
+      Some(BadgeFilter.Item(FilterCategory.Docs, "/u/CLAUDE.md"))
+    )
+  private val skillsText  =
+    "The following skills are available for use with the Skill tool:\n\n- graphify: Graphs.\n- archify: Diagrams.\n"
+  private val skillsBadge = InjectedMsgPart("u3", "🔧 Skills", skillsText, "green", Some(BadgeFilter.SkillsReminder))
 
   // ── Empty / no-results ────────────────────────────────────────────────
 
@@ -287,6 +322,119 @@ object MessageViewSpec extends Properties {
       )
     )
   }
+
+  // ── Request filter inline (Option B) ─────────────────────────────────
+
+  def testBadgeFilterAttrs: Result = {
+    val out = renderCards(List(userCard(List(ruleBadge, InjectedMsgPart("u9", "L", "C", "green")))))
+    Result.all(
+      List(
+        Result.assert(out.contains(s"""${MessageView.BadgeFilterAttr}="item"""")).log(out),
+        Result.assert(out.contains(s"""data-filter-cat="rules"""")).log(out),
+        Result.assert(out.contains(s"""data-filter-key="$rulePath"""")).log(out),
+        Result.assert(out.contains(s"""${MessageView.BadgePartAttr}="0.0"""")).log(out),
+        Result.assert(out.contains(s"""${MessageView.BadgePartAttr}="0.1"""")).log(out),
+        (out.split(MessageView.BadgeFilterAttr, -1).length - 1 ==== 1).log("keyless badge carries no filter attr"),
+        Result.assert(!out.contains(MessageView.GhostClass)).log("nothing removed by default"),
+      )
+    )
+  }
+
+  def testBadgeGhostSelected: Result = {
+    val cfg = FilterConfig.default.copy(rules = CategoryFilter(CategoryMode.RemoveSelected, List(rulePath)))
+    val out = renderCardsWith(List(userCard(List(ruleBadge, docBadge))), cfg)
+    Result.all(
+      List(
+        Result.assert(out.contains(s"""expandable ${MessageView.GhostClass}"""")).log(out),
+        Result.assert(out.contains("""<span class="filter-ghost-meta">removed · ~4 tok</span>""")).log(out),
+        (out.split(s"expandable ${MessageView.GhostClass}", -1).length - 1 ==== 1).log("only the rule badge is struck"),
+      )
+    )
+  }
+
+  def testBadgeGhostAll: Result = {
+    val cfg = FilterConfig.default.copy(docs = CategoryFilter(CategoryMode.RemoveAll, Nil))
+    val out = renderCardsWith(List(userCard(List(ruleBadge, docBadge))), cfg)
+    Result.all(
+      List(
+        (out.split(s"expandable ${MessageView.GhostClass}", -1).length - 1 ==== 1).log(out),
+        Result.assert(out.indexOf(MessageView.GhostClass) > out.indexOf("bb_u2")).log("docs badge is the struck one"),
+      )
+    )
+  }
+
+  def testBadgeGhostDisabled: Result = {
+    val cfg = FilterConfig.disabled.copy(docs = CategoryFilter(CategoryMode.RemoveAll, Nil))
+    val out = renderCardsWith(List(userCard(List(ruleBadge, docBadge))), cfg)
+    Result.assert(!out.contains(MessageView.GhostClass)).log(out)
+  }
+
+  def testSkillsRows: Result = {
+    val cfg = FilterConfig.default.copy(skills = CategoryFilter(CategoryMode.RemoveSelected, List("archify")))
+    val out = renderCardsWith(List(userCard(List(skillsBadge))), cfg)
+    Result.all(
+      List(
+        (out.split(s"""<div class="${MessageView.SkillEntryClass}""", -1).length - 1 ==== 2).log(out),
+        Result
+          .assert(
+            out.contains(
+              s"""class="${MessageView.SkillEntryClass} ${MessageView.SkillEntryRemovedClass}" data-filter-key="archify""""
+            )
+          )
+          .log(out),
+        Result
+          .assert(
+            out.contains(
+              s"""class="x-btn ${MessageView.SkillXClass} on" data-msg-filter-action="toggle-skill" data-filter-key="archify""""
+            )
+          )
+          .log(out),
+        Result
+          .assert(
+            out.contains(
+              s"""class="x-btn ${MessageView.SkillXClass}" data-msg-filter-action="toggle-skill" data-filter-key="graphify""""
+            )
+          )
+          .log(out),
+        Result.assert(out.contains("skills are available for use with the Skill tool")).log("head text kept"),
+        Result
+          .assert(
+            out.contains("Keep this skill in future requests") && out.contains("Remove this skill from future requests")
+          )
+          .log("titles"),
+      )
+    )
+  }
+
+  private val FakeToken = "sk-ant-api03-" + ("A" * 40)
+
+  def testSkillsMaskIdsStable: Property =
+    for {
+      n1 <- Gen.string(Gen.alpha, Range.linear(1, 8)).log("n1")
+      n2 <- Gen.string(Gen.alpha, Range.linear(1, 8)).log("n2")
+    } yield {
+      reset()
+      val content                         =
+        s"The following skills are available for use with the Skill tool:\n\n- $n1: uses $FakeToken\n- $n2: also $FakeToken\n"
+      val split                           = renderCards(
+        List(userCard(List(InjectedMsgPart("u1", "S", content, "green", Some(BadgeFilter.SkillsReminder)))))
+      )
+      val whole                           = MessageTokenView.buildTextFrag(content, "", "m.0.inj.0").render
+      def ids(html: String): List[String] = "data-token-id=\"([^\"]+)\"".r.findAllMatchIn(html).map(_.group(1)).toList
+      (ids(split) ==== ids(whole)).log(s"split=${ids(split)} whole=${ids(whole)}")
+    }
+
+  def testNoScriptLeakInSkillName: Property =
+    for {
+      chunk <- Gen.string(Gen.alpha, Range.linear(0, 12)).log("chunk")
+    } yield {
+      val payload = s"<script>alert('$chunk')</script>"
+      val content = s"The following skills are available for use with the Skill tool:\n- $payload: d\n"
+      val out     = renderCards(
+        List(userCard(List(InjectedMsgPart("u1", "S", content, "green", Some(BadgeFilter.SkillsReminder)))))
+      )
+      Result.assert(!out.contains("<script>")).log(out)
+    }
 
   // ── Search highlighting ───────────────────────────────────────────────
 
@@ -504,7 +652,7 @@ object MessageViewSpec extends Properties {
       removed = List(RemovedMark("📜 Global Rule: X.md", 410)),
     )
     val out  = MessageView
-      .buildCardsFrag(List(card), isUserFilter = false, query = "", GhostLabels("removed · ~{tokens} tok"))
+      .buildCardsFrag(List(card), isUserFilter = false, query = "", GhostLabels.default)
       .render
     Result.all(
       List(

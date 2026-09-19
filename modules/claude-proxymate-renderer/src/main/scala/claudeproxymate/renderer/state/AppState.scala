@@ -36,6 +36,10 @@ object AppState {
   // Badge toggle
   var activeBadgeUid: Option[String] = none[String]
 
+  /* The open badge by its stable `<cardIdx>.<partIdx>` part id, so a
+   * re-render (which mints new uids) can re-open the same badge. */
+  var activeBadgePart: Option[String] = none[String]
+
   // Search
   var searchCurrentIdx: Int = -1
 

@@ -1,8 +1,23 @@
 package claudeproxymate.renderer.messages
 
+import cats.syntax.all.*
 import claudeproxymate.core.ClaudeMdParser
+import claudeproxymate.core.filter.{ContentsSections, FilterCategory, SectionCategory}
 
 import scala.util.matching.Regex
+
+/** What the request filter can do with an injected badge: one `Contents of`
+  * section (key = path, the same key `RequestFilter` matches) or the whole
+  * skills reminder. Badges without a filter key carry `None`.
+  */
+enum BadgeFilter {
+  case Item(category: FilterCategory, key: String)
+  case SkillsReminder
+}
+
+object BadgeFilter {
+  given cats.Eq[BadgeFilter] = cats.Eq.fromUniversalEquals
+}
 
 /** Parse user message text into typed portions and injected blocks.
   *
@@ -14,7 +29,7 @@ object MessageParser {
   /** A parsed segment of user text. */
   enum Part {
     case TextPart(content: String)
-    case InjectedPart(label: String, content: String, cls: String)
+    case InjectedPart(label: String, content: String, cls: String, filter: Option[BadgeFilter] = None)
   }
 
   private val blockRe: Regex =
@@ -38,13 +53,18 @@ object MessageParser {
       if (raw.startsWith("<system-reminder>")) {
         val inner = raw.substring("<system-reminder>".length, raw.length - "</system-reminder>".length)
         if (skillsPattern.findFirstIn(inner).isDefined) {
-          parts += Part.InjectedPart("\uD83D\uDD27 Skills", inner, "green")
+          parts += Part.InjectedPart("\uD83D\uDD27 Skills", inner, "green", BadgeFilter.SkillsReminder.some)
         } else if (dateMemoryPattern.findFirstIn(inner).isDefined && claudeMdPattern.findFirstIn(inner).isEmpty) {
           parts += Part.InjectedPart("\uD83E\uDDE0 Memory", inner, "green")
         } else if (claudeMdPattern.findFirstIn(inner).isDefined) {
           val sections = ClaudeMdParser.parseClaudeMdSections(inner)
           if (sections.nonEmpty) {
-            sections.foreach(s => parts += Part.InjectedPart(s.label, s.content, s.cls))
+            sections.foreach { s =>
+              val category =
+                if (ContentsSections.categoryOf(s.path) === SectionCategory.Rules) FilterCategory.Rules
+                else FilterCategory.Docs
+              parts += Part.InjectedPart(s.label, s.content, s.cls, BadgeFilter.Item(category, s.path).some)
+            }
           } else {
             parts += Part.InjectedPart("\uD83D\uDCCB CLAUDE.md", inner, "green")
           }

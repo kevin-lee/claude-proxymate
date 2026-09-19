@@ -20,8 +20,30 @@ object FilterConfigEdits {
       cfg.withCategory(cat, current.copy(keys = keys))
     }
 
+  /** Removes `key` in future requests: switches `KeepAll` to `RemoveSelected`
+    * with that key, adds the key under `RemoveSelected` (idempotent), and
+    * leaves `RemoveAll` alone because the key is already removed.
+    */
+  def removeKey(cat: FilterCategory, key: String): FilterConfig => FilterConfig =
+    cfg => {
+      val current = cfg.category(cat)
+      current.mode match {
+        case CategoryMode.KeepAll => cfg.withCategory(cat, CategoryFilter(CategoryMode.RemoveSelected, List(key)))
+        case CategoryMode.RemoveSelected =>
+          if (current.keys.contains(key)) cfg
+          else cfg.withCategory(cat, current.copy(keys = current.keys :+ key))
+        case CategoryMode.RemoveAll => cfg
+      }
+    }
+
   def addRule(kind: TextRuleKind): FilterConfig => FilterConfig =
     cfg => cfg.copy(textRules = cfg.textRules :+ TextRule.default.copy(kind = kind))
+
+  /** Appends an enabled rule unless an identical (kind, pattern, scope) rule exists. */
+  def appendRule(kind: TextRuleKind, pattern: String, scope: TextRuleScope): FilterConfig => FilterConfig =
+    cfg =>
+      if (cfg.textRules.exists(r => r.kind === kind && r.pattern === pattern && r.scope === scope)) cfg
+      else cfg.copy(textRules = cfg.textRules :+ TextRule(kind, pattern, scope, enabled = true))
 
   def removeRule(idx: Int): FilterConfig => FilterConfig =
     cfg =>

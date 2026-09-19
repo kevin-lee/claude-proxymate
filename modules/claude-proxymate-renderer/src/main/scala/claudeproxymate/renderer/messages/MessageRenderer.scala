@@ -2,7 +2,10 @@ package claudeproxymate.renderer.messages
 
 import cats.syntax.all.*
 import claudeproxymate.core.{HtmlIds, RequestAnatomy}
+import claudeproxymate.core.filter.FilterReport
+import claudeproxymate.renderer.filter.{BarLabels, BarModel, MessageFilterMenu, MessageFilterView}
 import claudeproxymate.renderer.i18n.I18n
+import claudeproxymate.renderer.util.JsJsonBridge
 import claudeproxymate.renderer.state.AppState
 import claudeproxymate.renderer.util.Debounce
 import claudeproxymate.renderer.view.ViewHelpers
@@ -80,7 +83,7 @@ object MessageRenderer {
     val badgeEl = target.closest(s".${MessageView.BadgeClass}[${MessageView.BadgeDataAttr}]")
     if (badgeEl != null) {
       val uid = badgeEl.asInstanceOf[dom.html.Element].getAttribute(MessageView.BadgeDataAttr)
-      if (uid != null && uid.nonEmpty) BadgeToggle.toggleBadge(uid)
+      if (uid != null && uid.nonEmpty) MessageFilterMenu.onBadgeClick(uid, badgeEl.asInstanceOf[dom.html.Element])
     }
   }
 
@@ -94,23 +97,41 @@ object MessageRenderer {
     } else {
       val _ = AppState.maskOverrides.add(tokenId)
     }
+    rerenderPreservingScroll()
+  }
 
+  /** Re-render the Messages tab for the selected capture, keeping the
+    * container's scrollTop and the expanded badge (by its stable part id,
+    * since badge uids are re-minted). No-op unless the Messages tab shows
+    * a selected capture.
+    */
+  def rerenderPreservingScroll(): Unit = {
+    if (AppState.proxyDetailTab =!= "messages") return
     val container   = dom.document.getElementById(HtmlIds.ProxyDetailView)
     if (container == null) return
     val containerEl = container.asInstanceOf[dom.html.Element]
     val savedScroll = containerEl.scrollTop
+    val openPart    = AppState.activeBadgePart
 
     val entry = AppState.proxyCaptures.find(e => e.id == AppState.selectedProxyId.map(_.asInstanceOf[js.Any]).orNull)
     entry match {
       case None => ()
       case Some(e) =>
         renderProxyMessages(e, containerEl)
+        openPart.foreach(BadgeToggle.reopen)
         // scrollTop reset to 0 by setInnerHtml; restore on the next
         // animation frame so layout has settled.
         val _ = dom.window.requestAnimationFrame { _ =>
           containerEl.scrollTop = savedScroll
         }
     }
+  }
+
+  /** The request filter report the proxy attached to a capture, if any. */
+  def captureReport(entry: js.Dynamic): Option[FilterReport] = {
+    val filter = entry.selectDynamic("filter")
+    if (js.isUndefined(filter) || filter == null) none[FilterReport]
+    else JsJsonBridge.toCirceJson(filter).toOption.flatMap(_.as[FilterReport].toOption)
   }
 
   private def handleInput(e: dom.Event): Unit = {
@@ -231,7 +252,7 @@ object MessageRenderer {
         else
           MessageParser.parseUserText(cText.toString).exists {
             case MessageParser.Part.TextPart(_) => true
-            case MessageParser.Part.InjectedPart(_, _, _) => false
+            case MessageParser.Part.InjectedPart(_, _, _, _) => false
           }
       }
 
@@ -278,12 +299,34 @@ object MessageRenderer {
       query = q,
     )
 
+    val ghostLabels = GhostLabels(
+      I18n.t("filter.ghostRemoved"),
+      I18n.t("filter.skillRemove"),
+      I18n.t("filter.skillRestore"),
+    )
     val body2: Frag =
       if (cards.isEmpty) MessageView.buildNoResultsFrag(I18n.t("proxy.noResults"))
-      else MessageView.buildCardsFrag(cards, isUserFilter, q, GhostLabels(I18n.t("filter.ghostRemoved")))
+      else MessageView.buildCardsFrag(cards, isUserFilter, q, ghostLabels, AppState.filterConfig)
+
+    val bar = MessageFilterView.buildBarFrag(
+      BarModel(
+        enabled = AppState.filterConfig.enabled,
+        ruleCount = AppState.filterConfig.activeRuleCount,
+        removed = MessageFilterView.barRemoved(captureReport(entry)),
+        labels = BarLabels(
+          title = I18n.t("filter.barTitle"),
+          rules = I18n.t("filter.barRules"),
+          removed = I18n.t("filter.barRemoved"),
+          removedNone = I18n.t("filter.barRemovedNone"),
+          off = I18n.t("filter.barOff"),
+          textRule = I18n.t("filter.barTextRule"),
+          manage = I18n.t("filter.barManage"),
+        ),
+      )
+    )
 
     val full = frag(
-      div(style := "position:sticky;top:0;z-index:1;background:var(--bg)")(header),
+      div(style := "position:sticky;top:0;z-index:1;background:var(--bg)")(header, bar),
       div(style := "display:flex;flex-direction:column;gap:8px;padding:12px")(body2),
     )
     ViewHelpers.setInnerHtml(container, full)
@@ -350,13 +393,13 @@ object MessageRenderer {
           if (typedOnly) {
             parsed.foreach {
               case MessageParser.Part.TextPart(content) => parts += MsgPart.TextMsgPart(content)
-              case MessageParser.Part.InjectedPart(_, _, _) => ()
+              case MessageParser.Part.InjectedPart(_, _, _, _) => ()
             }
           } else {
             parsed.foreach {
               case MessageParser.Part.TextPart(content) => parts += MsgPart.TextMsgPart(content)
-              case MessageParser.Part.InjectedPart(label, content, cls) =>
-                parts += MsgPart.InjectedMsgPart(nextBadgeUid(), label, content, cls)
+              case MessageParser.Part.InjectedPart(label, content, cls, filter) =>
+                parts += MsgPart.InjectedMsgPart(nextBadgeUid(), label, content, cls, filter)
             }
           }
         }
@@ -414,7 +457,7 @@ object MessageRenderer {
     }
     def textOfPart(p: MsgPart): String      = p match {
       case MsgPart.TextMsgPart(c) => c
-      case MsgPart.InjectedMsgPart(_, l, c, _) => l + " " + c
+      case MsgPart.InjectedMsgPart(_, l, c, _, _) => l + " " + c
     }
     card.userParts.exists(p => textOfPart(p).toLowerCase.contains(q)) ||
     card.contents.exists(c => textOf(c).toLowerCase.contains(q))

@@ -166,7 +166,7 @@ object RequestFilterView {
     )
   }
 
-  private def switchButton(on: Boolean, mods: Modifier*): Frag =
+  def switchButton(on: Boolean, mods: Modifier*): Frag =
     button(
       cls := (if (on) "switch on" else "switch"),
       attr("role") := "switch",

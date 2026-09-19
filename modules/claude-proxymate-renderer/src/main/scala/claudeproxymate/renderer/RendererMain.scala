@@ -6,7 +6,7 @@ import claudeproxymate.core.RouteMode
 import claudeproxymate.renderer.analysis.MechChips
 import claudeproxymate.renderer.copy.CopyUtil
 import claudeproxymate.renderer.detail.{DtabListeners, TokenPopover}
-import claudeproxymate.renderer.filter.RequestFilterSheet
+import claudeproxymate.renderer.filter.{MessageFilterMenu, RequestFilterSheet}
 import claudeproxymate.renderer.facades.ElectronApi
 import claudeproxymate.renderer.json.JsonTreeViewer
 import claudeproxymate.renderer.i18n.I18n
@@ -55,6 +55,7 @@ object RendererMain {
     JsonTreeViewer.install()
     MechChips.install()
     MessageRenderer.install()
+    MessageFilterMenu.install()
     ProxyDetailSearchListeners.install()
     DtabListeners.install()
     Onboarding.install()

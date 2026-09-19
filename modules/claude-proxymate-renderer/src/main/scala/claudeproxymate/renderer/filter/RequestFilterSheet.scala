@@ -5,6 +5,7 @@ import claudeproxymate.core.{ClaudeMdParser, HtmlIds, RequestAnatomy}
 import claudeproxymate.core.filter.*
 import claudeproxymate.renderer.facades.ElectronApi
 import claudeproxymate.renderer.i18n.I18n
+import claudeproxymate.renderer.messages.MessageRenderer
 import claudeproxymate.renderer.state.AppState
 import claudeproxymate.renderer.util.JsJsonBridge
 import claudeproxymate.renderer.view.ViewHelpers
@@ -30,6 +31,11 @@ object RequestFilterSheet {
   private var previewReport: Option[FilterReport]            = none[FilterReport]
   private var isOpen: Boolean                                = false
   private var trafficCache: Map[Double, List[InventoryItem]] = Map.empty
+
+  /* Set by openWithNewRule: the disk scan re-renders the card once it
+   * resolves, which would drop the focus put on the new rule's input, so
+   * render() re-focuses it until that scan has come back. */
+  private var focusLastPattern: Boolean = false
 
   private val PreviewCaptures: Int = 10
 
@@ -70,14 +76,16 @@ object RequestFilterSheet {
         .`then`[Unit] { (result: js.Dynamic) =>
           disk = parseDisk(result)
           if (isOpen) render() else ()
+          focusLastPattern = false
         }
         .asInstanceOf[js.Dynamic]
-        .`catch`({ (_: Any) => () }: js.Function1[Any, Unit])
+        .`catch`({ (_: Any) => focusLastPattern = false }: js.Function1[Any, Unit])
     }
   }
 
   def close(): Unit = {
     isOpen = false
+    focusLastPattern = false
     modalEl.foreach(_.style.display = "none")
   }
 
@@ -86,7 +94,13 @@ object RequestFilterSheet {
   def render(): Unit =
     cardEl.foreach { card =>
       ViewHelpers.setInnerHtml(card, RequestFilterView.buildCardFrag(model()))
+      if (focusLastPattern) focusLastPatternInput(card) else ()
     }
+
+  private def focusLastPatternInput(card: dom.html.Element): Unit = {
+    val inputs = card.querySelectorAll(".filter-pattern")
+    if (inputs.length > 0) inputs(inputs.length - 1).asInstanceOf[dom.html.Input].focus() else ()
+  }
 
   /** Update only the preview line (keeps the focused pattern input alive). */
   private def refreshPreview(): Unit = {
@@ -119,16 +133,21 @@ object RequestFilterSheet {
   }
 
   private def save(): Unit =
+    persist(draft) {
+      AppState.filterConfig = draft
+      renderButton()
+      close()
+    }
+
+  /** Validate and persist `cfg` through the Electron bridge, then run `onOk`. */
+  private def persist(cfg: FilterConfig)(onOk: => Unit): Unit =
     ElectronApi.get.foreach { api =>
       api
-        .filterConfigSet(JsJsonBridge.toJsDynamic(draft.asJson))
+        .filterConfigSet(JsJsonBridge.toJsDynamic(cfg.asJson))
         .`then`[Unit] { (result: js.Dynamic) =>
           val ok = result.selectDynamic("ok")
-          if (!js.isUndefined(ok) && ok.asInstanceOf[Boolean]) {
-            AppState.filterConfig = draft
-            renderButton()
-            close()
-          } else {
+          if (!js.isUndefined(ok) && ok.asInstanceOf[Boolean]) onOk
+          else {
             val reason = result.selectDynamic("reason")
             val text   = if (js.isUndefined(reason) || reason == null) "" else reason.toString
             dom.window.alert(I18n.t("filter.saveFail", Map("reason" -> text)))
@@ -139,6 +158,33 @@ object RequestFilterSheet {
           dom.window.alert(I18n.t("filter.saveFail", Map("reason" -> e.toString)))
         }: js.Function1[Any, Unit])
     }
+
+  /** Apply `edit` to the saved config and persist it (inline controls of the
+    * Messages tab). On success the button, an open sheet and the Messages
+    * tab are refreshed. A no-op edit saves nothing.
+    */
+  def applyAndSave(edit: FilterConfig => FilterConfig): Unit = {
+    val next = edit(AppState.filterConfig)
+    if (next === AppState.filterConfig) ()
+    else
+      persist(next) {
+        AppState.filterConfig = next
+        renderButton()
+        if (isOpen) {
+          draft = next
+          render()
+        } else ()
+        MessageRenderer.rerenderPreservingScroll()
+      }
+  }
+
+  /** Open the sheet with a new empty rule of `kind` appended and focused. */
+  def openWithNewRule(kind: TextRuleKind): Unit = {
+    open()
+    draft = FilterConfigEdits.addRule(kind)(draft)
+    focusLastPattern = true
+    render()
+  }
 
   // ── model ──
 
@@ -193,11 +239,7 @@ object RequestFilterSheet {
     else JsJsonBridge.toCirceJson(body).toOption
   }
 
-  private def entryReport(entry: js.Dynamic): Option[FilterReport] = {
-    val filter = entry.selectDynamic("filter")
-    if (js.isUndefined(filter) || filter == null) none[FilterReport]
-    else JsJsonBridge.toCirceJson(filter).toOption.flatMap(_.as[FilterReport].toOption)
-  }
+  private def entryReport(entry: js.Dynamic): Option[FilterReport] = MessageRenderer.captureReport(entry)
 
   private def currentPreviewEntry(): Option[js.Dynamic] = {
     val selected = AppState.selectedProxyId.flatMap { id =>

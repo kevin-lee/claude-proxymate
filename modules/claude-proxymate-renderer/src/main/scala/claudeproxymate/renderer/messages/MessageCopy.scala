@@ -70,7 +70,7 @@ object MessageCopy {
           card.userParts.zipWithIndex.foreach {
             case (TextMsgPart(content), partIdx) =>
               buf.append(append(content, s"m.${card.rawIdx}.user.$partIdx")).append("\n\n")
-            case (InjectedMsgPart(_, label, content, _), partIdx) =>
+            case (InjectedMsgPart(_, label, content, _, _), partIdx) =>
               buf
                 .append(s"[$label]\n")
                 .append(append(content, s"m.${card.rawIdx}.inj.$partIdx"))
