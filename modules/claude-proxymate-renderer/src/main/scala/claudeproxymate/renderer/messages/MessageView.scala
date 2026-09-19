@@ -103,6 +103,10 @@ object MessageView {
   val BadgeClass: String    = "msg-badge"
   val BadgeDataAttr: String = "data-msg-badge-uid"
 
+  /** Text blocks the selection-to-rule menu accepts a selection in. */
+  val TypedClass: String = "msg-typed"
+  val TextClass: String  = "msg-text"
+
   /** Stable `<cardIdx>.<partIdx>` of a badge (uids are re-minted per render). */
   val BadgePartAttr: String = "data-msg-badge-part"
 
@@ -247,7 +251,7 @@ object MessageView {
   ): Frag = p match {
     case TextMsgPart(content) =>
       val idPrefix = s"m.$cardIdx.user.$partIdx"
-      div(cls := "msg-typed")(MessageTokenView.buildTextFrag(content, query, idPrefix))
+      div(cls := TypedClass)(MessageTokenView.buildTextFrag(content, query, idPrefix))
 
     case InjectedMsgPart(uid, label, content, badgeCls, filter) =>
       // Auto-expand the badge when the search query matches inside the
@@ -351,7 +355,7 @@ object MessageView {
     c match {
       case TextContent(text) =>
         val idPrefix = s"m.$cardIdx.text.$partIdx"
-        div(cls := "msg-text")(MessageTokenView.buildTextFrag(text, query, idPrefix))
+        div(cls := TextClass)(MessageTokenView.buildTextFrag(text, query, idPrefix))
 
       case ToolUseContent(name) =>
         if (isUserFilter) frag()

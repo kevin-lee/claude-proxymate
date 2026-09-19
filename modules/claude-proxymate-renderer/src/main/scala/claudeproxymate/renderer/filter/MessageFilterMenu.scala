@@ -12,7 +12,8 @@ import org.scalajs.dom
 import scala.scalajs.js
 
 /** DOM sibling of [[MessageFilterView]]: opens the badge popover, tracks a
-  * text selection inside a typed part, and dispatches every inline filter
+  * text selection inside a typed part or an assistant text block, and
+  * dispatches every inline filter
   * action to [[RequestFilterSheet.applyAndSave]].
   *
   * Document-level delegation like every other feature object. Badge clicks
@@ -156,12 +157,12 @@ object MessageFilterMenu {
 
   // ── selection ──
 
-  private def typedAncestor(node: dom.Node): Option[dom.Element] = {
+  private def selectableAncestor(node: dom.Node): Option[dom.Element] = {
     val el: dom.Element = node match {
       case e: dom.Element => e
       case other => other.parentNode.asInstanceOf[dom.Element]
     }
-    Option(el).flatMap(e => Option(e.closest(".msg-typed")))
+    Option(el).flatMap(e => Option(e.closest(s".${MessageView.TypedClass}, .${MessageView.TextClass}")))
   }
 
   private def handleMouseUp(e: dom.MouseEvent): Unit = {
@@ -172,7 +173,7 @@ object MessageFilterMenu {
       closeSelectionMenu()
       return
     }
-    (typedAncestor(sel.anchorNode), typedAncestor(sel.focusNode)) match {
+    (selectableAncestor(sel.anchorNode), selectableAncestor(sel.focusNode)) match {
       case (Some(a), Some(f)) if a eq f =>
         val text = sel.toString
         val tag  = MessageFilterView.tagNameOf(text)
@@ -184,20 +185,24 @@ object MessageFilterMenu {
     }
   }
 
-  private def showSelectionMenu(typedEl: dom.html.Element, range: dom.Range): Unit = {
-    val existing  = dom.document.getElementById(HtmlIds.SelectionMenu)
+  /* The menu is appended to the block's parent (`.msg-body`), not to the
+   * block itself: `.msg-text` is a scroll container and would clip it.
+   */
+  private def showSelectionMenu(blockEl: dom.html.Element, range: dom.Range): Unit = {
+    val existing   = dom.document.getElementById(HtmlIds.SelectionMenu)
     if (existing != null) locally { val _ = existing.parentNode.removeChild(existing) }
-    val rect      = range.getBoundingClientRect()
-    val typedRect = typedEl.getBoundingClientRect()
-    val left      = math.max(0.0, rect.left - typedRect.left)
-    val top       = math.max(0.0, rect.bottom - typedRect.top + 4)
-    val holder    = dom.document.createElement("div")
+    val anchor     = Option(blockEl.parentElement).fold(blockEl)(identity)
+    val rect       = range.getBoundingClientRect()
+    val anchorRect = anchor.getBoundingClientRect()
+    val left       = math.max(0.0, rect.left - anchorRect.left)
+    val top        = math.max(0.0, rect.bottom - anchorRect.top + 4)
+    val holder     = dom.document.createElement("div")
     ViewHelpers.setInnerHtml(holder, MessageFilterView.buildSelectionMenuFrag(selectionModel()))
-    val menu      = holder.firstElementChild.asInstanceOf[dom.html.Element]
+    val menu       = holder.firstElementChild.asInstanceOf[dom.html.Element]
     if (menu != null) {
       menu.style.left = s"${left}px"
       menu.style.top = s"${top}px"
-      locally { val _ = typedEl.appendChild(menu) }
+      locally { val _ = anchor.appendChild(menu) }
       revealMenu(menu)
     }
   }

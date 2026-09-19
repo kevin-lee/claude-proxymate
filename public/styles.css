@@ -894,7 +894,7 @@
 
     /* ── Request Filter - inline (Option B) ── */
     .msg-injected-row { position: relative; }
-    .msg-typed { position: relative; }
+    .msg-body { position: relative; }
     .badge-menu {
       position: absolute; left: 0; top: calc(100% + 4px); z-index: 20; min-width: 230px;
       display: flex; flex-direction: column; gap: 2px; padding: 6px;
