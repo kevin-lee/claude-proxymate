@@ -14,6 +14,7 @@ object BadgeToggle {
     val content = dom.document.getElementById(s"bc_$uid")
     val btn     = dom.document.getElementById(s"bb_$uid")
     if (content == null) return
+    val part    = Option(btn).map(_.getAttribute(MessageView.BadgePartAttr)).filter(_ != null)
 
     // Deactivate previous badge if different
     AppState.activeBadgeUid.foreach { prevUid =>
@@ -42,5 +43,25 @@ object BadgeToggle {
     }
 
     AppState.activeBadgeUid = Option.unless(isOpen)(uid)
+    AppState.activeBadgePart = if (isOpen) None else part
+  }
+
+  /** Re-open the badge with the stable part id `part` after a re-render
+    * (which mints new uids), without toggling.
+    */
+  def reopen(part: String): Unit = {
+    val escaped   = scala.scalajs.js.Dynamic.global.CSS.applyDynamic("escape")(part).asInstanceOf[String]
+    val btn       = dom.document.querySelector(s"""[${MessageView.BadgePartAttr}="$escaped"]""")
+    if (btn == null) return
+    val uid       = btn.getAttribute(MessageView.BadgeDataAttr)
+    val content   = if (uid == null) null else dom.document.getElementById(s"bc_$uid")
+    if (content == null) return
+    val contentEl = content.asInstanceOf[dom.html.Element]
+    contentEl.style.display = "block"
+    locally { val _ = contentEl.classList.add("badge-section-hl") }
+    locally { val _ = btn.classList.add("open") }
+    locally { val _ = btn.classList.add("hl-active") }
+    AppState.activeBadgeUid = Some(uid)
+    AppState.activeBadgePart = Some(part)
   }
 }

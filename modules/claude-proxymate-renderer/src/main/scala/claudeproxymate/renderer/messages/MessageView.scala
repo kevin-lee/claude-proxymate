@@ -1,6 +1,9 @@
 package claudeproxymate.renderer.messages
 
 import cats.syntax.all.*
+import claudeproxymate.core.RequestAnatomy
+import claudeproxymate.core.filter.{CategoryMode, FilterConfig, SkillsList, TextRules}
+import claudeproxymate.renderer.filter.{MessageFilterView, RequestFilterView}
 import scalatags.Text.all.*
 
 /** A parsed user-text part, ready for rendering. Mirrors
@@ -14,7 +17,26 @@ import scalatags.Text.all.*
   */
 enum MsgPart {
   case TextMsgPart(content: String)
-  case InjectedMsgPart(uid: String, label: String, content: String, badgeCls: String)
+  case InjectedMsgPart(
+    uid: String,
+    label: String,
+    content: String,
+    badgeCls: String,
+    filter: Option[BadgeFilter] = None,
+  )
+}
+
+/** Whether the saved config removes a badge: not at all, by key (`RemoveSelected`)
+  * or because its whole category is `RemoveAll`.
+  */
+enum BadgeState {
+  case Live
+  case RemovedSelected
+  case RemovedAll
+}
+
+object BadgeState {
+  given cats.Eq[BadgeState] = cats.Eq.fromUniversalEquals
 }
 
 /** A typed message-content block. */
@@ -52,11 +74,17 @@ final case class RemovedMark(label: String, tokens: Int)
 
 final case class FilterLabels(user: String, typed: String, assistant: String, all: String)
 
-/** Labels for the request-filter ghost rows; `removed` carries a `{tokens}` placeholder. */
-final case class GhostLabels(removed: String)
+/** Labels for the request-filter ghost rows and the per-skill ✕ buttons;
+  * `removed` carries a `{tokens}` placeholder.
+  */
+final case class GhostLabels(removed: String, skillRemove: String, skillRestore: String)
 
 object GhostLabels {
-  val default: GhostLabels = GhostLabels("removed · ~{tokens} tok")
+  val default: GhostLabels = GhostLabels(
+    "removed · ~{tokens} tok",
+    "Remove this skill from future requests",
+    "Keep this skill in future requests",
+  )
 }
 final case class SearchLabels(placeholder: String, clear: String)
 
@@ -74,6 +102,19 @@ object MessageView {
 
   val BadgeClass: String    = "msg-badge"
   val BadgeDataAttr: String = "data-msg-badge-uid"
+
+  /** Stable `<cardIdx>.<partIdx>` of a badge (uids are re-minted per render). */
+  val BadgePartAttr: String = "data-msg-badge-part"
+
+  /** `item` or `skills` on badges the request filter can act on. */
+  val BadgeFilterAttr: String   = "data-msg-badge-filter"
+  val BadgeFilterItem: String   = "item"
+  val BadgeFilterSkills: String = "skills"
+
+  val SkillEntryClass: String        = "skill-entry"
+  val SkillEntryRemovedClass: String = "removed"
+  val SkillEntryTextClass: String    = "skill-entry-text"
+  val SkillXClass: String            = "skill-x"
 
   val GhostClass: String     = "filter-ghost"
   val GhostMetaClass: String = "filter-ghost-meta"
@@ -129,14 +170,45 @@ object MessageView {
     buildCardsFrag(cards, isUserFilter, query, GhostLabels.default)
 
   def buildCardsFrag(cards: List[MsgCard], isUserFilter: Boolean, query: String, ghostLabels: GhostLabels): Frag =
-    frag(cards.map(c => buildCardFrag(c, isUserFilter, query, ghostLabels)))
+    buildCardsFrag(cards, isUserFilter, query, ghostLabels, FilterConfig.default)
 
-  private def buildCardFrag(card: MsgCard, isUserFilter: Boolean, query: String, ghostLabels: GhostLabels): Frag =
+  def buildCardsFrag(
+    cards: List[MsgCard],
+    isUserFilter: Boolean,
+    query: String,
+    ghostLabels: GhostLabels,
+    config: FilterConfig,
+  ): Frag =
+    frag(cards.map(c => buildCardFrag(c, isUserFilter, query, ghostLabels, config)))
+
+  /** What the saved config does to a badge. Nothing is struck through while
+    * filtering is switched off, since the filter will not act.
+    */
+  def badgeState(config: FilterConfig, filter: BadgeFilter): BadgeState =
+    if (!config.enabled) BadgeState.Live
+    else
+      filter match {
+        case BadgeFilter.Item(category, key) =>
+          val cf = config.category(category)
+          if (cf.mode === CategoryMode.RemoveAll) BadgeState.RemovedAll
+          else if (cf.mode === CategoryMode.RemoveSelected && cf.keys.contains(key)) BadgeState.RemovedSelected
+          else BadgeState.Live
+        case BadgeFilter.SkillsReminder =>
+          if (config.skills.mode === CategoryMode.RemoveAll) BadgeState.RemovedAll else BadgeState.Live
+      }
+
+  private def buildCardFrag(
+    card: MsgCard,
+    isUserFilter: Boolean,
+    query: String,
+    ghostLabels: GhostLabels,
+    config: FilterConfig,
+  ): Frag =
     div(cls := s"msg-card msg-${card.role}")(
       div(cls := "msg-role")(card.role),
       div(cls := "msg-body")(
         frag(card.removed.map(m => buildGhostRowFrag(m, ghostLabels))),
-        buildBodyFrag(card, isUserFilter, query),
+        buildBodyFrag(card, isUserFilter, query, ghostLabels, config),
       ),
     )
 
@@ -147,9 +219,17 @@ object MessageView {
       span(cls := GhostMetaClass)(ghostLabels.removed.replace("{tokens}", mark.tokens.toString)),
     )
 
-  private def buildBodyFrag(card: MsgCard, isUserFilter: Boolean, query: String): Frag = {
+  private def buildBodyFrag(
+    card: MsgCard,
+    isUserFilter: Boolean,
+    query: String,
+    ghostLabels: GhostLabels,
+    config: FilterConfig,
+  ): Frag = {
     if (card.role === "user" && card.userParts.nonEmpty) {
-      frag(card.userParts.zipWithIndex.map { case (p, idx) => buildUserPartFrag(p, query, card.rawIdx, idx) })
+      frag(card.userParts.zipWithIndex.map {
+        case (p, idx) => buildUserPartFrag(p, query, card.rawIdx, idx, ghostLabels, config)
+      })
     } else {
       frag(
         card.contents.zipWithIndex.map { case (c, idx) => buildContentFrag(c, isUserFilter, query, card.rawIdx, idx) }
@@ -157,39 +237,114 @@ object MessageView {
     }
   }
 
-  private def buildUserPartFrag(p: MsgPart, query: String, cardIdx: Int, partIdx: Int): Frag = p match {
+  private def buildUserPartFrag(
+    p: MsgPart,
+    query: String,
+    cardIdx: Int,
+    partIdx: Int,
+    ghostLabels: GhostLabels,
+    config: FilterConfig,
+  ): Frag = p match {
     case TextMsgPart(content) =>
       val idPrefix = s"m.$cardIdx.user.$partIdx"
       div(cls := "msg-typed")(MessageTokenView.buildTextFrag(content, query, idPrefix))
 
-    case InjectedMsgPart(uid, label, content, badgeCls) =>
+    case InjectedMsgPart(uid, label, content, badgeCls, filter) =>
       // Auto-expand the badge when the search query matches inside the
       // collapsed content. Without this, search hits inside system-reminders /
       // skills / etc. are wrapped in <mark> but invisible to the user because
       // the parent is display:none.
-      val matched        = query.nonEmpty && content.toLowerCase.contains(query.toLowerCase)
-      val badgeClasses   =
-        if (matched) s"$BadgeClass $badgeCls expandable open hl-active"
-        else s"$BadgeClass $badgeCls expandable"
-      val contentStyle   =
+      val matched                    = query.nonEmpty && content.toLowerCase.contains(query.toLowerCase)
+      val state                      = filter.fold(BadgeState.Live)(f => badgeState(config, f))
+      val ghost                      = if (state === BadgeState.Live) "" else s" $GhostClass"
+      val badgeClasses               =
+        if (matched) s"$BadgeClass $badgeCls expandable open hl-active$ghost"
+        else s"$BadgeClass $badgeCls expandable$ghost"
+      val contentStyle               =
         if (matched) "display:block"
         else "display:none"
-      val contentClasses =
+      val contentClasses             =
         if (matched) "badge-expand-content badge-section-hl"
         else "badge-expand-content"
-      val idPrefix       = s"m.$cardIdx.inj.$partIdx"
+      val idPrefix                   = s"m.$cardIdx.inj.$partIdx"
+      val filterAttrs: Seq[Modifier] = filter match {
+        case Some(BadgeFilter.Item(category, key)) =>
+          Seq(
+            attr(BadgeFilterAttr) := BadgeFilterItem,
+            attr(RequestFilterView.CatAttr) := category.wire,
+            attr(RequestFilterView.KeyAttr) := key,
+          )
+        case Some(BadgeFilter.SkillsReminder) =>
+          Seq(attr(BadgeFilterAttr) := BadgeFilterSkills, attr(RequestFilterView.CatAttr) := "skills")
+        case None => Seq.empty
+      }
+      val meta                       =
+        if (state === BadgeState.Live) frag()
+        else {
+          val tokens = RequestAnatomy.estTokens(TextRules.byteLen(content))
+          span(cls := GhostMetaClass)(ghostLabels.removed.replace("{tokens}", tokens.toString))
+        }
+      val body                       = filter match {
+        case Some(BadgeFilter.SkillsReminder) => buildSkillsContentFrag(content, query, idPrefix, ghostLabels, config)
+        case Some(BadgeFilter.Item(_, _)) | None => MessageTokenView.buildTextFrag(content, query, idPrefix)
+      }
       div(cls := "msg-injected-row")(
         span(
           id := s"bb_$uid",
           cls := badgeClasses,
           attr(BadgeDataAttr) := uid,
+          attr(BadgePartAttr) := s"$cardIdx.$partIdx",
+          filterAttrs,
         )(label),
+        meta,
         div(
           id := s"bc_$uid",
           cls := contentClasses,
           style := contentStyle,
-        )(MessageTokenView.buildTextFrag(content, query, idPrefix)),
+        )(body),
       )
+  }
+
+  /** The skills reminder rendered entry by entry, each with a ✕ toggle. Mask
+    * ids stay those of the whole text thanks to the `offset` argument.
+    */
+  private def buildSkillsContentFrag(
+    content: String,
+    query: String,
+    idPrefix: String,
+    ghostLabels: GhostLabels,
+    config: FilterConfig,
+  ): Frag = {
+    val entries = SkillsList.entries(content)
+    entries.headOption match {
+      case None => MessageTokenView.buildTextFrag(content, query, idPrefix)
+      case Some(first) =>
+        val head    = MessageTokenView.buildTextFrag(content.substring(0, first.start), query, idPrefix)
+        val rows    = entries.map { e =>
+          val removed = config.enabled && config.skills.remove(e.name)
+          div(
+            cls := (if (removed) s"$SkillEntryClass $SkillEntryRemovedClass" else SkillEntryClass),
+            attr(RequestFilterView.KeyAttr) := e.name,
+          )(
+            button(
+              cls := (if (removed) s"x-btn $SkillXClass on" else s"x-btn $SkillXClass"),
+              attr(MessageFilterView.ActionAttr) := MessageFilterView.Action.ToggleSkill,
+              attr(RequestFilterView.KeyAttr) := e.name,
+              attr("aria-label") := (if (removed) ghostLabels.skillRestore else ghostLabels.skillRemove),
+              attr("title") := (if (removed) ghostLabels.skillRestore else ghostLabels.skillRemove),
+            )("✕"),
+            span(cls := SkillEntryTextClass)(
+              MessageTokenView.buildTextFrag(content.substring(e.start, e.end), query, idPrefix, e.start)
+            ),
+          )
+        }
+        val lastEnd = entries.last.end
+        val tail    =
+          if (lastEnd < content.length)
+            MessageTokenView.buildTextFrag(content.substring(lastEnd), query, idPrefix, lastEnd)
+          else frag()
+        frag(head, rows, tail)
+    }
   }
 
   private def buildContentFrag(c: MsgContent, isUserFilter: Boolean, query: String, cardIdx: Int, partIdx: Int): Frag =

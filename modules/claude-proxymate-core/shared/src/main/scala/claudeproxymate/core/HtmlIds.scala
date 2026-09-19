@@ -64,4 +64,7 @@ object HtmlIds {
   val MsgSearchInput: String         = "msgSearchInput"
   val MsgCountEl: String             = "msgCountEl"
   val RequestFilterPreview: String   = "requestFilterPreview"
+  val MsgFilterBar: String           = "msgFilterBar"
+  val BadgeMenu: String              = "badgeMenu"
+  val SelectionMenu: String          = "selectionMenu"
 }

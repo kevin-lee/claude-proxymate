@@ -439,6 +439,16 @@ is touched; `system`, `tools` and everything else pass through untouched.
   every filtered capture carries a report: the Messages tab shows removed items
   as struck-through "removed · ~N tok" rows, and the Request tab shows the body
   that was actually sent.
+- **Filtering from the Messages tab** — clicking a rule, doc or skills badge
+  opens a small menu with *Remove from future requests* (or *Keep in future
+  requests* for an item that is already removed), *Remove all rules / docs /
+  skills* and *Expand*. Inside the expanded Skills badge every entry has a ✕
+  toggle. Badges the saved config removes render struck through with
+  "removed · ~N tok". Selecting text inside the typed part of a message shows
+  *Text / Regex / Tag `<name>`* + *Add* (Tag only when the selection is exactly
+  one tag element) and adds the rule with scope *Both*. The bar above the
+  message list has the Filtering switch, the rule count, the tokens removed
+  from the selected request, *+ Text rule* and *Manage rules*.
 
 The config lives in `request-filter.json` under the app's `userData`
 directory and is passed to the proxy as `--filter-config <path>`; the proxy
