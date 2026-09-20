@@ -83,6 +83,10 @@ lazy val coreJvm    = core.jvm
 lazy val coreJs     = core.js.settings(jsSettingsForFuture)
 lazy val coreNative = core.native.settings(nativeSettings)
 
+/* Guard for proxyServer / Compile / nativeLink; see the setting in proxyServer below. */
+lazy val checkNativeLinkEnv =
+  taskKey[Unit]("Fail unless SCALANATIVE_GC_TRAP_BASED_YIELDPOINTS=0 is set in the environment of the sbt process")
+
 lazy val proxyServer = (project in file("modules/claude-proxymate-server"))
   .enablePlugins(ScalaNativePlugin)
   .settings(
@@ -104,6 +108,29 @@ lazy val proxyServer = (project in file("modules/claude-proxymate-server"))
         .withMode(Mode.releaseFast)
         .withGC(GC.commix)
     },
+    /* Scala Native 0.5.x release builds (Mode.releaseFast above) default to
+     * trap-based GC yieldpoints, which lose fault delivery under concurrent load
+     * on macOS and wedge the proxy binary. The Scala Native toolchain reads
+     * SCALANATIVE_GC_TRAP_BASED_YIELDPOINTS from the environment of the sbt JVM
+     * at link time (not from build.sbt), so the only lever is the environment
+     * sbt was started with. Refuse to link rather than ship a wedging binary.
+     * Only Compile / nativeLink is guarded; Test / nativeLink (proxyServer/test)
+     * is left alone. */
+    checkNativeLinkEnv := {
+      val key = "SCALANATIVE_GC_TRAP_BASED_YIELDPOINTS"
+      if (sys.env.get(key).contains("0")) ()
+      else
+        sys.error(
+          s"""$key is not set to "0" in the environment of this sbt process.
+             |The Scala Native toolchain reads it at link time; without it, release builds use trap-based
+             |GC yieldpoints, which wedge the proxy binary under concurrent requests on macOS.
+             |Run:
+             |  export $key=0
+             |then restart sbt (a running sbt shell or server keeps the environment it was started with)
+             |and re-run the task.""".stripMargin
+        )
+    },
+    Compile / nativeLink := (Compile / nativeLink).dependsOn(checkNativeLinkEnv).value,
     // CurlMain uses libcurl (no s2n needed); Main uses EmberClient (needs `brew install s2n`)
     Compile / mainClass := Some("claudeproxymate.proxy.CurlMain"),
   )
@@ -237,7 +264,7 @@ generatePackageJson := {
   }
 
   IO.write(outputFile, rendered)
-  log.info(s"Generated ${outputFile}")
+  log.info(s"Generated $outputFile")
 }
 
 // ===== Dev UI task =====

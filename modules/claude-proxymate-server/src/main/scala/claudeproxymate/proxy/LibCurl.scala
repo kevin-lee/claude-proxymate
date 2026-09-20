@@ -13,6 +13,13 @@ private[proxy] object LibCurl {
   def curl_global_init(flags: CLong): CURLcode                         = extern
   def curl_easy_init(): CURL                                           = extern
   def curl_easy_cleanup(curl: CURL): Unit                              = extern
+  /* curl_easy_perform blocks the calling thread for the whole HTTP round trip.
+   * @blocking makes the call notify the GC that the thread is in unmanaged
+   * code, so a collection triggered by another request does not wait for it.
+   * Safe only because nothing in the call re-enters Scala: CURLOPT_WRITEDATA is
+   * a C FILE* (CurlHttpClient.performWithTmpFile), there is no Scala write
+   * callback. If a CFuncPtr callback is ever added, drop the annotation. */
+  @blocking
   def curl_easy_perform(curl: CURL): CURLcode                          = extern
   def curl_easy_setopt(curl: CURL, option: CInt, args: Any*): CURLcode = extern
   def curl_easy_getinfo(curl: CURL, info: CInt, args: Any*): CURLcode  = extern
