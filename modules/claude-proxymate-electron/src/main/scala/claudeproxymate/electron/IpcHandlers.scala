@@ -291,6 +291,21 @@ object IpcHandlers {
               }: js.Function1[js.Any, Unit]
             )
 
+          /* stderr is a pipe as well and nothing read it, so the binary's
+           * diagnostics (GC safepoint warnings, invalid filter config, stack
+           * traces) were invisible, and an unread pipe eventually blocks the
+           * child's writes once the buffers fill. Surface it in the main log. */
+          child.stderr.setEncoding("utf8")
+
+          child
+            .stderr
+            .on(
+              "data",
+              { (chunk: js.Any) =>
+                val _ = js.Dynamic.global.console.warn("proxy stderr:", chunk.toString)
+              }: js.Function1[js.Any, Unit]
+            )
+
           child.on(
             "exit",
             { (_: js.Any) =>

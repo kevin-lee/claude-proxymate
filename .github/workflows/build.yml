@@ -10,6 +10,15 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# Scala Native 0.5.x release builds default to trap-based GC yieldpoints, which
+# lose fault delivery under concurrent load on macOS and wedge the proxy binary.
+# The toolchain reads this from the sbt JVM's environment at link time, and
+# build.sbt's checkNativeLinkEnv refuses proxyServer / Compile / nativeLink
+# without it. Workflow-level so every job's sbt sees it. Keep in sync with
+# release.yml.
+env:
+  SCALANATIVE_GC_TRAP_BASED_YIELDPOINTS: "0"
+
 jobs:
   test:
     runs-on: ubuntu-latest

@@ -235,8 +235,12 @@ sbt proxyServer/test
 The proxy has two TLS backends. The default (`CurlMain`) uses the system's libcurl via Scala Native FFI — no extra dependencies on macOS:
 
 ```bash
+# Required: read by the Scala Native toolchain at link time; build.sbt refuses to link without it
+export SCALANATIVE_GC_TRAP_BASED_YIELDPOINTS=0
 sbt proxyServer/nativeLink
 ```
+
+Scala Native 0.5.x release builds default to trap-based GC yieldpoints, which lose fault delivery under concurrent requests on macOS and wedge the proxy. The variable is read from the environment of the sbt JVM at link time, so a running sbt shell, sbt server or IDE-launched sbt must be restarted after exporting it. Put the export in the shell profile to make it permanent. The first link after changing the variable needs `sbt proxyServer/clean`, otherwise the stale incremental cache fails the link with undefined `scalanative_GC_yieldpoint_trap` symbols.
 
 To use the alternative http4s Ember / s2n backend instead, install s2n and switch the main class:
 
@@ -303,7 +307,9 @@ With the `CSC_LINK` / `CSC_KEY_PASSWORD` / `APPLE_ID` /
 the DMGs are Developer-ID signed and notarized; without them, electron-builder
 falls back to an ad-hoc signature and skips notarization. The
 `GA_MEASUREMENT_ID` / `GA_API_SECRET` repository secrets are passed to the
-build step for the GA4 analytics integration.
+build step for the GA4 analytics integration. Both workflows set
+`SCALANATIVE_GC_TRAP_BASED_YIELDPOINTS=0` at the workflow level, which
+`build.sbt`'s `checkNativeLinkEnv` requires before linking the proxy binary.
 
 ## Usage
 
@@ -339,6 +345,9 @@ claude
 For development, assemble the `electron-app/` directory and run:
 
 ```bash
+# 0. Required for the native link (see "Build the native proxy binary")
+export SCALANATIVE_GC_TRAP_BASED_YIELDPOINTS=0
+
 # 1. Clean, build all modules, and assemble electron-app/
 sbt devUi
 
