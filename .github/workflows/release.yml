@@ -226,17 +226,17 @@ jobs:
       - name: Sanity-check artifacts
         run: |
           set -euo pipefail
+          shopt -s nullglob
           ls -la artifacts/
-          # shellcheck disable=SC2012
           for arch in arm64 x64; do
-            COUNT=$(ls artifacts/*-"$arch".dmg 2>/dev/null | wc -l)
-            if [ "$COUNT" -ne 1 ]; then
-              echo "ERROR: expected exactly 1 $arch DMG, found $COUNT"
+            DMGS=(artifacts/*-"$arch".dmg)
+            if [ "${#DMGS[@]}" -ne 1 ]; then
+              echo "ERROR: expected exactly 1 $arch DMG, found ${#DMGS[@]}"
               exit 1
             fi
-            COUNT=$(ls artifacts/*-"$arch".dmg.sha256 2>/dev/null | wc -l)
-            if [ "$COUNT" -ne 1 ]; then
-              echo "ERROR: expected exactly 1 $arch checksum file, found $COUNT"
+            SUMS=(artifacts/*-"$arch".dmg.sha256)
+            if [ "${#SUMS[@]}" -ne 1 ]; then
+              echo "ERROR: expected exactly 1 $arch checksum file, found ${#SUMS[@]}"
               exit 1
             fi
           done
