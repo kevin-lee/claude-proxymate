@@ -15,18 +15,24 @@ on:
 env:
   SCALANATIVE_GC_TRAP_BASED_YIELDPOINTS: "0"
 
+# Read-only by default. The release job alone gets contents: write, for the
+# GitHub release. The tap job pushes to kevin-lee/homebrew-tap with
+# HOMEBREW_TAP_TOKEN, not GITHUB_TOKEN.
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-java@v6
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
           java-version: 21
 
-      - uses: sbt/setup-sbt@v1
+      - uses: sbt/setup-sbt@82da71df4e122282484a99a8d70096bc2369dbd8 # v1.5.9
 
       - name: Run core tests
         run: sbt "clean; coreJVM/test; coreJS/test; proxyServer/test; renderer/test"
@@ -58,16 +64,16 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-java@v6
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
           java-version: 21
 
-      - uses: sbt/setup-sbt@v1
+      - uses: sbt/setup-sbt@82da71df4e122282484a99a8d70096bc2369dbd8 # v1.5.9
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
 
@@ -181,11 +187,25 @@ jobs:
             fi
           done
 
+      # Taken after electron-builder has finished and the read-only
+      # verification above has run, so it describes the bytes that are uploaded
+      # and published. The release and tap jobs check every copy against it.
+      # Verify DMG has already checked that there is exactly one DMG.
+      - name: Write the DMG checksum
+        run: |
+          set -euo pipefail
+          cd electron-app/release
+          DMGS=(*.dmg)
+          shasum -a 256 "${DMGS[0]}" > "${DMGS[0]}.sha256"
+          shasum -a 256 -c "${DMGS[0]}.sha256"
+
       - name: Upload artifacts
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: release-${{ matrix.arch }}
-          path: electron-app/release/*-${{ matrix.arch }}.dmg
+          path: |
+            electron-app/release/*-${{ matrix.arch }}.dmg
+            electron-app/release/*-${{ matrix.arch }}.dmg.sha256
 
   release:
     needs: build
@@ -194,14 +214,15 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           path: artifacts
           merge-multiple: true
 
-      # Each artifact now carries only its own arch's DMG, so merge-multiple
-      # cannot collide. Assert we have exactly one DMG per arch before
-      # publishing anything.
+      # Each artifact now carries only its own arch's DMG and checksum file, so
+      # merge-multiple cannot collide. Assert we have exactly one DMG and one
+      # checksum file per arch, and that every DMG matches the checksum written
+      # in its build job, before publishing anything.
       - name: Sanity-check artifacts
         run: |
           set -euo pipefail
@@ -212,11 +233,123 @@ jobs:
               echo "ERROR: expected exactly 1 $arch DMG, found $COUNT"
               exit 1
             fi
+            COUNT=$(ls artifacts/*-"$arch".dmg.sha256 2>/dev/null | wc -l)
+            if [ "$COUNT" -ne 1 ]; then
+              echo "ERROR: expected exactly 1 $arch checksum file, found $COUNT"
+              exit 1
+            fi
           done
-          sha256sum artifacts/*.dmg
+          (cd artifacts && sha256sum -c ./*.sha256)
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
-          files: artifacts/**/*.dmg
+          files: |
+            artifacts/**/*.dmg
+            artifacts/**/*.sha256
           generate_release_notes: true
+
+  tap:
+    needs: release
+    # brew style needs Homebrew.
+    runs-on: macos-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Require the tap token
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          if [ -z "$HOMEBREW_TAP_TOKEN" ]; then
+            echo "error: repository secret HOMEBREW_TAP_TOKEN is not set"
+            exit 1
+          fi
+
+      # This repository, for scripts/update-cask.sh.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: kevin-lee/homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: tap
+
+      # The published release assets are what brew downloads, so they are the
+      # files checked. Each DMG is checked against the .sha256 written in its
+      # build job, so a corrupted download fails here instead of reaching the
+      # cask.
+      - name: Download the published DMGs and checksums
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release download "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --pattern '*.dmg' --pattern '*.dmg.sha256' --dir release-assets
+          ls -la release-assets
+
+      - name: Update the cask
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          for arch in arm64 x64; do
+            NAME="Claude-Proxy-$VERSION-$arch.dmg"
+            for file in "release-assets/$NAME" "release-assets/$NAME.sha256"; do
+              if [ ! -f "$file" ]; then
+                echo "error: $file not found"
+                exit 1
+              fi
+            done
+            (cd release-assets && shasum -a 256 -c "$NAME.sha256")
+          done
+          ARM="$(awk '{print $1}' "release-assets/Claude-Proxy-$VERSION-arm64.dmg.sha256")"
+          X64="$(awk '{print $1}' "release-assets/Claude-Proxy-$VERSION-x64.dmg.sha256")"
+          scripts/update-cask.sh "$VERSION" "$ARM" "$X64" tap
+          git -C tap add Casks
+
+      # brew style only inspects casks that live inside a tap directory, so the
+      # checkout is linked into Homebrew's taps folder under the real tap name
+      # and the casks are named by token. Only the changed casks are checked,
+      # so older hand-written casks cannot fail a release under newer RuboCop
+      # rules.
+      - name: Check the cask style
+        run: |
+          set -euo pipefail
+          TAP_DIR="$(brew --repository)/Library/Taps/kevin-lee/homebrew-tap"
+          mkdir -p "$(dirname "$TAP_DIR")"
+          ln -sfn "$GITHUB_WORKSPACE/tap" "$TAP_DIR"
+          TOKENS=()
+          while IFS= read -r cask; do
+            TOKENS+=("kevin-lee/tap/$(basename "$cask" .rb)")
+          done < <(git -C tap diff --cached --name-only -- Casks)
+          if [ "${#TOKENS[@]}" -eq 0 ]; then
+            echo "No cask changes to check."
+            exit 0
+          fi
+          brew style --cask "${TOKENS[@]}"
+
+      - name: Commit and push
+        run: |
+          set -euo pipefail
+          cd tap
+          if git diff --cached --quiet; then
+            echo "No cask changes to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          VERSION="${GITHUB_REF_NAME#v}"
+          TITLE="Update \`claude-proxymate\` to \`$VERSION\`"
+          PREVIOUS=""
+          PREVIOUS_FILE=$(git diff --cached --name-only --diff-filter=A | grep 'Casks/claude-proxymate@' | sort -V | tail -n 1 || true)
+          if [ -n "$PREVIOUS_FILE" ]; then
+            PREVIOUS=$(basename "$PREVIOUS_FILE" .rb)
+            PREVIOUS="${PREVIOUS#claude-proxymate@}"
+            TITLE="$TITLE and add versioned cask for \`$PREVIOUS\`"
+          fi
+          if [ -n "$PREVIOUS" ]; then
+            git commit -m "$TITLE" -m "- \`claude-proxymate\`: \`$PREVIOUS\` => \`$VERSION\`"
+          else
+            git commit -m "$TITLE"
+          fi
+          # Picks up a tap push from another release, such as token-watchroo's,
+          # made since the checkout.
+          git pull --rebase origin main
+          git push origin HEAD:main

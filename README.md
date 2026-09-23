@@ -311,6 +311,19 @@ build step for the GA4 analytics integration. Both workflows set
 `SCALANATIVE_GC_TRAP_BASED_YIELDPOINTS=0` at the workflow level, which
 `build.sbt`'s `checkNativeLinkEnv` requires before linking the proxy binary.
 
+Each build job writes a `.sha256` next to its DMG, and the release job verifies
+the checksums and publishes them with the DMGs. After the GitHub Release, the
+`tap` job checks the published DMGs against their published `.sha256` files
+and runs [`scripts/update-cask.sh`](scripts/update-cask.sh) on a checkout of
+[`kevin-lee/homebrew-tap`](https://github.com/kevin-lee/homebrew-tap). That
+updates `claude-proxymate.rb` in place and keeps the previous release as
+`claude-proxymate@<previous>.rb`. The job then runs `brew style` on the changed
+casks and pushes to the tap's `main`. A manual tap update uses the same command:
+`scripts/update-cask.sh <version> <arm64-sha256> <x64-sha256> <tap-checkout>`.
+The workflows run with a read-only `GITHUB_TOKEN`, and only the release job
+gets `contents: write`. Actions are pinned to commit SHAs, and Dependabot
+updates them.
+
 ## Usage
 
 ### Option 1: Standalone proxy (headless)
@@ -470,7 +483,7 @@ rules mid-session invalidates Claude Code's prompt cache once.
 claude-proxymate/
 ├── .github/
 │   └── workflows/
-│       └── release.yml               # CI: test → build arm64/x64 DMGs → GitHub Release on v* tags
+│       └── release.yml               # CI: test → build arm64/x64 DMGs → GitHub Release → Homebrew cask on v* tags
 ├── build.sbt                         # sbt build definition (props, libs, devUi/prodUi, generateHtml/generateI18n)
 ├── project/
 │   ├── build.properties              # sbt 1.12.5
@@ -564,6 +577,7 @@ claude-proxymate/
 └── scripts/
     ├── package.sh                    # Full 9-step build + Electron packaging
     ├── notarize.sh                   # macOS notarization
+    ├── update-cask.sh                # Update the cask in kevin-lee/homebrew-tap
     └── generate-icons.sh             # Generate app icons from source art
 ```
 
