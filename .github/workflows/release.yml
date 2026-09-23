@@ -227,6 +227,7 @@ jobs:
         run: |
           set -euo pipefail
           ls -la artifacts/
+          # shellcheck disable=SC2012
           for arch in arm64 x64; do
             COUNT=$(ls artifacts/*-"$arch".dmg 2>/dev/null | wc -l)
             if [ "$COUNT" -ne 1 ]; then
