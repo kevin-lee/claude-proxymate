@@ -2,12 +2,21 @@ package claudeproxymate.renderer.detail
 
 import scalatags.Text.all.*
 
+/** What a popover row's price is charged per. Token rows are priced per
+  * million tokens. Web search is priced per search.
+  */
+enum RowUnit {
+  case PerMTok
+  case PerSearch
+}
+
 /** A single row in the token-cost popover. */
 final case class TokenPopoverRow(
   label: String,
   tokens: String,
   price: String,
   cost: String,
+  unit: RowUnit,
 )
 
 /** Dynamic per-capture data driving the token popover content. */
@@ -29,6 +38,8 @@ final case class TokenPopoverData(
   * `notePricingDate` should be the i18n template already filled with the
   * pricing-date placeholder. `noteCacheSaving` is `Some` only when the
   * cache-hit rate is high enough that the note should appear.
+  * `noteFastMode` and `noteUsInference` are `Some` only when the capture
+  * was billed with that pricing modifier.
   */
 final case class TokenPopoverLabels(
   costTitle: String,
@@ -42,6 +53,8 @@ final case class TokenPopoverLabels(
   noteOfficialDoc: String,
   noteMTok: String,
   noteCacheSaving: Option[String],
+  noteFastMode: Option[String],
+  noteUsInference: Option[String],
 )
 
 /** Pure view functions for the token-cost popover. */
@@ -49,6 +62,12 @@ object TokenPopoverView {
 
   val DocsHref: String =
     "https://platform.claude.com/docs/en/about-claude/pricing"
+
+  /** The `count × price` part of a row, in the row's unit. */
+  private def formula(r: TokenPopoverRow): String = r.unit match {
+    case RowUnit.PerMTok => s"${r.tokens} tok × $$${r.price}/MTok"
+    case RowUnit.PerSearch => s"${r.tokens} × $$${r.price}"
+  }
 
   /** Build the human-readable multi-line text that the Copy button places
     * on the clipboard. Pure function; no DOM access.
@@ -62,11 +81,13 @@ object TokenPopoverView {
     builder += s"${labels.reqSizeLabel}: ${data.kb} KB"
     builder += ""
     for (r <- data.rows) {
-      builder += s"${r.label}: ${r.tokens} tok × $$${r.price}/MTok = ${r.cost}"
+      builder += s"${r.label}: ${formula(r)} = ${r.cost}"
     }
     builder += ""
     builder += s"${labels.totalLabel}: ${data.total}"
     builder += s"${labels.cacheHitRateLabel}: ${data.cachePct}%"
+    builder ++= labels.noteFastMode.toList
+    builder ++= labels.noteUsInference.toList
     builder.mkString("\n")
   }
 
@@ -84,7 +105,7 @@ object TokenPopoverView {
     val rowFrags: List[Frag] = data.rows.flatMap { r =>
       val rowFrag: Frag          = div(cls := "token-popover-row")(
         span(cls := "tp-label")(r.label),
-        span(cls := "tp-formula")(s"${r.tokens} tok × $$${r.price}/MTok"),
+        span(cls := "tp-formula")(formula(r)),
         span(cls := "tp-result")(r.cost),
       )
       val descFrag: Option[Frag] = descriptions.get(r.label).map { desc =>
@@ -94,6 +115,16 @@ object TokenPopoverView {
     }
 
     val noteCacheSavingFrag: Frag = labels.noteCacheSaving match {
+      case Some(s) => frag(br, s)
+      case None => frag()
+    }
+
+    val noteFastModeFrag: Frag = labels.noteFastMode match {
+      case Some(s) => frag(br, s)
+      case None => frag()
+    }
+
+    val noteUsInferenceFrag: Frag = labels.noteUsInference match {
       case Some(s) => frag(br, s)
       case None => frag()
     }
@@ -136,6 +167,8 @@ object TokenPopoverView {
         br,
         labels.noteMTok,
         noteCacheSavingFrag,
+        noteFastModeFrag,
+        noteUsInferenceFrag,
       ),
     )
   }

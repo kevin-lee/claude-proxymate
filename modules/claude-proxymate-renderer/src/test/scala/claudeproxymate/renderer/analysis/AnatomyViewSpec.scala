@@ -1,6 +1,7 @@
 package claudeproxymate.renderer.analysis
 
 import claudeproxymate.core.{AnomalyKind, RequestAnatomy, StructureFacts}
+import claudeproxymate.renderer.detail.{InferenceGeo, Speed}
 import hedgehog.*
 import hedgehog.runner.*
 
@@ -15,6 +16,8 @@ object AnatomyViewSpec extends Properties {
     example("anomaly strip -> security class + glyph; empty -> none", testAnomalyStrip),
     property("<script> in labels/messages never leaks raw", testNoScriptLeak),
     example("no inline event handlers in output", testNoInlineHandlers),
+    example("cost with modifiers -> fast/US notes + web search row", testCostModifiersShown),
+    example("standard cost -> no modifier notes, no web search row", testCostModifiersAbsent),
   )
 
   private val labels = AnatomyLabels(
@@ -34,6 +37,8 @@ object AnatomyViewSpec extends Properties {
     lblImages = "Images",
     lblThinking = "thinking",
     lblStream = "stream",
+    noteFastMode = "Fast mode 2x",
+    noteUsInference = "US-only 1.1x",
   )
 
   private val structure = StructureFacts(
@@ -80,7 +85,20 @@ object AnatomyViewSpec extends Properties {
   }
 
   def testCostFromUsage: Result = {
-    val out = render(AnatomyCost.fromUsage("claude-haiku-4-5-20251001", "10.0", 1000, 2000, 500, 0, 400))
+    val out = render(
+      AnatomyCost.fromUsage(
+        "claude-haiku-4-5-20251001",
+        "10.0",
+        1000,
+        2000,
+        500,
+        0,
+        400,
+        Speed.Standard,
+        InferenceGeo.Global,
+        0
+      )
+    )
     Result.all(
       List(
         Result.assert(out.contains("cache hit")).log("cache hit missing"),
@@ -154,7 +172,18 @@ object AnatomyViewSpec extends Properties {
 
   def testNoInlineHandlers: Result = {
     val out = render(
-      AnatomyCost.fromUsage("claude-haiku-4-5-20251001", "1.0", 100, 100, 100, 0, 100),
+      AnatomyCost.fromUsage(
+        "claude-haiku-4-5-20251001",
+        "1.0",
+        100,
+        100,
+        100,
+        0,
+        100,
+        Speed.Standard,
+        InferenceGeo.Global,
+        0
+      ),
       segments = List(SegmentRow("s", 1, 1)),
       inventory = List(InventoryDisplay("i", 1, 1)),
       anomalies = List(AnomalyDisplay(AnomalyKind.Warn, "w")),
@@ -163,6 +192,54 @@ object AnatomyViewSpec extends Properties {
       List(
         Result.assert(!out.contains("onclick=")).log(s"onclick: $out"),
         Result.assert(!out.contains("oninput=")).log(s"oninput: $out"),
+      )
+    )
+  }
+
+  def testCostModifiersShown: Result = {
+    val out = render(
+      AnatomyCost.fromUsage(
+        "claude-opus-5-5",
+        "1.0",
+        1000,
+        0,
+        0,
+        0,
+        100,
+        Speed.Fast,
+        InferenceGeo.Us,
+        3
+      )
+    )
+    Result.all(
+      List(
+        Result.assert(out.contains("Fast mode 2x")).log(s"fast-mode note missing: $out"),
+        Result.assert(out.contains("US-only 1.1x")).log(s"US-only note missing: $out"),
+        Result.assert(out.contains("web search")).log(s"web search row missing: $out"),
+      )
+    )
+  }
+
+  def testCostModifiersAbsent: Result = {
+    val out = render(
+      AnatomyCost.fromUsage(
+        "claude-opus-5-5",
+        "1.0",
+        1000,
+        0,
+        0,
+        0,
+        100,
+        Speed.Standard,
+        InferenceGeo.Global,
+        0
+      )
+    )
+    Result.all(
+      List(
+        Result.assert(!out.contains("Fast mode 2x")).log(s"fast-mode note leaked: $out"),
+        Result.assert(!out.contains("US-only 1.1x")).log(s"US-only note leaked: $out"),
+        Result.assert(!out.contains("web search")).log(s"web search row leaked: $out"),
       )
     )
   }

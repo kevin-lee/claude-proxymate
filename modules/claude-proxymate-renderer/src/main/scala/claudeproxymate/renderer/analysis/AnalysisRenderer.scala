@@ -2,6 +2,7 @@ package claudeproxymate.renderer.analysis
 
 import cats.syntax.all.*
 import claudeproxymate.core.{ClaudeMdParser, HtmlIds, RequestAnatomy, SegmentSize}
+import claudeproxymate.renderer.detail.{InferenceGeo, Speed}
 import claudeproxymate.renderer.i18n.I18n
 import claudeproxymate.renderer.json.JsonTreeViewer
 import claudeproxymate.renderer.util.JsJsonBridge
@@ -132,6 +133,9 @@ object AnalysisRenderer {
           cacheWrite5m = cacheWrite5m,
           cacheWrite1h = cacheWrite1h,
           outputTokens = usageInt(usage, "output_tokens"),
+          speed = Speed.fromUsage(usageString(usage, "speed")),
+          inferenceGeo = InferenceGeo.fromUsage(usageString(usage, "inference_geo")),
+          webSearches = webSearchRequests(usage),
         )
       } else
         AnatomyCost.estimateOnly(model, reqKb, RequestAnatomy.estTokens(reqBytes))
@@ -194,6 +198,21 @@ object AnalysisRenderer {
     else 0
   }
 
+  private def usageString(obj: js.Dynamic, name: String): Option[String] = {
+    val v = obj.selectDynamic(name)
+    Option.unless(js.isUndefined(v) || v == null)(v.toString)
+  }
+
+  /** Server-side web searches, billed per search and reported under
+    * `server_tool_use`. Older captures and responses without a search carry
+    * no such object, which counts as zero searches.
+    */
+  private def webSearchRequests(usage: js.Dynamic): Int = {
+    val serverToolUse = usage.selectDynamic("server_tool_use")
+    if (js.isUndefined(serverToolUse) || serverToolUse == null) 0
+    else usageInt(serverToolUse, "web_search_requests")
+  }
+
   private def buildAnatomyLabels(): AnatomyLabels =
     AnatomyLabels(
       costTitle = I18n.t("anatomy.costTitle"),
@@ -212,6 +231,8 @@ object AnalysisRenderer {
       lblImages = I18n.t("anatomy.lblImages"),
       lblThinking = I18n.t("anatomy.lblThinking"),
       lblStream = I18n.t("anatomy.lblStream"),
+      noteFastMode = I18n.t("token.noteFastMode"),
+      noteUsInference = I18n.t("token.noteUsInference"),
     )
 
   private def readModelName(body: js.Dynamic): Option[String] = {

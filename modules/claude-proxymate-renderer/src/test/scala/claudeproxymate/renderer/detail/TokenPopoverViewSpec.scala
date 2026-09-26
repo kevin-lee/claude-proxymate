@@ -18,6 +18,9 @@ object TokenPopoverViewSpec extends Properties {
     example("buildCopyText produces expected multiline format", testCopyTextFormat),
     example("buildCopyText includes all rows", testCopyTextAllRows),
     property("buildPopoverFrag output never contains literal <script>", testNoScriptLeak),
+    example("per-search row renders count × price in popover and copy text", testPerSearchRow),
+    example("fast-mode and US-only notes render when Some", testModifierNotesIncluded),
+    example("fast-mode and US-only notes are omitted when None", testModifierNotesOmitted),
   )
 
   private val sampleRow = TokenPopoverRow(
@@ -25,6 +28,7 @@ object TokenPopoverViewSpec extends Properties {
     tokens = "1.2K",
     price = "3.00",
     cost = "$0.0036",
+    unit = RowUnit.PerMTok,
   )
 
   private def sampleData(model: String = "claude-opus-4-7"): TokenPopoverData =
@@ -49,6 +53,8 @@ object TokenPopoverViewSpec extends Properties {
     noteOfficialDoc = "Official Docs",
     noteMTok = "MTok = million tokens",
     noteCacheSaving = Some("Cache 75%"),
+    noteFastMode = None,
+    noteUsInference = None,
   )
 
   private val sampleDescriptions = Map(
@@ -124,7 +130,7 @@ object TokenPopoverViewSpec extends Properties {
   }
 
   def testCopyTextAllRows: Result = {
-    val row2 = TokenPopoverRow("Output", "0.3K", "15.00", "$0.0045")
+    val row2 = TokenPopoverRow("Output", "0.3K", "15.00", "$0.0045", RowUnit.PerMTok)
     val data = sampleData().copy(rows = List(sampleRow, row2))
     val text = TokenPopoverView.buildCopyText(data, sampleLabels)
     Result.all(
@@ -144,4 +150,46 @@ object TokenPopoverViewSpec extends Properties {
         .assert(!html.contains("<script>"))
         .log(s"raw <script> leaked for evil=$evil: $html")
     }
+
+  def testPerSearchRow: Result = {
+    val searchRow = TokenPopoverRow("Web Search", "3", "0.01", "$0.0300", RowUnit.PerSearch)
+    val data      = sampleData().copy(rows = List(searchRow))
+    val html      = render(data = data)
+    val text      = TokenPopoverView.buildCopyText(data, sampleLabels)
+    Result.all(
+      List(
+        Result.assert(html.contains("3 × $0.01")).log(html),
+        Result.assert(!html.contains("/MTok")).log(html),
+        Result.assert(text.contains("Web Search: 3 × $0.01 = $0.0300")).log(text),
+      )
+    )
+  }
+
+  def testModifierNotesIncluded: Result = {
+    val labels = sampleLabels.copy(noteFastMode = Some("Fast 2x"), noteUsInference = Some("US 1.1x"))
+    val html   = render(labels = labels)
+    val text   = TokenPopoverView.buildCopyText(sampleData(), labels)
+    Result.all(
+      List(
+        Result.assert(html.contains("Fast 2x")).log(html),
+        Result.assert(html.contains("US 1.1x")).log(html),
+        Result.assert(text.contains("Fast 2x")).log(text),
+        Result.assert(text.contains("US 1.1x")).log(text),
+      )
+    )
+  }
+
+  def testModifierNotesOmitted: Result = {
+    val labels = sampleLabels.copy(noteFastMode = None, noteUsInference = None)
+    val html   = render(labels = labels)
+    val text   = TokenPopoverView.buildCopyText(sampleData(), labels)
+    Result.all(
+      List(
+        Result.assert(!html.contains("Fast 2x")).log(html),
+        Result.assert(!html.contains("US 1.1x")).log(html),
+        Result.assert(!text.contains("Fast 2x")).log(text),
+        Result.assert(!text.contains("US 1.1x")).log(text),
+      )
+    )
+  }
 }

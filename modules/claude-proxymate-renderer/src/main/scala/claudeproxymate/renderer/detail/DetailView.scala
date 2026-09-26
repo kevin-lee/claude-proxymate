@@ -266,10 +266,33 @@ object DetailView {
       else 0
     }
 
+    def stringField(name: String): Option[String] = {
+      val v = usage.selectDynamic(name)
+      if (!js.isUndefined(v) && v != null) v.toString.some else none[String]
+    }
+
     val inputTokens = intField("input_tokens")
     val cacheRead   = intField("cache_read_input_tokens")
     val cacheWrite  = intField("cache_creation_input_tokens")
     val outTok      = intField("output_tokens")
+
+    val speed        = Speed.fromUsage(stringField("speed"))
+    val inferenceGeo = InferenceGeo.fromUsage(stringField("inference_geo"))
+
+    /* Server-side web searches are billed per search, reported under
+     * `server_tool_use`. Older captures and responses without a search carry
+     * no such object, which counts as zero searches. */
+    val webSearches = {
+      val serverToolUse = usage.selectDynamic("server_tool_use")
+      if (js.isUndefined(serverToolUse) || serverToolUse == null) 0
+      else {
+        val v = serverToolUse.selectDynamic("web_search_requests")
+        if (!js.isUndefined(v) && v != null)
+          try v.asInstanceOf[Int]
+          catch { case _: Throwable => 0 }
+        else 0
+      }
+    }
 
     /* `cache_creation` splits the write by time-to-live (TTL) bucket, and its
      * two fields sum to `cache_creation_input_tokens`. When the breakdown is
@@ -308,15 +331,18 @@ object DetailView {
       else ""
     }
 
-    val rates = ModelTier.forModel(model).rates
+    val rates = ModelTier.forModel(model).ratesFor(speed, inferenceGeo)
     val inP   = rates.input
     val outP  = rates.output
     val crP   = rates.cacheRead
     val cw5P  = rates.cacheWrite5m
     val cw1P  = rates.cacheWrite1h
 
+    val webSearchCost = ModelTier.webSearchCost(webSearches)
+
     val cost    =
-      (inputTokens * inP + cacheRead * crP + cacheWrite5m * cw5P + cacheWrite1h * cw1P + outTok * outP) / 1000000.0
+      (inputTokens * inP + cacheRead * crP + cacheWrite5m * cw5P + cacheWrite1h * cw1P + outTok * outP) / 1000000.0 +
+        webSearchCost
     val costStr = fmtCost(cost)
 
     /* Without a 1h write there is nothing to disambiguate, so the row keeps
@@ -374,7 +400,19 @@ object DetailView {
               "price"  -> outP,
               "cost"   -> fmtCost(outTok * outP / 1000000.0)
             ),
-        )
+        ) :::
+        (if (webSearches > 0)
+           List(
+             js.Dynamic
+               .literal(
+                 "label"  -> I18n.t("token.webSearch"),
+                 "tokens" -> webSearches.toString,
+                 "price"  -> ModelTier.WebSearchUsdPerSearch,
+                 "cost"   -> fmtCost(webSearchCost),
+                 "unit"   -> "search"
+               )
+           )
+         else Nil)
 
     val popData = js
       .JSON
@@ -387,6 +425,8 @@ object DetailView {
             "rows"        -> js.Array(rows*),
             "total"       -> costStr,
             "cachePct"    -> cachePct,
+            "fastMode"    -> (speed == Speed.Fast),
+            "usInference" -> (inferenceGeo == InferenceGeo.Us),
           )
       )
 

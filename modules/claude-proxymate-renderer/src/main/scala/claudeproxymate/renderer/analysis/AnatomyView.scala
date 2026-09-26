@@ -2,6 +2,7 @@ package claudeproxymate.renderer.analysis
 
 import cats.syntax.all.*
 import claudeproxymate.core.{AnomalyKind, RequestAnatomy, StructureFacts}
+import claudeproxymate.renderer.detail.{InferenceGeo, Speed}
 import scalatags.Text.all.*
 
 /** Display-resolved segment row (label already i18n-resolved). */
@@ -30,6 +31,8 @@ final case class AnatomyLabels(
   lblImages: String,
   lblThinking: String,
   lblStream: String,
+  noteFastMode: String,
+  noteUsInference: String,
 )
 
 /** Pure Scalatags view for the Request Anatomy dashboard. No DOM, no inline
@@ -89,6 +92,8 @@ object AnatomyView {
               span(cls := "av")(s"${fmtTok(s.tokens)} · ${fmtCost(s.costUsd)}"),
             )
           }),
+          if (cost.webSearches > 0) kv("web search", s"${cost.webSearches} · ${fmtCost(cost.webSearchCostUsd)}")
+          else frag(),
           div(cls := "anatomy-row anatomy-row-strong")(
             span(cls := "ak")("cache hit"),
             span(cls := "av")(s"${cost.cacheHitPct}%"),
@@ -97,6 +102,14 @@ object AnatomyView {
             span(cls := "ak")("total"),
             span(cls := "av anatomy-cost")(fmtCost(cost.totalCostUsd)),
           ),
+          cost.speed match {
+            case Speed.Fast => div(cls := "anatomy-note")(labels.noteFastMode)
+            case Speed.Standard => frag()
+          },
+          cost.inferenceGeo match {
+            case InferenceGeo.Us => div(cls := "anatomy-note")(labels.noteUsInference)
+            case InferenceGeo.Global => frag()
+          },
         )
       },
     )
