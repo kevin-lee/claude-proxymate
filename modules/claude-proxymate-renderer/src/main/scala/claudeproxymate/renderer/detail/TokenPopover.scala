@@ -84,13 +84,24 @@ object TokenPopover {
     val d        = js.JSON.parse(costData)
 
     val rows = d.selectDynamic("rows").asInstanceOf[js.Array[js.Dynamic]].toList.map { r =>
+      val unit = r.selectDynamic("unit")
       TokenPopoverRow(
         label = r.label.asInstanceOf[String],
         tokens = r.tokens.asInstanceOf[String],
         price = r.price.toString,
         cost = r.cost.asInstanceOf[String],
+        unit =
+          if (!js.isUndefined(unit) && unit != null && unit.toString == "search") RowUnit.PerSearch
+          else RowUnit.PerMTok,
       )
     }
+
+    def boolField(name: String): Boolean = {
+      val v = d.selectDynamic(name)
+      !js.isUndefined(v) && v != null && v.asInstanceOf[Boolean]
+    }
+    val fastMode                         = boolField("fastMode")
+    val usInference                      = boolField("usInference")
 
     val data = TokenPopoverData(
       model = d.model.asInstanceOf[String],
@@ -108,6 +119,7 @@ object TokenPopover {
       I18n.t("token.cacheWrite1h")  -> I18n.t("token.descCacheWrite1h"),
       I18n.t("token.uncachedInput") -> I18n.t("token.descUncached"),
       I18n.t("token.output")        -> I18n.t("token.descOutput"),
+      I18n.t("token.webSearch")     -> I18n.t("token.descWebSearch"),
     )
 
     val labels = TokenPopoverLabels(
@@ -123,6 +135,8 @@ object TokenPopover {
       noteMTok = I18n.t("token.noteMTok"),
       noteCacheSaving =
         Option.when(data.cachePct >= 50)(I18n.t("token.noteCacheSaving", Map("pct" -> data.cachePct.toString))),
+      noteFastMode = Option.when(fastMode)(I18n.t("token.noteFastMode")),
+      noteUsInference = Option.when(usInference)(I18n.t("token.noteUsInference")),
     )
 
     val pop = dom.document.createElement("div").asInstanceOf[dom.html.Div]

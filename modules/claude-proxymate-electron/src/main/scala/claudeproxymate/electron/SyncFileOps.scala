@@ -107,8 +107,7 @@ object SyncFileOps {
     val options = js
       .Dynamic
       .literal(
-        formattingOptions =
-          js.Dynamic.literal(insertSpaces = indent.insertSpaces, tabSize = indent.tabSize, eol = eol),
+        formattingOptions = js.Dynamic.literal(insertSpaces = indent.insertSpaces, tabSize = indent.tabSize, eol = eol),
         isArrayInsertion = isArrayInsertion,
       )
       .asInstanceOf[js.Object]
@@ -162,8 +161,8 @@ object SyncFileOps {
   private def propertyRange(mod: JsoncParserModule, text: String, key: String): Option[(Int, Int)] = {
     val parseOptions = js.Dynamic.literal(allowTrailingComma = true).asInstanceOf[js.Object]
     for {
-      root     <- Option(mod.parseTree(text, js.Array[js.Dynamic](), parseOptions)).filterNot(node => js.isUndefined(node))
-      value    <- Option(mod.findNodeAtLocation(root, js.Array[js.Any](key))).filterNot(node => js.isUndefined(node))
+      root  <- Option(mod.parseTree(text, js.Array[js.Dynamic](), parseOptions)).filterNot(node => js.isUndefined(node))
+      value <- Option(mod.findNodeAtLocation(root, js.Array[js.Any](key))).filterNot(node => js.isUndefined(node))
       property <- Option(value.selectDynamic("parent")).filterNot(node => js.isUndefined(node))
     } yield (property.selectDynamic("offset").asInstanceOf[Int], property.selectDynamic("length").asInstanceOf[Int])
   }

@@ -1,5 +1,6 @@
 package claudeproxymate.renderer.analysis
 
+import claudeproxymate.renderer.detail.{InferenceGeo, Speed}
 import hedgehog.*
 import hedgehog.runner.*
 
@@ -11,6 +12,8 @@ object AnatomyCostSpec extends Properties {
     property("cacheHitPct math", testCacheHitPct),
     property("estimateOnly is estimated with empty segments", testEstimateOnly),
     property("unknown model falls back to OpusPremium rates", testUnknownFallback),
+    property("fromUsage applies the fast-mode and US-only multipliers", testFastUsModifiers),
+    property("fromUsage adds web search cost outside the segments", testWebSearchCost),
   )
 
   /* Haiku 4.5 rates: input 1.0, output 5.0, cacheRead 0.1, cacheWrite5m 1.25,
@@ -25,6 +28,9 @@ object AnatomyCostSpec extends Properties {
         cacheWrite5m = 500, // 500 * 1.25 / 1e6 = 0.000625
         cacheWrite1h = 0,
         outputTokens = 400, // 400 * 5.0 / 1e6 = 0.002
+        speed = Speed.Standard,
+        inferenceGeo = InferenceGeo.Global,
+        webSearches = 0,
       )
       val expected = 0.001 + 0.0002 + 0.000625 + 0.002
       Result
@@ -49,6 +55,9 @@ object AnatomyCostSpec extends Properties {
         cacheWrite5m = 500, // 500 * 1.25 / 1e6 = 0.000625
         cacheWrite1h = 200, // 200 * 2.0 / 1e6 = 0.0004
         outputTokens = 0,
+        speed = Speed.Standard,
+        inferenceGeo = InferenceGeo.Global,
+        webSearches = 0,
       )
       val expected = 0.000625 + 0.0004
       Result
@@ -72,7 +81,10 @@ object AnatomyCostSpec extends Properties {
         cacheRead = 900,
         cacheWrite5m = 0,
         cacheWrite1h = 0,
-        outputTokens = 10
+        outputTokens = 10,
+        speed = Speed.Standard,
+        inferenceGeo = InferenceGeo.Global,
+        webSearches = 0,
       )
       Result.assert(card.cacheHitPct == 90).log(s"cacheHitPct=${card.cacheHitPct}")
     }
@@ -99,10 +111,58 @@ object AnatomyCostSpec extends Properties {
         cacheRead = 0,
         cacheWrite5m = 0,
         cacheWrite1h = 0,
-        outputTokens = 0
+        outputTokens = 0,
+        speed = Speed.Standard,
+        inferenceGeo = InferenceGeo.Global,
+        webSearches = 0,
       )
       Result
         .assert(math.abs(card.totalCostUsd - 5.0) < 1e-9)
         .log(s"cost=${card.totalCostUsd} (expected 5.0 from OpusPremium input rate)")
+    }
+
+  /* Opus 5.5 input is 4.0 $/MTok. Fast mode (2x) and US-only inference
+   * (1.1x) stack to 8.8 $/MTok. */
+  def testFastUsModifiers: Property =
+    for { _ <- Gen.constant(()).forAll } yield {
+      val card = AnatomyCost.fromUsage(
+        "claude-opus-5-5",
+        "1.0",
+        inputTokens = 1000000,
+        cacheRead = 0,
+        cacheWrite5m = 0,
+        cacheWrite1h = 0,
+        outputTokens = 0,
+        speed = Speed.Fast,
+        inferenceGeo = InferenceGeo.Us,
+        webSearches = 0,
+      )
+      Result
+        .assert(math.abs(card.totalCostUsd - 8.8) < 1e-9)
+        .log(s"cost=${card.totalCostUsd} (expected 8.8 from 4.0 x 2 x 1.1)")
+        .and(Result.assert(card.speed == Speed.Fast).log(s"speed=${card.speed}"))
+        .and(Result.assert(card.inferenceGeo == InferenceGeo.Us).log(s"inferenceGeo=${card.inferenceGeo}"))
+    }
+
+  /* 3 searches at $0.01 each. The token segments stay as they are. */
+  def testWebSearchCost: Property =
+    for { _ <- Gen.constant(()).forAll } yield {
+      val card = AnatomyCost.fromUsage(
+        "claude-haiku-4-5-20251001",
+        "1.0",
+        inputTokens = 0,
+        cacheRead = 0,
+        cacheWrite5m = 0,
+        cacheWrite1h = 0,
+        outputTokens = 0,
+        speed = Speed.Standard,
+        inferenceGeo = InferenceGeo.Global,
+        webSearches = 3,
+      )
+      Result
+        .assert(math.abs(card.totalCostUsd - 0.03) < 1e-9)
+        .log(s"cost=${card.totalCostUsd} (expected 0.03)")
+        .and(Result.assert(card.webSearches == 3).log(s"webSearches=${card.webSearches}"))
+        .and(Result.assert(card.segments.size == 4).log(s"segments=${card.segments.size}"))
     }
 }

@@ -41,8 +41,8 @@ object JsonIndentSpec extends Properties {
     for {
       width <- genWidth.log("width")
     } yield {
-      val one = " " * width
-      val two = " " * (width * 2)
+      val one  = " " * width
+      val two  = " " * (width * 2)
       val text = doc(
         "{",
         s"""$one"env": {""",

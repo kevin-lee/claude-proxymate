@@ -1,6 +1,6 @@
 package claudeproxymate.renderer.analysis
 
-import claudeproxymate.renderer.detail.ModelTier
+import claudeproxymate.renderer.detail.{InferenceGeo, ModelTier, Speed}
 
 /** One colored slice of the cost breakdown. */
 final case class CostSegment(label: String, tokens: Int, costUsd: Double, color: String)
@@ -18,12 +18,18 @@ final case class CostCard(
   segments: List[CostSegment],
   totalCostUsd: Double,
   estTokens: Int,
+  speed: Speed,
+  inferenceGeo: InferenceGeo,
+  webSearches: Int,
+  webSearchCostUsd: Double,
 )
 
 /** Pure cost-card assembly. Reuses [[ModelTier]] pricing; no DOM, no
   * `js.Dynamic`, so it is unit-testable.
   *
-  * Replicates the math in `DetailView.buildUsageTokenPill`.
+  * Replicates the math in `DetailView.buildUsageTokenPill`. Web search cost
+  * is added to the total but kept out of the segments, because the segment
+  * bar is sized by token count and a search count does not belong in it.
   */
 object AnatomyCost {
 
@@ -35,8 +41,11 @@ object AnatomyCost {
     cacheWrite5m: Int,
     cacheWrite1h: Int,
     outputTokens: Int,
+    speed: Speed,
+    inferenceGeo: InferenceGeo,
+    webSearches: Int,
   ): CostCard = {
-    val rates    = ModelTier.forModel(model).rates
+    val rates    = ModelTier.forModel(model).ratesFor(speed, inferenceGeo)
     val totalIn  = inputTokens + cacheRead + cacheWrite5m + cacheWrite1h
     val cachePct = if (totalIn > 0) math.round(cacheRead.toDouble / totalIn * 100).toInt else 0
 
@@ -47,6 +56,7 @@ object AnatomyCost {
     val cacheWrite5mCost = cost(cacheWrite5m, rates.cacheWrite5m)
     val cacheWrite1hCost = cost(cacheWrite1h, rates.cacheWrite1h)
     val outputCost       = cost(outputTokens, rates.output)
+    val webSearchCost    = ModelTier.webSearchCost(webSearches)
 
     /* Without a 1h write there is nothing to disambiguate, so the segment
      * keeps the plain "Cache Write" label it has always had. */
@@ -73,8 +83,12 @@ object AnatomyCost {
       outputTokens = outputTokens,
       cacheHitPct = cachePct,
       segments = segments,
-      totalCostUsd = uncachedCost + cacheReadCost + cacheWrite5mCost + cacheWrite1hCost + outputCost,
+      totalCostUsd = uncachedCost + cacheReadCost + cacheWrite5mCost + cacheWrite1hCost + outputCost + webSearchCost,
       estTokens = 0,
+      speed = speed,
+      inferenceGeo = inferenceGeo,
+      webSearches = webSearches,
+      webSearchCostUsd = webSearchCost,
     )
   }
 
@@ -89,5 +103,9 @@ object AnatomyCost {
       segments = Nil,
       totalCostUsd = 0.0,
       estTokens = estTokens,
+      speed = Speed.Standard,
+      inferenceGeo = InferenceGeo.Global,
+      webSearches = 0,
+      webSearchCostUsd = 0.0,
     )
 }

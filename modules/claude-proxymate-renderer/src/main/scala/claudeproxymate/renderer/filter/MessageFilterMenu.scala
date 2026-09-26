@@ -213,7 +213,8 @@ object MessageFilterMenu {
    */
   private def revealMenu(menu: dom.Element): Unit =
     locally {
-      val _ = menu.asInstanceOf[js.Dynamic].scrollIntoView(js.Dynamic.literal("block" -> "nearest", "inline" -> "nearest"))
+      val _ =
+        menu.asInstanceOf[js.Dynamic].scrollIntoView(js.Dynamic.literal("block" -> "nearest", "inline" -> "nearest"))
     }
 
   private def rerenderSelectionMenu(): Unit = {
