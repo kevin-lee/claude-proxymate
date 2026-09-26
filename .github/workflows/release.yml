@@ -32,7 +32,7 @@ jobs:
           distribution: temurin
           java-version: 21
 
-      - uses: sbt/setup-sbt@82da71df4e122282484a99a8d70096bc2369dbd8 # v1.5.9
+      - uses: sbt/setup-sbt@ce95da69b39609ea153bad087708da5f37366897 # v1.5.10
 
       - name: Run core tests
         run: sbt "clean; coreJVM/test; coreJS/test; proxyServer/test; renderer/test"
@@ -71,7 +71,7 @@ jobs:
           distribution: temurin
           java-version: 21
 
-      - uses: sbt/setup-sbt@82da71df4e122282484a99a8d70096bc2369dbd8 # v1.5.9
+      - uses: sbt/setup-sbt@ce95da69b39609ea153bad087708da5f37366897 # v1.5.10
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
