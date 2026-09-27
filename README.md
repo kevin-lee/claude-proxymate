@@ -277,7 +277,7 @@ modules/claude-proxymate-renderer/target/scala-3.8.4/claude-proxymate-renderer-o
 
 ### Generated assets
 
-`index.html` and the runtime i18n JSON are not checked in — they're generated from Scala/properties sources at build time (and wired into `devUi` / `prodUi` / `package.sh`):
+`index.html` and the runtime i18n JSON are not checked in — they're generated from Scala/properties sources at build time (and wired into `devUi` / `prodUi`):
 
 ```bash
 sbt generateHtml   # ScalaTags → electron-app/public/index.html
@@ -287,10 +287,15 @@ sbt generateI18n   # i18n/*.properties → electron-app/public/i18n/*.json
 ### Package the Electron app (macOS DMG)
 
 ```bash
-./scripts/package.sh
+# Required for the native link (see "Build the native proxy binary")
+export SCALANATIVE_GC_TRAP_BASED_YIELDPOINTS=0
+sbt prodUi
+cd electron-app
+npm install
+npm run dist:mac
 ```
 
-This runs all build steps (native binary, electron JS, renderer JS, preload JS, copy artifacts, generate index.html, generate i18n JSON, npm install, electron-builder) and produces a DMG in `electron-app/release/`. Signing uses the Developer ID certificate from the login keychain (electron-builder auto-discovery; ad-hoc if none is present), and notarization runs when the `APPLE_ID` / `APPLE_APP_SPECIFIC_PASSWORD` / `APPLE_TEAM_ID` environment variables are set — electron-builder handles it inline (`"notarize": true`). [`scripts/notarize.sh`](scripts/notarize.sh) remains as a standalone tool for re-notarizing an existing DMG.
+`sbt prodUi` cleans, builds every module with full optimization (native binary, electron JS, preload JS, renderer JS), and assembles `electron-app/` (generated `package.json`, index.html, i18n JSON, styles and assets). `npm run dist:mac` then runs electron-builder, which produces a DMG for the host architecture in `electron-app/release/`. Signing uses the Developer ID certificate from the login keychain (electron-builder auto-discovery; ad-hoc if none is present), and notarization runs when the `APPLE_ID` / `APPLE_APP_SPECIFIC_PASSWORD` / `APPLE_TEAM_ID` environment variables are set — electron-builder handles it inline (`"notarize": true`).
 
 ### Releases (CI)
 
@@ -580,10 +585,7 @@ claude-proxymate/
 │   ├── icon.icns
 │   └── logo/                         # light/dark logo SVG variants
 └── scripts/
-    ├── package.sh                    # Full 9-step build + Electron packaging
-    ├── notarize.sh                   # macOS notarization
-    ├── update-cask.sh                # Update the cask in kevin-lee/homebrew-tap
-    └── generate-icons.sh             # Generate app icons from source art
+    └── update-cask.sh                # Update the cask in kevin-lee/homebrew-tap
 ```
 
 ## Tech Stack
