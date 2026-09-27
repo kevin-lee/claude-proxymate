@@ -311,6 +311,10 @@
     }
     .proxy-info-popover-body { font-size: 12px; color: var(--dim); line-height: 1.55; }
     .proxy-info-popover-link-row + .proxy-info-popover-link-row { margin-top: 4px; }
+    .proxy-info-popover-replay {
+      background: none; border: none; padding: 0; font: inherit;
+      color: var(--blue); text-decoration: underline; cursor: pointer;
+    }
 
     /* ── Messages view ── */
     .msg-filter {
@@ -723,63 +727,19 @@
     }
     .onboard-title { font-size: 1.3rem; font-weight: 700; margin-bottom: 8px; }
     .onboard-sub { color: var(--fg2, var(--dim)); margin-bottom: 24px; font-size: .9rem; }
-    .onboard-steps {
-      padding-left: 20px; display: flex; flex-direction: column; gap: 12px;
-      font-size: .9rem; margin-bottom: 20px; line-height: 1.5;
-    }
-    .onboard-cmd {
-      display: block; margin-top: 6px; background: var(--bg2, var(--sidebar));
-      border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px;
-      font-family: monospace; font-size: .85rem; color: var(--accent, var(--blue));
-      white-space: nowrap; overflow-x: auto;
-      user-select: all; cursor: text;
-    }
     .onboard-note { font-size: .8rem; color: var(--fg2, var(--dim)); margin-bottom: 20px; }
-
-    /* ── Onboarding Carousel ──────────────────────────────────────────── */
-    .onboard-carousel { margin-bottom: 16px; }
-    .onboard-viewport {
-      position: relative; overflow: hidden;
-      height: 400px; /* fixed = tallest slide (1432x972 @ ~640w -> ~434h, capped) */
-      border: 1px solid var(--border); border-radius: 10px;
-      background: var(--bg2, var(--sidebar));
-    }
-    .onboard-track {
-      display: flex; height: 100%;
-      transition: transform .32s ease;
-      will-change: transform;
-    }
-    .onboard-slide {
-      flex: 0 0 100%; height: 100%; box-sizing: border-box;
-      display: flex; align-items: center; justify-content: center;
-      padding: 16px;
-    }
-    .onboard-img {
-      max-width: 100%; max-height: 100%;
-      object-fit: contain; border-radius: 6px; display: block;
-    }
-    .onboard-slide.onboard-slide-text {
-      flex-direction: column; align-items: flex-start; justify-content: center; gap: 12px;
-    }
-    .onboard-s3-title { font-size: 1.05rem; font-weight: 700; }
-    .onboard-s3-body { font-size: .9rem; line-height: 1.6; }
     .onboard-nav {
       display: grid; grid-template-columns: 1fr auto 1fr;
       align-items: center; gap: 14px; margin-top: 12px;
     }
-    .onboard-nav > .onboard-arrow:first-child { justify-self: start; }
-    .onboard-nav-right { display: flex; align-items: center; justify-self: end; }
-    .onboard-arrow {
-      background: none; border: 1px solid var(--border); color: var(--text);
-      border-radius: 6px; width: 30px; height: 30px; line-height: 1;
-      font-size: 1.1rem; cursor: pointer;
-      display: flex; align-items: center; justify-content: center;
-      transition: all .15s;
+    .onboard-nav > :first-child { justify-self: start; }
+    .onboard-nav > :last-child { justify-self: end; }
+    .onboard-link-btn {
+      background: none; border: none; color: var(--dim);
+      font-size: 13px; font-weight: 600; cursor: pointer; padding: 6px 4px;
+      transition: color .15s;
     }
-    .onboard-arrow:hover { background: var(--bg2, var(--sidebar)); }
-    .onboard-arrow.is-hidden { visibility: hidden; }
-    /* In the right nav cell, next-arrow and pill are mutually exclusive — fully remove the hidden one. */
-    .onboard-nav-right .is-hidden { display: none; }
+    .onboard-link-btn:hover { color: var(--text); }
     .onboard-btn-pill {
       background: var(--accent, var(--blue)); color: #fff; border: none;
       border-radius: 8px; padding: 8px 16px;
@@ -787,12 +747,373 @@
       white-space: nowrap; transition: opacity .15s;
     }
     .onboard-btn-pill:hover { opacity: .9; }
-    .onboard-dots { display: flex; gap: 8px; align-items: center; }
-    .onboard-dot {
-      width: 8px; height: 8px; border-radius: 50%;
-      background: var(--border); cursor: pointer; transition: all .15s;
+
+    /* ── Getting Started Motion ───────────────────────────────────────── */
+    /* The stage's base (no `.gs-play`) is the static end frame, which is
+     * also the reduced-motion poster. `.gs-play` runs a 14s choreography:
+     * scene 1 (--gs-s1) Claude Code, scene 2 (--gs-s2) request through
+     * the proxy, scene 3 (--gs-s3) the app window, scene 4 (--gs-s4)
+     * the tagline. Every duration and delay is multiplied by --gs-pace
+     * (1.3: about 18s, the last animation ending at about 15.9s). Raise
+     * or lower --gs-pace to change the speed. */
+    @property --gs-tok { syntax: '<integer>'; inherits: false; initial-value: 12480; }
+    .gs-stage {
+      --gs-req: var(--blue); --gs-res: var(--green);
+      --gs-proxy: var(--orange); --gs-insight: var(--purple);
+      --gs-s1: 0s; --gs-s2: 3s; --gs-s3: 7s; --gs-s4: 11.5s; --gs-pace: 1.3;
+      position: relative; width: 608px; max-width: 100%; height: 340px;
+      overflow: hidden; border-radius: 12px;
+      border: 1px solid var(--border); background: var(--surface);
+      margin-bottom: 14px;
     }
-    .onboard-dot.active { background: var(--accent, var(--blue)); transform: scale(1.25); }
+    .gs-scene { position: absolute; inset: 0 0 64px 0; }
+
+    /* scene 1-2: terminal → proxy → api flow */
+    .gs-flow { opacity: 0; }
+    .gs-term {
+      position: absolute; left: 20px; top: 70px; width: 170px; height: 110px;
+      background: var(--bg); border: 1px solid var(--border); border-radius: 10px;
+      font-family: 'SF Mono', monospace; font-size: 12px; overflow: hidden;
+      --gs-dx: -16px; --gs-dy: 0px;
+    }
+    .gs-term-bar {
+      height: 18px; display: flex; align-items: center; gap: 5px; padding: 0 8px;
+      background: var(--surface2); border-bottom: 1px solid var(--border);
+    }
+    .gs-term-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--red); }
+    .gs-term-dot:nth-child(2) { background: var(--yellow); }
+    .gs-term-dot:nth-child(3) { background: var(--green); }
+    .gs-term-line { padding: 8px 10px 0; white-space: nowrap; overflow: hidden; color: var(--text); }
+    .gs-term-prompt { color: var(--gs-req); }
+    .gs-node {
+      position: absolute; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 2px;
+      background: var(--bg); color: var(--text);
+    }
+    .gs-node-proxy {
+      left: 250px; top: 88px; width: 120px; height: 74px;
+      border: 2px solid var(--gs-proxy); border-radius: 12px;
+    }
+    .gs-node-api {
+      left: 430px; top: 101px; width: 158px; height: 48px;
+      border: 1px solid var(--border); border-radius: 24px;
+      font-family: 'SF Mono', monospace; font-size: 12px;
+    }
+    .gs-node-name { font-size: 12px; font-weight: 700; }
+    .gs-node-api .gs-node-name { font-weight: 600; }
+    .gs-node-sub { font-size: 11px; font-family: 'SF Mono', monospace; color: var(--dim); }
+    .gs-tag {
+      position: absolute; top: -22px; left: 50%; transform: translateX(-50%);
+      font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+      color: var(--gs-proxy); background: color-mix(in srgb, var(--gs-proxy) 14%, transparent);
+      border-radius: 8px; padding: 1px 8px; white-space: nowrap; opacity: 0;
+    }
+    .gs-wire {
+      position: absolute; top: 125px; width: 60px; height: 2px;
+      background: repeating-linear-gradient(90deg, var(--dim) 0 6px, transparent 6px 10px);
+      transform-origin: left;
+    }
+    .gs-wire-a { left: 190px; }
+    .gs-wire-b { left: 370px; }
+    .gs-packet {
+      position: absolute; left: 185px; top: 121px; width: 10px; height: 10px;
+      border-radius: 50%; opacity: 0;
+    }
+    .gs-packet-req { background: var(--gs-req); box-shadow: 0 0 10px var(--gs-req); }
+    .gs-packet-res { background: var(--gs-res); box-shadow: 0 0 10px var(--gs-res); }
+
+    /* scene 3: a drawn copy of the app window */
+    .gs-scene.gs-app {
+      inset: auto; left: 20px; top: 16px; width: 568px; height: 244px;
+      background: var(--bg); border: 1px solid var(--border); border-radius: 10px;
+      overflow: hidden; opacity: .35; transform-origin: 51% 45%;
+    }
+    .gs-app-bar {
+      height: 34px; display: flex; align-items: center; gap: 10px; padding: 0 10px;
+      background: var(--surface); border-bottom: 1px solid var(--border);
+    }
+    .gs-app-stop {
+      font-size: 11px; font-weight: 600; color: var(--red); background: var(--bg);
+      border: 1px solid color-mix(in srgb, var(--red) 45%, transparent);
+      border-radius: 6px; padding: 3px 9px; white-space: nowrap;
+    }
+    .gs-app-cmd {
+      flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      font-family: 'SF Mono', monospace; font-size: 10.5px; color: var(--text);
+      background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px;
+    }
+    .gs-app-body { display: flex; height: calc(100% - 34px); }
+    .gs-app-list {
+      width: 180px; flex-shrink: 0; display: flex; flex-direction: column;
+      background: var(--surface); border-right: 1px solid var(--border);
+    }
+    .gs-app-list-head {
+      font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+      color: var(--dim); padding: 7px 10px; border-bottom: 1px solid var(--border);
+    }
+    .gs-app-row {
+      padding: 7px; border-bottom: 1px solid var(--border);
+      border-left: 3px solid transparent; font-size: 10.5px;
+    }
+    .gs-app-row-1 {
+      background: color-mix(in srgb, var(--gs-req) 14%, transparent);
+      border-left-color: var(--gs-req);
+    }
+    .gs-app-method {
+      font-size: 9.5px; font-weight: 700; font-family: 'SF Mono', monospace;
+      color: var(--green); margin-right: 5px;
+    }
+    .gs-app-path { font-family: 'SF Mono', monospace; font-size: 10px; color: var(--text); }
+    .gs-app-model { font-size: 9.5px; color: var(--dim); margin-top: 2px; }
+    .gs-app-detail { flex: 1; position: relative; display: flex; flex-direction: column; }
+    .gs-app-tabs {
+      display: flex; gap: 4px; padding: 6px 10px;
+      background: var(--surface); border-bottom: 1px solid var(--border);
+    }
+    .gs-app-tab {
+      padding: 2px 8px; font-size: 11px; border-radius: 4px;
+      border: 1px solid transparent; color: var(--dim);
+    }
+    .gs-app-tab-4 {
+      background: var(--surface2); border-color: var(--border);
+      color: var(--gs-insight); font-weight: 600;
+    }
+    .gs-app-bubble {
+      width: 62%; margin: 10px 12px 0; padding: 8px 10px; border-radius: 8px;
+      display: flex; flex-direction: column; gap: 5px;
+    }
+    .gs-app-bubble-user {
+      margin-left: auto; transform-origin: right;
+      background: color-mix(in srgb, var(--gs-req) 12%, transparent);
+    }
+    .gs-app-bubble-assistant {
+      transform-origin: left;
+      background: var(--surface); border: 1px solid var(--border);
+    }
+    .gs-app-line {
+      display: block; height: 6px; border-radius: 3px; width: 90%;
+      background: color-mix(in srgb, var(--text) 22%, transparent);
+    }
+    .gs-app-line:nth-child(2) { width: 70%; }
+    .gs-app-line:nth-child(3) { width: 55%; }
+    .gs-app-meter {
+      position: absolute; right: 12px; bottom: 10px;
+      display: flex; align-items: baseline; gap: 5px; font-size: 10px; color: var(--dim);
+    }
+    .gs-app-tokens {
+      counter-reset: gs-tok var(--gs-tok);
+      font-size: 16px; font-weight: 700; color: var(--gs-insight);
+      font-variant-numeric: tabular-nums;
+    }
+    .gs-app-tokens::before { content: counter(gs-tok); }
+
+    /* captions */
+    .gs-caps { position: absolute; left: 0; right: 0; bottom: 0; height: 64px; }
+    /* Block (not flex) so the spaces around the <b> keyword survive; the
+     * standalone `translate` centers it without fighting the keyframes'
+     * `transform`. */
+    .gs-cap {
+      position: absolute; left: 0; right: 0; top: 50%; translate: 0 -50%;
+      padding: 0 24px; text-align: center;
+      font-size: 17px; font-weight: 700; line-height: 1.35; color: var(--text);
+    }
+    .gs-cap-1, .gs-cap-2, .gs-cap-3 { opacity: 0; }
+    .gs-cap-1 b { color: var(--gs-req); }
+    .gs-cap-2 b { color: var(--gs-proxy); }
+    .gs-cap-3 b { color: var(--gs-insight); }
+    .gs-cap-4 { font-size: 19px; }
+
+    /* timeline */
+    .gs-stage.gs-play .gs-flow { animation: gsSceneOut calc(7.5s * var(--gs-pace)) linear calc(var(--gs-s1) * var(--gs-pace)) both; }
+    .gs-stage.gs-play .gs-term { animation: gsFadeUp calc(.5s * var(--gs-pace)) ease-out calc(var(--gs-s1) * var(--gs-pace)) both; }
+    .gs-stage.gs-play .gs-cap-1 {
+      animation: gsFadeUp calc(.45s * var(--gs-pace)) ease-out calc((var(--gs-s1) + .3s) * var(--gs-pace)) both,
+                 gsFadeOut calc(.3s * var(--gs-pace)) ease-in calc((var(--gs-s1) + 2.8s) * var(--gs-pace)) forwards;
+    }
+    .gs-stage.gs-play .gs-term-cmd { animation: gsReveal calc(.5s * var(--gs-pace)) ease-out calc((var(--gs-s1) + .6s) * var(--gs-pace)) both; }
+    .gs-stage.gs-play .gs-term-prompt { animation: gsReveal calc(1s * var(--gs-pace)) linear calc((var(--gs-s1) + 1.2s) * var(--gs-pace)) both; }
+    .gs-stage.gs-play .gs-node-proxy {
+      animation: gsPop calc(.4s * var(--gs-pace)) cubic-bezier(.34,1.56,.64,1) calc(var(--gs-s2) * var(--gs-pace)) both,
+                 gsRing calc(.8s * var(--gs-pace)) ease-out calc((var(--gs-s2) + 1.8s) * var(--gs-pace));
+    }
+    .gs-stage.gs-play .gs-node-api { animation: gsPop calc(.4s * var(--gs-pace)) cubic-bezier(.34,1.56,.64,1) calc((var(--gs-s2) + .2s) * var(--gs-pace)) both; }
+    .gs-stage.gs-play .gs-wire-a { animation: gsDraw calc(.35s * var(--gs-pace)) ease-out calc((var(--gs-s2) + .3s) * var(--gs-pace)) both; }
+    .gs-stage.gs-play .gs-wire-b { animation: gsDraw calc(.35s * var(--gs-pace)) ease-out calc((var(--gs-s2) + .5s) * var(--gs-pace)) both; }
+    .gs-stage.gs-play .gs-cap-2 {
+      animation: gsFadeUp calc(.45s * var(--gs-pace)) ease-out calc((var(--gs-s2) + .2s) * var(--gs-pace)) both,
+                 gsFadeOut calc(.3s * var(--gs-pace)) ease-in calc((var(--gs-s3) - .2s) * var(--gs-pace)) forwards;
+    }
+    .gs-stage.gs-play .gs-packet-req { animation: gsPacketReq calc(1.6s * var(--gs-pace)) ease-in-out calc((var(--gs-s2) + 1s) * var(--gs-pace)) both; }
+    .gs-stage.gs-play .gs-tag { animation: gsTag calc(1.8s * var(--gs-pace)) ease-out calc((var(--gs-s2) + 1.8s) * var(--gs-pace)) both; }
+    .gs-stage.gs-play .gs-packet-res { animation: gsPacketRes calc(1.2s * var(--gs-pace)) ease-in-out calc((var(--gs-s2) + 2.8s) * var(--gs-pace)) both; }
+    .gs-stage.gs-play .gs-app {
+      animation: gsZoomIn calc(.6s * var(--gs-pace)) ease-out calc((var(--gs-s3) + .2s) * var(--gs-pace)) both,
+                 gsDim calc(.5s * var(--gs-pace)) ease calc(var(--gs-s4) * var(--gs-pace)) forwards;
+    }
+    .gs-stage.gs-play .gs-cap-3 {
+      animation: gsFadeUp calc(.45s * var(--gs-pace)) ease-out calc((var(--gs-s3) + .4s) * var(--gs-pace)) both,
+                 gsFadeOut calc(.3s * var(--gs-pace)) ease-in calc((var(--gs-s4) - .2s) * var(--gs-pace)) forwards;
+    }
+    .gs-stage.gs-play .gs-app-row-1 {
+      animation: gsRowIn calc(.3s * var(--gs-pace)) ease-out calc((var(--gs-s3) + .9s) * var(--gs-pace)) both,
+                 gsTabOn calc(.3s * var(--gs-pace)) ease calc((var(--gs-s3) + 1.9s) * var(--gs-pace)) both;
+    }
+    .gs-stage.gs-play .gs-app-row-2 { animation: gsRowIn calc(.3s * var(--gs-pace)) ease-out calc((var(--gs-s3) + 1.2s) * var(--gs-pace)) both; }
+    .gs-stage.gs-play .gs-app-row-3 { animation: gsRowIn calc(.3s * var(--gs-pace)) ease-out calc((var(--gs-s3) + 1.5s) * var(--gs-pace)) both; }
+    .gs-stage.gs-play .gs-app-tab-1 { animation: gsTabFlash calc(.35s * var(--gs-pace)) ease calc((var(--gs-s3) + 2.1s) * var(--gs-pace)); }
+    .gs-stage.gs-play .gs-app-tab-2 { animation: gsTabFlash calc(.35s * var(--gs-pace)) ease calc((var(--gs-s3) + 2.35s) * var(--gs-pace)); }
+    .gs-stage.gs-play .gs-app-tab-3 { animation: gsTabFlash calc(.35s * var(--gs-pace)) ease calc((var(--gs-s3) + 2.6s) * var(--gs-pace)); }
+    .gs-stage.gs-play .gs-app-tab-4 { animation: gsTabOn calc(.3s * var(--gs-pace)) ease calc((var(--gs-s3) + 2.85s) * var(--gs-pace)) both; }
+    .gs-stage.gs-play .gs-app-bubble-user { animation: gsGrow calc(.4s * var(--gs-pace)) ease-out calc((var(--gs-s3) + 2.3s) * var(--gs-pace)) both; }
+    .gs-stage.gs-play .gs-app-bubble-assistant { animation: gsGrow calc(.4s * var(--gs-pace)) ease-out calc((var(--gs-s3) + 2.5s) * var(--gs-pace)) both; }
+    .gs-stage.gs-play .gs-app-tokens { animation: gsCount calc(1.3s * var(--gs-pace)) ease-out calc((var(--gs-s3) + 3s) * var(--gs-pace)) both; }
+    .gs-stage.gs-play .gs-cap-4 { animation: gsTagline calc(.5s * var(--gs-pace)) ease-out calc((var(--gs-s4) + .2s) * var(--gs-pace)) both; }
+
+    @keyframes gsSceneOut {
+      0% { opacity: 0; transform: scale(1); }
+      6.67% { opacity: 1; }
+      93.33% { opacity: 1; transform: scale(1); }
+      100% { opacity: 0; transform: scale(.96); }
+    }
+    @keyframes gsFadeUp {
+      from { opacity: 0; transform: translate(var(--gs-dx, 0px), var(--gs-dy, 12px)); }
+      to { opacity: 1; transform: translate(0, 0); }
+    }
+    @keyframes gsFadeOut { from { opacity: 1; } to { opacity: 0; } }
+    @keyframes gsReveal {
+      from { clip-path: inset(0 100% 0 0); }
+      to { clip-path: inset(0 0 0 0); }
+    }
+    @keyframes gsPop {
+      from { opacity: 0; transform: scale(.6); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    @keyframes gsDraw { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+    @keyframes gsPacketReq {
+      0% { opacity: 0; transform: translateX(0); }
+      6% { opacity: 1; }
+      50% { transform: translateX(125px); }
+      56.25% { transform: translateX(125px); }
+      92% { opacity: 1; }
+      100% { opacity: 0; transform: translateX(315px); }
+    }
+    @keyframes gsPacketRes {
+      0% { opacity: 0; transform: translateX(315px); }
+      6% { opacity: 1; }
+      50% { transform: translateX(125px); }
+      92% { opacity: 1; }
+      100% { opacity: 0; transform: translateX(0); }
+    }
+    @keyframes gsTag {
+      0% { opacity: 0; transform: translate(-50%, 6px) scale(.8); }
+      15% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+      85% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+      100% { opacity: 0; transform: translate(-50%, 0) scale(1); }
+    }
+    @keyframes gsRing {
+      from { box-shadow: 0 0 0 0 color-mix(in srgb, var(--gs-proxy) 55%, transparent); }
+      to { box-shadow: 0 0 0 14px color-mix(in srgb, var(--gs-proxy) 0%, transparent); }
+    }
+    @keyframes gsZoomIn {
+      from { opacity: 0; transform: scale(.6); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    @keyframes gsRowIn {
+      from { opacity: 0; transform: translateY(-8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes gsTabFlash {
+      50% { background: var(--surface2); border-color: var(--border); color: var(--text); }
+    }
+    @keyframes gsTabOn {
+      from { background-color: transparent; border-color: transparent; color: var(--dim); }
+    }
+    @keyframes gsGrow {
+      from { opacity: 0; transform: scaleX(0); }
+      to { opacity: 1; transform: scaleX(1); }
+    }
+    @keyframes gsCount { from { --gs-tok: 0; } to { --gs-tok: 12480; } }
+    @keyframes gsDim { from { opacity: 1; } to { opacity: .35; } }
+    @keyframes gsTagline {
+      from { opacity: 0; transform: scale(.92); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    /* ── Getting Started Tour ─────────────────────────────────────────── */
+    .tour-layer { position: fixed; inset: 0; z-index: 1100; -webkit-app-region: no-drag; }
+    .tour-spot {
+      position: fixed; border-radius: 10px; pointer-events: none;
+      box-shadow: 0 0 0 9999px rgba(0,0,0,.55);
+      outline: 2px solid var(--orange); outline-offset: 2px;
+      transition: left .3s ease, top .3s ease, width .3s ease, height .3s ease;
+    }
+    .tour-spot::after {
+      content: ''; position: absolute; inset: -2px; border-radius: inherit;
+      border: 2px solid var(--orange);
+      animation: gsSpotRing 1.6s ease-out infinite;
+    }
+    @keyframes gsSpotRing {
+      from { inset: -2px; opacity: .8; }
+      to { inset: -10px; opacity: 0; }
+    }
+    .tour-callout {
+      position: fixed; left: 0; top: 0; width: 300px;
+      background: var(--bg); color: var(--text);
+      border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px;
+      box-shadow: 0 12px 32px rgba(0,0,0,.28);
+      transition: left .3s ease, top .3s ease;
+      animation: popFadeIn .15s ease-out;
+    }
+    .tour-callout::before {
+      content: ''; position: absolute; width: 12px; height: 12px;
+      background: var(--bg); border: 1px solid var(--border); transform: rotate(45deg);
+    }
+    .tour-callout--below::before {
+      top: -7px; left: calc(var(--tour-arrow, 50%) - 6px);
+      border-right: none; border-bottom: none;
+    }
+    .tour-callout--above::before {
+      bottom: -7px; left: calc(var(--tour-arrow, 50%) - 6px);
+      border-left: none; border-top: none;
+    }
+    .tour-callout--right::before {
+      left: -7px; top: calc(var(--tour-arrow, 50%) - 6px);
+      border-top: none; border-right: none;
+    }
+    .tour-callout--left::before {
+      right: -7px; top: calc(var(--tour-arrow, 50%) - 6px);
+      border-bottom: none; border-left: none;
+    }
+    .tour-callout-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .tour-callout-progress { font-size: 11px; font-weight: 600; color: var(--dim); font-variant-numeric: tabular-nums; }
+    .tour-callout-skip {
+      background: none; border: none; color: var(--dim);
+      font-size: 12px; font-weight: 600; cursor: pointer; padding: 0;
+      transition: color .15s;
+    }
+    .tour-callout-skip:hover { color: var(--text); }
+    .tour-callout-title { font-size: 15px; font-weight: 700; margin: 6px 0; }
+    .tour-callout-body { font-size: 13px; line-height: 1.55; }
+    .tour-callout-actions { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 12px; }
+    .tour-callout-back {
+      background: none; border: 1px solid var(--border); color: var(--text);
+      border-radius: 8px; padding: 7px 14px; font-size: .85rem; cursor: pointer;
+    }
+    .tour-callout-back:hover { background: var(--surface); }
+
+    /* "your turn" pulse on the real Start Proxy button after onboarding */
+    .addr-start.gs-nudge { animation: gsNudge 1.6s ease-in-out infinite; }
+    @keyframes gsNudge {
+      from { box-shadow: 0 0 0 0 color-mix(in srgb, var(--blue) 55%, transparent); }
+      to { box-shadow: 0 0 0 7px color-mix(in srgb, var(--blue) 0%, transparent); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .gs-stage, .gs-stage *, .tour-spot, .tour-spot::after, .tour-callout, .addr-start.gs-nudge {
+        animation: none !important; transition: none !important;
+      }
+      .addr-start.gs-nudge { box-shadow: 0 0 0 3px color-mix(in srgb, var(--blue) 45%, transparent); }
+    }
 
     /* ── Dark Theme (Atom One Dark) ─────────────────────────────────────── */
     [data-theme="dark"] {

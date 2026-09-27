@@ -39,11 +39,15 @@ object RendererMain {
     locally {
       val _ = I18n
         .loadLocales()
-        .`then`[Unit] { (_: Unit) => I18n.applyI18n() }
+        .`then`[Unit] { (_: Unit) =>
+          I18n.applyI18n()
+          Onboarding.showIfNeeded()
+        }
         .asInstanceOf[js.Dynamic]
         .`catch`({ (_: Any) =>
           // If fetch fails (e.g. files not yet generated), HTML already has Korean defaults
           I18n.applyI18n()
+          Onboarding.showIfNeeded()
         }: js.Function1[Any, Unit])
     }
     showProxyUi()
@@ -69,7 +73,6 @@ object RendererMain {
     RouteControl.render()
     RequestFilterSheet.install()
     RequestFilterSheet.loadConfig()
-    Onboarding.showIfNeeded()
   }
 
   /** Wire the status-bar mask switch to PresenterMode.toggle.
@@ -101,48 +104,51 @@ object RendererMain {
       .addEventListener(
         "keydown",
         { (e: dom.KeyboardEvent) =>
-          // Cmd+F / Ctrl+F: focus search input
-          if ((e.metaKey || e.ctrlKey) && e.key === "f") {
-            val proxyInp = dom.document.getElementById(HtmlIds.ProxyDetailSearchInput)
-            val msgInp   = dom.document.getElementById(HtmlIds.MsgSearchInput)
-            val target   = if (proxyInp != null) proxyInp else msgInp
-            if (target != null) {
-              e.preventDefault()
-              target.asInstanceOf[dom.html.Input].focus()
-              target.asInstanceOf[dom.html.Input].select()
+          /* Onboarding owns the keyboard while it runs (the app is inert). */
+          if (!Onboarding.isActive) {
+            // Cmd+F / Ctrl+F: focus search input
+            if ((e.metaKey || e.ctrlKey) && e.key === "f") {
+              val proxyInp = dom.document.getElementById(HtmlIds.ProxyDetailSearchInput)
+              val msgInp   = dom.document.getElementById(HtmlIds.MsgSearchInput)
+              val target   = if (proxyInp != null) proxyInp else msgInp
+              if (target != null) {
+                e.preventDefault()
+                target.asInstanceOf[dom.html.Input].focus()
+                target.asInstanceOf[dom.html.Input].select()
+              }
             }
-          }
-          // Escape: clear search
-          if (e.key === "Escape") {
-            val proxyInp = dom.document.getElementById(HtmlIds.ProxyDetailSearchInput)
-            val msgInp   = dom.document.getElementById(HtmlIds.MsgSearchInput)
-            if (proxyInp != null && dom.document.activeElement == proxyInp && AppState.proxyDetailSearch.nonEmpty) {
-              SearchNavigation.setProxyDetailSearch("")
-            } else if (msgInp != null && dom.document.activeElement == msgInp && AppState.msgSearchQuery.nonEmpty) {
-              MessageRenderer.setMsgSearch("")
+            // Escape: clear search
+            if (e.key === "Escape") {
+              val proxyInp = dom.document.getElementById(HtmlIds.ProxyDetailSearchInput)
+              val msgInp   = dom.document.getElementById(HtmlIds.MsgSearchInput)
+              if (proxyInp != null && dom.document.activeElement == proxyInp && AppState.proxyDetailSearch.nonEmpty) {
+                SearchNavigation.setProxyDetailSearch("")
+              } else if (msgInp != null && dom.document.activeElement == msgInp && AppState.msgSearchQuery.nonEmpty) {
+                MessageRenderer.setMsgSearch("")
+              }
             }
-          }
-          // Cmd+Shift+M / Ctrl+Shift+M: toggle presenter mode (C3 PR 5).
-          // Some browsers report shifted letters in upper case, others
-          // pass the unshifted key; check both. Doesn't collide with
-          // Electron's Cmd+M ("Minimize") because the shifted variant
-          // is free.
-          if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === "M" || e.key === "m")) {
-            e.preventDefault()
-            PresenterMode.toggle()
-          }
-          // Enter / Shift+Enter: navigate search matches.
-          // Triggers from either the proxy detail search input (Request /
-          // Response / Analysis) or the messages-tab search input.
-          if (e.key === "Enter") {
-            val proxyInp = dom.document.getElementById(HtmlIds.ProxyDetailSearchInput)
-            val msgInp   = dom.document.getElementById(HtmlIds.MsgSearchInput)
-            val active   = dom.document.activeElement
-            val onProxy  = proxyInp != null && active == proxyInp
-            val onMsg    = msgInp != null && active == msgInp
-            if (onProxy || onMsg) {
+            // Cmd+Shift+M / Ctrl+Shift+M: toggle presenter mode (C3 PR 5).
+            // Some browsers report shifted letters in upper case, others
+            // pass the unshifted key; check both. Doesn't collide with
+            // Electron's Cmd+M ("Minimize") because the shifted variant
+            // is free.
+            if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === "M" || e.key === "m")) {
               e.preventDefault()
-              SearchNavigation.navigateSearchMatch(if (e.shiftKey) -1 else 1)
+              PresenterMode.toggle()
+            }
+            // Enter / Shift+Enter: navigate search matches.
+            // Triggers from either the proxy detail search input (Request /
+            // Response / Analysis) or the messages-tab search input.
+            if (e.key === "Enter") {
+              val proxyInp = dom.document.getElementById(HtmlIds.ProxyDetailSearchInput)
+              val msgInp   = dom.document.getElementById(HtmlIds.MsgSearchInput)
+              val active   = dom.document.activeElement
+              val onProxy  = proxyInp != null && active == proxyInp
+              val onMsg    = msgInp != null && active == msgInp
+              if (onProxy || onMsg) {
+                e.preventDefault()
+                SearchNavigation.navigateSearchMatch(if (e.shiftKey) -1 else 1)
+              }
             }
           }
         }
