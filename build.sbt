@@ -421,19 +421,19 @@ lazy val props = new {
 
   val CatsVersion = "2.13.0"
 
-  val CatsEffectVersion = "3.7.0"
+  val CatsEffectVersion = "3.7.1"
 
   val KittensVersion = "3.5.0"
 
-  val Http4sVersion = "0.23.34"
+  val Http4sVersion = "0.23.37"
 
-  val Fs2Version = "3.13.0"
+  val Fs2Version = "3.14.0"
 
   val ScalaJsDomVersion = "2.8.1"
 
-  val HedgehogVersion = "0.13.1"
+  val HedgehogVersion = "0.15.0"
 
-  val MunitVersion = "1.3.3"
+  val MunitVersion = "1.3.6"
 
   val ScalatagsVersion = "0.13.1"
 
