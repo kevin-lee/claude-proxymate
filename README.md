@@ -110,18 +110,18 @@ opening one of those:
 
 The project is split into five modules:
 
-| Module                      | Platform          | Purpose                                                                                                                                                                                                                                                                                                                                                                      |
-|-----------------------------|-------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `claude-proxymate-core`     | JVM / JS / Native | Shared cross-compiled core: data models, JSON codecs, SSE parser, CLAUDE.md parser, mechanism detector, Request Anatomy, masking primitives (sensitive keys, token/correlation-id patterns, query-param mask), IPC channel & HTML element ID constants, JSON-line protocol. The **JVM** side additionally generates `index.html` (ScalaTags) and the i18n JSON at build time |
-| `claude-proxymate-server`   | Scala Native      | HTTP proxy binary. Intercepts requests, forwards to Anthropic, tees the response, emits events as JSON lines on stdout. Default TLS backend is libcurl via FFI (`CurlMain`); an http4s Ember / s2n backend (`Main`) is available as a fallback                                                                                                                               |
-| `claude-proxymate-electron` | Scala.js          | Electron main process. Spawns the native proxy, reads its stdout, forwards events to the renderer UI via IPC                                                                                                                                                                                                                                                                 |
-| `claude-proxymate-preload`  | Scala.js          | Electron preload bridge. Exposes IPC channels to the renderer via `contextBridge`                                                                                                                                                                                                                                                                                            |
-| `claude-proxymate-renderer` | Scala.js          | Electron renderer UI. All frontend logic: i18n, theme, JSON tree viewer, message parsing, analysis, masking, search, and more. Built on a testable **View/logic split** (pure ScalaTags `*View` modules render to strings; sibling modules wire them to the DOM)                                                                                                             |
+| Module                      | Platform          | Purpose                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+|-----------------------------|-------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `claude-proxymate-core`     | JVM / JS / Native | Shared cross-compiled core: data models, JSON codecs, SSE parser, CLAUDE.md parser, mechanism detector, Request Anatomy, Request Filter (`filter/`: config model and the `messages[]` rewrite shared by the proxy and the renderer preview), masking primitives (sensitive keys, token/correlation-id patterns, query-param mask), IPC channel & HTML element ID constants, JSON-line protocol. The **JVM** side additionally generates `index.html` (ScalaTags) and the i18n JSON at build time |
+| `claude-proxymate-server`   | Scala Native      | HTTP proxy binary. Intercepts requests, forwards to Anthropic, tees the response, emits events as JSON lines on stdout. Default TLS backend is libcurl via FFI (`CurlMain`); an http4s Ember / s2n backend (`Main`) is available as a fallback                                                                                                                                                                                                                                                   |
+| `claude-proxymate-electron` | Scala.js          | Electron main process. Spawns the native proxy, reads its stdout, forwards events to the renderer UI via IPC                                                                                                                                                                                                                                                                                                                                                                                     |
+| `claude-proxymate-preload`  | Scala.js          | Electron preload bridge. Exposes IPC channels to the renderer via `contextBridge`                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `claude-proxymate-renderer` | Scala.js          | Electron renderer UI. All frontend logic: i18n, theme, JSON tree viewer, message parsing, analysis, masking, search, and more. Built on a testable **View/logic split** (pure ScalaTags `*View` modules render to strings; sibling modules wire them to the DOM)                                                                                                                                                                                                                                 |
 
 Dependency graph:
 
 ```
-              core (JVM, JS, Native)
+             core (JVM, JS, Native)
             /     |      |        \
   server(Native) electron(JS) preload(JS) renderer(JS)
 ```
@@ -212,21 +212,22 @@ sbt compile
 
 ### Run tests
 
-Tests are written with [hedgehog](https://github.com/hedgehogqa/scala-hedgehog) (property-based) on the JVM and Scala.js, and [munit](https://scalameta.org/munit/) on Scala Native (the hedgehog test runner hangs on SN 0.5, so the Native platform runs deterministic munit ports of the shared core specs). 49 spec files in total.
+Tests are written with [hedgehog](https://github.com/hedgehogqa/scala-hedgehog) (property-based) on the JVM and Scala.js, and [munit](https://scalameta.org/munit/) on Scala Native (the hedgehog test runner hangs on SN 0.5, so the Native platform runs deterministic munit ports of the shared core specs). 72 spec files in total.
 
 ```bash
 # All tests (core on JVM + JS + Native, renderer on JS, server on Native)
 sbt "coreJVM/test; coreJS/test; coreNative/test; renderer/test; proxyServer/test"
 
-# Core only — SSE/CLAUDE.md/mechanism parsers, Request Anatomy,
+# Core only — SSE/CLAUDE.md/mechanism parsers, Request Anatomy, request filter,
 #             masking primitives, JSON-line protocol, i18n loader, HTML gen
 sbt coreJVM/test
 
 # Renderer only — views, message rendering, masking copy, pricing,
-#                 JSON tree, i18n templating, presenter mode
+#                 JSON tree, i18n templating, presenter mode, request filter UI
 sbt renderer/test
 
-# Server only (munit on Native) — proxy error mapping
+# Server only (munit on Native) — command-line argument parsing,
+#             filter config loading, proxy error mapping
 sbt proxyServer/test
 ```
 
@@ -268,7 +269,7 @@ sbt preload/fastLinkJS    # or preload/fullLinkJS
 sbt renderer/fastLinkJS   # or renderer/fullLinkJS
 ```
 
-Output paths (replace `-fastopt` for `fastLinkJS`):
+Output paths for `fullLinkJS` (for `fastLinkJS`, replace `-opt` with `-fastopt`):
 ```
 modules/claude-proxymate-electron/target/scala-3.8.4/claude-proxymate-electron-opt/main.js
 modules/claude-proxymate-preload/target/scala-3.8.4/claude-proxymate-preload-opt/main.js
@@ -299,9 +300,13 @@ npm run dist:mac
 
 ### Releases (CI)
 
+Every pull request and push to `main` triggers
+[`build.yml`](.github/workflows/build.yml), which runs all tests (core on JVM,
+JS and Native, renderer, server) and an unsigned Apple Silicon DMG smoke build.
+
 Pushing a `v*` tag (or manual dispatch) triggers
-[`release.yml`](.github/workflows/release.yml), which runs the full test suite,
-then builds the app with `sbt prodUi` + electron-builder on both an Apple
+[`release.yml`](.github/workflows/release.yml), which runs the tests (all but
+`coreNative/test`, which only `build.yml` runs), then builds the app with `sbt prodUi` + electron-builder on both an Apple
 Silicon and an Intel macOS runner — each architecture must build on matching
 hardware because the Scala Native proxy binary is compiled for the host CPU —
 verifies each DMG (image integrity, single arch, matching binary
@@ -494,7 +499,9 @@ rules mid-session invalidates Claude Code's prompt cache once.
 claude-proxymate/
 ├── .github/
 │   └── workflows/
-│       └── release.yml               # CI: test → build arm64/x64 DMGs → GitHub Release → Homebrew cask on v* tags
+│       ├── build.yml                 # CI: test → unsigned arm64 DMG smoke build on PRs and pushes to main
+│       ├── release.yml               # CI: test → build arm64/x64 DMGs → GitHub Release → Homebrew tap PR on v* tags
+│       └── pr-labeler.yml            # Label PRs from .github/pr-labeler.yml
 ├── build.sbt                         # sbt build definition (props, libs, devUi/prodUi, generateHtml/generateI18n)
 ├── project/
 │   ├── build.properties              # sbt 1.12.5
@@ -523,7 +530,21 @@ claude-proxymate/
 │   │   │   ├── VsCodeEnv.scala          # Pure apply/remove decisions for VS Code settings
 │   │   │   ├── ClaudeEnv.scala          # Pure apply/remove decisions for ~/.claude/settings.json
 │   │   │   ├── IpcChannels.scala        # IPC channel name constants (single source of truth)
-│   │   │   └── HtmlIds.scala            # DOM element ID constants shared with renderer
+│   │   │   ├── HtmlIds.scala            # DOM element ID constants shared with renderer
+│   │   │   ├── SyncAction.scala         # Result of one settings-file sync, shared by main process and renderer
+│   │   │   ├── ProxyLifecycle.scala     # Main process view of the proxy child: idle / running / stopping
+│   │   │   ├── JsonIndent.scala         # Detected JSONC indentation, fed to jsonc-parser's formatting options
+│   │   │   ├── GettingStarted.scala     # Onboarding model: motion intro stages and guided-tour steps
+│   │   │   └── filter/                  # Request Filter (pure, shared by the proxy and the renderer preview)
+│   │   │       ├── FilterConfig.scala       # Config ADT: category modes, Text / Regex / Tag rules, scopes
+│   │   │       ├── FilterConfigEdits.scala  # Pure edits the filter sheet applies to its draft config
+│   │   │       ├── FilterInventory.scala    # Merge on-disk, in-traffic and saved items for the sheet
+│   │   │       ├── RequestFilter.scala      # Apply a FilterConfig to messages[] of a request body
+│   │   │       ├── FilterReport.scala       # What the filter removed from one request
+│   │   │       ├── ReminderBlocks.scala     # Split user text into typed text and injected blocks
+│   │   │       ├── ContentsSections.scala   # Locate and remove `Contents of …` sections
+│   │   │       ├── SkillsList.scala         # Parse and edit the skills reminder
+│   │   │       └── TextRules.scala          # Compile and apply Text / Regex / Tag rules
 │   │   └── jvm/src/main/scala/claudeproxymate/core/
 │   │       ├── IndexHtmlGenerator.scala     # ScalaTags-based index.html generator
 │   │       ├── IndexHtmlGeneratorMain.scala # CLI entry point for build-time HTML generation
@@ -538,7 +559,13 @@ claude-proxymate/
 │   │       ├── CurlHttpClient.scala      # http4s Client[IO] backed by libcurl's easy API
 │   │       ├── LibCurl.scala             # libcurl FFI bindings
 │   │       ├── ProxyErrorHttp4s.scala    # http4s status/entity mapping for ProxyError
-│   │       └── EventEmitter.scala        # Emit ProxyEvent JSON lines to stdout
+│   │       ├── EventEmitter.scala        # Emit ProxyEvent JSON lines to stdout
+│   │       ├── PortArg.scala             # `--port` parsing
+│   │       ├── FilterConfigArg.scala     # `--filter-config` parsing
+│   │       ├── FilterConfigLoader.scala  # Re-read the filter config on every request
+│   │       ├── ParentLinkArg.scala       # `--exit-on-stdin-close` parsing
+│   │       ├── ParentLink.scala          # Whether the process is tied to a parent holding its stdin
+│   │       └── ParentWatch.scala         # Exit when the parent's stdin pipe closes
 │   ├── claude-proxymate-electron/        # Scala.js only
 │   │   └── src/main/scala/claudeproxymate/electron/
 │   │       ├── ElectronMain.scala        # BrowserWindow, app lifecycle, IPC, hardening
@@ -547,6 +574,9 @@ claude-proxymate/
 │   │       ├── SyncFileOps.scala         # Shared backup → write → verify → restore protocol + ownership record
 │   │       ├── VsCodeSync.scala          # VS Code-family settings.json backend
 │   │       ├── ClaudeSettingsSync.scala  # ~/.claude/settings.json (env object) backend
+│   │       ├── StopOutcome.scala         # Whether stopping the proxy has to wait for the child to exit
+│   │       ├── RequestFilterStore.scala  # <userData>/request-filter.json read/validate/write
+│   │       ├── ClaudeInventoryScan.scala # List rules, docs and skills under ~/.claude for the filter sheet
 │   │       ├── Analytics.scala           # GA4 integration
 │   │       ├── Config.scala              # Environment variable access
 │   │       └── facades/                  # @js.native Electron & Node.js facades
@@ -571,6 +601,7 @@ claude-proxymate/
 │           ├── analysis/                     # Analysis tab, Request Anatomy, mechanism chips
 │           ├── detail/                       # Detail view, pricing, token popover
 │           ├── copy/                         # CopyUtil, MaskedCopy (WYSIWYG clipboard)
+│           ├── filter/                       # Request Filter sheet, Messages tab badge/selection menus, filter bar
 │           ├── update/                       # GitHub release update check
 │           └── onboarding/                   # First-run Getting Started (motion intro + guided tour)
 │           # convention: each *View.scala renders ScalaTags to a string and is unit-tested;
