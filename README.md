@@ -305,8 +305,8 @@ Every pull request and push to `main` triggers
 JS and Native, renderer, server) and an unsigned Apple Silicon DMG smoke build.
 
 Pushing a `v*` tag (or manual dispatch) triggers
-[`release.yml`](.github/workflows/release.yml), which runs the tests (all but
-`coreNative/test`, which only `build.yml` runs), then builds the app with `sbt prodUi` + electron-builder on both an Apple
+[`release.yml`](.github/workflows/release.yml), which runs the full test suite,
+then builds the app with `sbt prodUi` + electron-builder on both an Apple
 Silicon and an Intel macOS runner — each architecture must build on matching
 hardware because the Scala Native proxy binary is compiled for the host CPU —
 verifies each DMG (image integrity, single arch, matching binary
