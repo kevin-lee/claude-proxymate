@@ -8,6 +8,7 @@ final case class ProxyInfoPopoverLabels(
   title: String,
   websiteLabel: String,
   bugReportLabel: String,
+  gettingStartedLabel: String,
 )
 
 /** Pure view for the proxy-info (About) popover. */
@@ -18,10 +19,18 @@ object ProxyInfoPopoverView {
   val WebsiteHref: String = "https://claude-proxymate.kevinly.dev/"
   val IssuesHref: String  = "https://github.com/kevin-lee/claude-proxymate/issues"
 
+  /** Marks the button that replays Getting Started (handled by ProxyInfoPopover). */
+  val ReplayAttr: String = "data-onboard-replay"
+
   def buildPopoverFrag(labels: ProxyInfoPopoverLabels): Frag =
     frag(
       div(cls := s"$PopoverClass-title")(labels.title),
       div(cls := s"$PopoverClass-body")(
+        div(cls := s"$PopoverClass-link-row")(
+          button(tpe := "button", cls := s"$PopoverClass-replay", attr(ReplayAttr) := "true")(
+            labels.gettingStartedLabel
+          )
+        ),
         div(cls := s"$PopoverClass-link-row")(externalLink(WebsiteHref, labels.websiteLabel)),
         div(cls := s"$PopoverClass-link-row")(externalLink(IssuesHref, labels.bugReportLabel)),
       ),

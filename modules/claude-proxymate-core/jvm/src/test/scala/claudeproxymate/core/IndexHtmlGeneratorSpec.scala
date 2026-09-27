@@ -7,10 +7,10 @@ object IndexHtmlGeneratorSpec extends Properties {
 
   override def tests: List[Test] = List(
     example("no inline event handler attributes are emitted", testNoInlineEventHandlers),
-    example("onboard close button has the OnboardCloseBtn id", testOnboardCloseBtnId),
-    example("onboard carousel elements have their ids", testOnboardCarouselElements),
-    example("onboard slides reference the getting-started screenshots", testOnboardSlideImages),
-    example("onboard dots carry their data-onboard-slide attributes", testOnboardDotsDataAttr),
+    example("onboarding stage and its controls have their ids", testOnboardControlIds),
+    example("guided tour layer shell is emitted hidden", testTourLayerShell),
+    example("every guided tour target id exists in the generated HTML", testTourTargetsExist),
+    example("no getting-started screenshot is referenced", testNoScreenshotReferences),
     example("proxy cmd copy button has the ProxyCmdCopyBtn id", testProxyCmdCopyBtnId),
     example("proxy clear button has the ProxyClearBtn id", testProxyClearBtnId),
     example("header has the AppHeader id", testAppHeaderId),
@@ -33,15 +33,19 @@ object IndexHtmlGeneratorSpec extends Properties {
   private val sampleLocale: Map[String, String] = Map(
     "onboard.title"            -> "title",
     "onboard.sub"              -> "sub",
-    "onboard.s3.title"         -> "s3title",
-    "onboard.s3.body"          -> "s3body",
-    "onboard.s3.after"         -> "s3after",
-    "onboard.imgAlt1"          -> "imgAlt1",
-    "onboard.imgAlt2"          -> "imgAlt2",
-    "onboard.prev"             -> "prev",
-    "onboard.next"             -> "next",
     "onboard.note"             -> "note",
-    "onboard.btn"              -> "btn",
+    "onboard.skip"             -> "skip",
+    "onboard.replay"           -> "replay",
+    "onboard.tourBtn"          -> "tourBtn",
+    "onboard.motionAlt"        -> "motionAlt",
+    "onboard.motion.prompt"    -> "prompt",
+    "onboard.motion.cap1"      -> "cap1",
+    "onboard.motion.cap2"      -> "cap2",
+    "onboard.motion.cap3"      -> "cap3",
+    "onboard.motion.captured"  -> "captured",
+    "onboard.motion.tokens"    -> "tokens",
+    "onboard.motion.tagline"   -> "tagline",
+    "proxy.stopProxy"          -> "stopProxy",
     "header.logoSub"           -> "Proxy",
     "proxy.port"               -> "port",
     "proxy.startFirst"         -> "startFirst",
@@ -98,37 +102,43 @@ object IndexHtmlGeneratorSpec extends Properties {
         .log(s"unexpected inline handler attribute `$attr` in generated HTML")
     })
 
-  def testOnboardCloseBtnId: Result =
-    Result
-      .assert(rendered.contains(s"""id="${HtmlIds.OnboardCloseBtn}""""))
-      .log(s"`id=\"${HtmlIds.OnboardCloseBtn}\"` missing from generated HTML")
-
-  def testOnboardCarouselElements: Result =
+  def testOnboardControlIds: Result =
     Result.all(
-      List(HtmlIds.OnboardTrack, HtmlIds.OnboardDots, HtmlIds.OnboardPrev, HtmlIds.OnboardNext).map { id =>
+      List(HtmlIds.OnboardStage, HtmlIds.OnboardSkipBtn, HtmlIds.OnboardReplayBtn, HtmlIds.OnboardTourBtn).map { id =>
         Result
           .assert(rendered.contains(s"""id="$id""""))
           .log(s"`id=\"$id\"` missing from generated HTML")
       }
     )
 
-  def testOnboardSlideImages: Result =
+  def testTourLayerShell: Result =
     Result.all(
-      List("getting-started-01.png", "getting-started-02.png").map { img =>
+      List(
         Result
-          .assert(rendered.contains(img))
-          .log(s"`$img` missing from generated HTML")
+          .assert(rendered.contains(s"""id="${HtmlIds.TourLayer}" class="tour-layer" style="display:none""""))
+          .log(s"hidden `${HtmlIds.TourLayer}` shell missing from generated HTML"),
+        Result
+          .assert(rendered.contains(s"""id="${HtmlIds.TourSpot}""""))
+          .log(s"`id=\"${HtmlIds.TourSpot}\"` missing from generated HTML"),
+        Result
+          .assert(rendered.contains(s"""id="${HtmlIds.TourCallout}""""))
+          .log(s"`id=\"${HtmlIds.TourCallout}\"` missing from generated HTML"),
+      )
+    )
+
+  def testTourTargetsExist: Result =
+    Result.all(
+      GettingStarted.tourSteps.map { step =>
+        Result
+          .assert(rendered.contains(s"""id="${step.targetId}""""))
+          .log(s"tour target `id=\"${step.targetId}\"` missing from generated HTML")
       }
     )
 
-  def testOnboardDotsDataAttr: Result =
-    Result.all(
-      List("0", "1", "2").map { n =>
-        Result
-          .assert(rendered.contains(s"""data-onboard-slide="$n""""))
-          .log(s"`data-onboard-slide=\"$n\"` missing from generated HTML")
-      }
-    )
+  def testNoScreenshotReferences: Result =
+    Result
+      .assert(!rendered.contains("getting-started-0"))
+      .log("the generated HTML still references a getting-started screenshot")
 
   def testProxyCmdCopyBtnId: Result =
     Result

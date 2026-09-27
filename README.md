@@ -561,7 +561,7 @@ claude-proxymate/
 │           ├── detail/                       # Detail view, pricing, token popover
 │           ├── copy/                         # CopyUtil, MaskedCopy (WYSIWYG clipboard)
 │           ├── update/                       # GitHub release update check
-│           └── onboarding/                   # First-run onboarding modal (image carousel)
+│           └── onboarding/                   # First-run Getting Started (motion intro + guided tour)
 │           # convention: each *View.scala renders ScalaTags to a string and is unit-tested;
 │           #             its sibling module wires that output to the DOM
 ├── electron-app/                     # Electron runtime package
@@ -572,7 +572,6 @@ claude-proxymate/
 ├── assets/
 │   ├── icon.png
 │   ├── icon.icns
-│   ├── getting-started/              # onboarding carousel screenshots
 │   └── logo/                         # light/dark logo SVG variants
 └── scripts/
     ├── package.sh                    # Full 9-step build + Electron packaging

@@ -1,6 +1,5 @@
 package claudeproxymate.core
 
-import cats.syntax.all.*
 import scalatags.Text.all.*
 import scalatags.Text.tags2.title as titleTag
 
@@ -14,12 +13,11 @@ import scalatags.Text.tags2.title as titleTag
   */
 object IndexHtmlGenerator {
 
-  private val i18n             = attr("data-i18n")
-  private val i18nHtml         = attr("data-i18n-html")
-  private val i18nAlt          = attr("data-i18n-alt")
-  private val i18nTitle        = attr("data-i18n-title")
-  private val dataDtab         = attr("data-dtab")
-  private val dataOnboardSlide = attr("data-onboard-slide")
+  private val i18n          = attr("data-i18n")
+  private val i18nHtml      = attr("data-i18n-html")
+  private val i18nTitle     = attr("data-i18n-title")
+  private val i18nAriaLabel = attr("data-i18n-aria-label")
+  private val dataDtab      = attr("data-dtab")
 
   /** Strict Content-Security-Policy applied via `<meta http-equiv>`.
     *
@@ -64,6 +62,7 @@ object IndexHtmlGenerator {
       body(
         onboardingModal(defaultLocale),
         requestFilterModal,
+        tourLayer,
         headerSection(defaultLocale),
         addressBar(defaultLocale),
         mainSection(defaultLocale),
@@ -79,72 +78,127 @@ object IndexHtmlGenerator {
       div(cls := "onboard-card")(
         div(cls := "onboard-title", i18n := "onboard.title")(tx(m, "onboard.title")),
         div(cls := "onboard-sub", i18n := "onboard.sub")(tx(m, "onboard.sub")),
-        div(cls := "onboard-carousel")(
-          div(cls := "onboard-viewport")(
-            div(id := HtmlIds.OnboardTrack, cls := "onboard-track")(
-              // Slide 0 — Start Proxy screenshot (image-only)
-              div(cls := "onboard-slide")(
-                img(
-                  cls := "onboard-img",
-                  src := "../assets/getting-started/getting-started-01.png",
-                  i18nAlt := "onboard.imgAlt1",
-                  alt := tx(m, "onboard.imgAlt1"),
-                ),
-              ),
-              // Slide 1 — Copy command screenshot (image-only)
-              div(cls := "onboard-slide")(
-                img(
-                  cls := "onboard-img",
-                  src := "../assets/getting-started/getting-started-02.png",
-                  i18nAlt := "onboard.imgAlt2",
-                  alt := tx(m, "onboard.imgAlt2"),
-                ),
-              ),
-              // Slide 2 — instructions (text)
-              div(cls := "onboard-slide onboard-slide-text")(
-                div(cls := "onboard-s3-title", i18n := "onboard.s3.title")(tx(m, "onboard.s3.title")),
-                div(cls := "onboard-s3-body")(
-                  span(i18n := "onboard.s3.body")(tx(m, "onboard.s3.body")),
-                  code(cls := "onboard-cmd")("ANTHROPIC_BASE_URL=http://localhost:8888 claude"),
-                  span(i18nHtml := "onboard.s3.after")(raw(tx(m, "onboard.s3.after"))),
-                ),
-              ),
-            ),
+        onboardingStage(m),
+        div(cls := "onboard-nav")(
+          button(
+            id := HtmlIds.OnboardSkipBtn,
+            cls := "onboard-link-btn",
+            i18n := "onboard.skip",
+          )(tx(m, "onboard.skip")),
+          button(
+            id := HtmlIds.OnboardReplayBtn,
+            cls := "onboard-link-btn",
+          )(
+            "↻ ",
+            span(i18n := "onboard.replay")(tx(m, "onboard.replay")),
           ),
-          div(cls := "onboard-nav")(
-            button(
-              id := HtmlIds.OnboardPrev,
-              cls := "onboard-arrow",
-              attr("aria-label") := tx(m, "onboard.prev"),
-              i18nTitle := "onboard.prev",
-              attr("title") := tx(m, "onboard.prev"),
-            )("‹"),
-            div(id := HtmlIds.OnboardDots, cls := "onboard-dots")(
-              (0 until 3).map { i =>
-                span(
-                  cls := (if (i === 0) "onboard-dot active" else "onboard-dot"),
-                  dataOnboardSlide := i.toString,
+          button(
+            id := HtmlIds.OnboardTourBtn,
+            cls := "onboard-btn-pill",
+            i18n := "onboard.tourBtn",
+          )(tx(m, "onboard.tourBtn")),
+        ),
+        div(cls := "onboard-note", i18n := "onboard.note")(tx(m, "onboard.note")),
+      ),
+    )
+
+  /** The motion-graphic stage. Pure HTML/CSS: `styles.css` animates it
+    * while the renderer's `Onboarding` puts the `gs-play` class on it.
+    * Without that class it shows its static end frame.
+    */
+  private def onboardingStage(m: Map[String, String]): Frag =
+    div(
+      id := HtmlIds.OnboardStage,
+      cls := "gs-stage",
+      attr("role") := "img",
+      attr("aria-label") := tx(m, "onboard.motionAlt"),
+      i18nAriaLabel := "onboard.motionAlt",
+    )(
+      div(cls := "gs-scene gs-flow")(
+        div(cls := "gs-wire gs-wire-a"),
+        div(cls := "gs-wire gs-wire-b"),
+        div(cls := "gs-term")(
+          div(cls := "gs-term-bar")(
+            span(cls := "gs-term-dot"),
+            span(cls := "gs-term-dot"),
+            span(cls := "gs-term-dot"),
+          ),
+          div(cls := "gs-term-line gs-term-cmd")("$ claude"),
+          div(cls := "gs-term-line gs-term-prompt")(
+            "> ",
+            span(i18n := "onboard.motion.prompt")(tx(m, "onboard.motion.prompt")),
+          ),
+        ),
+        div(cls := "gs-node gs-node-proxy")(
+          span(cls := "gs-node-name")("Claude Proxymate"),
+          span(cls := "gs-node-sub")("localhost:8888"),
+          span(cls := "gs-tag", i18n := "onboard.motion.captured")(tx(m, "onboard.motion.captured")),
+        ),
+        div(cls := "gs-node gs-node-api")(
+          span(cls := "gs-node-name")("api.anthropic.com"),
+        ),
+        div(cls := "gs-packet gs-packet-req"),
+        div(cls := "gs-packet gs-packet-res"),
+      ),
+      div(cls := "gs-scene gs-app")(
+        div(cls := "gs-app-bar")(
+          span(cls := "gs-app-stop", i18n := "proxy.stopProxy")(tx(m, "proxy.stopProxy")),
+          span(cls := "gs-app-cmd")("ANTHROPIC_BASE_URL=http://localhost:8888 claude"),
+        ),
+        div(cls := "gs-app-body")(
+          div(cls := "gs-app-list")(
+            div(cls := "gs-app-list-head", i18n := "proxy.capturedRequests")(tx(m, "proxy.capturedRequests")),
+            List("claude-opus-5-5", "claude-sonnet-5", "claude-haiku-4-5").zipWithIndex.map {
+              case (model, index) =>
+                div(cls := s"gs-app-row gs-app-row-${index + 1}")(
+                  span(cls := "gs-app-method")("POST"),
+                  span(cls := "gs-app-path")("/v1/messages"),
+                  div(cls := "gs-app-model")(model),
                 )
+            },
+          ),
+          div(cls := "gs-app-detail")(
+            div(cls := "gs-app-tabs")(
+              List("Messages", "Request", "Response", "Analysis").zipWithIndex.map {
+                case (tab, index) =>
+                  span(cls := s"gs-app-tab gs-app-tab-${index + 1}")(tab)
               },
             ),
-            div(cls := "onboard-nav-right")(
-              button(
-                id := HtmlIds.OnboardNext,
-                cls := "onboard-arrow",
-                attr("aria-label") := tx(m, "onboard.next"),
-                i18nTitle := "onboard.next",
-                attr("title") := tx(m, "onboard.next"),
-              )("›"),
-              // Shown only on the last slide (toggled by Onboarding.render); replaces the › arrow there.
-              button(
-                id := HtmlIds.OnboardCloseBtn,
-                cls := "onboard-btn-pill is-hidden",
-                i18n := "onboard.btn",
-              )(tx(m, "onboard.btn")),
+            div(cls := "gs-app-bubble gs-app-bubble-user")(
+              span(cls := "gs-app-line"),
+              span(cls := "gs-app-line"),
+            ),
+            div(cls := "gs-app-bubble gs-app-bubble-assistant")(
+              span(cls := "gs-app-line"),
+              span(cls := "gs-app-line"),
+              span(cls := "gs-app-line"),
+            ),
+            div(cls := "gs-app-meter")(
+              span(cls := "gs-app-tokens"),
+              span(i18n := "onboard.motion.tokens")(tx(m, "onboard.motion.tokens")),
             ),
           ),
         ),
-        div(cls := "onboard-note", i18n := "onboard.note")(tx(m, "onboard.note")),
+      ),
+      div(cls := "gs-caps")(
+        div(cls := "gs-cap gs-cap-1", i18nHtml := "onboard.motion.cap1")(raw(tx(m, "onboard.motion.cap1"))),
+        div(cls := "gs-cap gs-cap-2", i18nHtml := "onboard.motion.cap2")(raw(tx(m, "onboard.motion.cap2"))),
+        div(cls := "gs-cap gs-cap-3", i18nHtml := "onboard.motion.cap3")(raw(tx(m, "onboard.motion.cap3"))),
+        div(cls := "gs-cap gs-cap-4", i18n := "onboard.motion.tagline")(tx(m, "onboard.motion.tagline")),
+      ),
+    )
+
+  // ── Getting Started Tour (shell filled at runtime by the renderer's Onboarding) ──
+
+  private val tourLayer: Frag =
+    div(id := HtmlIds.TourLayer, cls := "tour-layer", style := "display:none")(
+      div(id := HtmlIds.TourSpot, cls := "tour-spot"),
+      div(
+        id := HtmlIds.TourCallout,
+        cls := "tour-callout",
+        attr("role") := "dialog",
+        attr("aria-modal") := "true",
+        attr("aria-live") := "polite",
       ),
     )
 
@@ -361,7 +415,7 @@ object IndexHtmlGenerator {
         ),
       ),
       div(cls := "proxy-detail")(
-        div(cls := "dtabs")(
+        div(id := HtmlIds.DetailTabs, cls := "dtabs")(
           // dtab clicks are dispatched by the renderer's DtabListeners
           // (doc-level click delegation reading data-dtab). No inline
           // handlers here — Scala.js NoModule's let-exported globals

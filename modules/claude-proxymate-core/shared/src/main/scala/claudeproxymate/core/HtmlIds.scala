@@ -3,14 +3,16 @@ package claudeproxymate.core
 /** DOM element IDs shared between the HTML generator (JVM) and renderer (JS). */
 object HtmlIds {
   // ── Onboarding ──
-  val OnboardModal: String    = "onboardModal"
-  val OnboardCloseBtn: String = "onboardCloseBtn"
+  val OnboardModal: String     = "onboardModal"
+  val OnboardStage: String     = "onboardStage"
+  val OnboardSkipBtn: String   = "onboardSkipBtn"
+  val OnboardReplayBtn: String = "onboardReplayBtn"
+  val OnboardTourBtn: String   = "onboardTourBtn"
 
-  // ── Onboarding Carousel ──
-  val OnboardTrack: String = "onboardTrack"
-  val OnboardDots: String  = "onboardDots"
-  val OnboardPrev: String  = "onboardPrev"
-  val OnboardNext: String  = "onboardNext"
+  // ── Getting Started Tour ──
+  val TourLayer: String   = "tourLayer"
+  val TourSpot: String    = "tourSpot"
+  val TourCallout: String = "tourCallout"
 
   // ── Header ──
   val AppHeader: String      = "appHeader"
@@ -56,6 +58,7 @@ object HtmlIds {
   val ProxyCount: String      = "proxyCount"
   val ProxyDetailView: String = "proxyDetailView"
   val CopyDetailBtn: String   = "copyDetailBtn"
+  val DetailTabs: String      = "detailTabs"
 
   // ── Dynamically created (not in index.html, but used across renderer modules) ──
   val ProxyDetailCode: String        = "proxyDetailCode"

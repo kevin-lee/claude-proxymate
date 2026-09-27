@@ -99,6 +99,11 @@ object I18n {
       val key = el.dataset.get("i18nAlt").getOrElse("")
       if (key.nonEmpty) el.asInstanceOf[dom.html.Image].alt = t(key)
     }
+    dom.document.querySelectorAll("[data-i18n-aria-label]").foreach { node =>
+      val el  = node.asInstanceOf[dom.HTMLElement]
+      val key = el.dataset.get("i18nAriaLabel").getOrElse("")
+      if (key.nonEmpty) el.setAttribute("aria-label", t(key))
+    }
 
     // lang toggle button text
     val btn = dom.document.getElementById(HtmlIds.LangToggleBtn)

@@ -14,6 +14,7 @@ object ProxyInfoPopoverViewSpec extends Properties {
     example("buildPopoverFrag contains bug report link href", testIssuesHref),
     example("buildPopoverFrag links carry external-link, _blank and noopener", testLinkAttrs),
     example("buildPopoverFrag renders both link labels", testLinkLabels),
+    example("buildPopoverFrag renders the Getting Started replay button", testReplayButton),
     property("buildPopoverFrag never leaks raw <script> from labels", testNoScriptLeak),
   )
 
@@ -24,6 +25,7 @@ object ProxyInfoPopoverViewSpec extends Properties {
     title = "About Claude Proxymate",
     websiteLabel = "Website",
     bugReportLabel = "Report a bug",
+    gettingStartedLabel = "Getting Started",
   )
 
   def testTitleClass: Result =
@@ -75,6 +77,18 @@ object ProxyInfoPopoverViewSpec extends Properties {
     )
   }
 
+  def testReplayButton: Result = {
+    val html = render(sampleLabels)
+    Result.all(
+      List(
+        Result
+          .assert(html.contains(s"""${ProxyInfoPopoverView.ReplayAttr}="true""""))
+          .log(s"replay attribute missing: $html"),
+        Result.assert(html.contains("Getting Started")).log(s"replay label missing: $html"),
+      )
+    )
+  }
+
   def testNoScriptLeak: Property =
     for {
       evil <- Gen.string(Gen.alpha, Range.linear(0, 12)).log("evil")
@@ -84,6 +98,7 @@ object ProxyInfoPopoverViewSpec extends Properties {
         title = payload,
         websiteLabel = payload,
         bugReportLabel = payload,
+        gettingStartedLabel = payload,
       )
       val html    = render(labels)
       Result
