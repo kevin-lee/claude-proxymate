@@ -318,7 +318,13 @@ and runs [`scripts/update-cask.sh`](scripts/update-cask.sh) on a checkout of
 [`kevin-lee/homebrew-tap`](https://github.com/kevin-lee/homebrew-tap). That
 updates `claude-proxymate.rb` in place and keeps the previous release as
 `claude-proxymate@<previous>.rb`. The job then runs `brew style` on the changed
-casks and pushes to the tap's `main`. A manual tap update uses the same command:
+casks, pushes the change to a `claude-proxymate/<version>` branch of the tap and
+opens a pull request to the tap's `main`, which is merged by hand. The job fails
+before changing anything if the tap already has a `claude-proxymate/*` branch,
+so a release PR has to be merged, or closed and its branch deleted, before the
+next release. `HOMEBREW_TAP_TOKEN` needs read and write access to contents and
+pull requests on `kevin-lee/homebrew-tap`. A manual tap update uses the same
+command:
 `scripts/update-cask.sh <version> <arm64-sha256> <x64-sha256> <tap-checkout>`.
 The workflows run with a read-only `GITHUB_TOKEN`, and only the release job
 gets `contents: write`. Actions are pinned to commit SHAs, and Dependabot

@@ -16,8 +16,8 @@ env:
   SCALANATIVE_GC_TRAP_BASED_YIELDPOINTS: "0"
 
 # Read-only by default. The release job alone gets contents: write, for the
-# GitHub release. The tap job pushes to kevin-lee/homebrew-tap with
-# HOMEBREW_TAP_TOKEN, not GITHUB_TOKEN.
+# GitHub release. The tap job pushes a branch to kevin-lee/homebrew-tap and
+# opens a pull request there with HOMEBREW_TAP_TOKEN, not GITHUB_TOKEN.
 permissions:
   contents: read
 
@@ -274,6 +274,25 @@ jobs:
           token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
           path: tap
 
+      # One claude-proxymate tap PR at a time. The tap deletes a branch when its
+      # PR is merged, so a claude-proxymate/* branch still there is this
+      # release's branch from an earlier run, or an earlier release's PR that is
+      # open or was closed without merging. Either needs a look by hand. Going
+      # on would fail at the push after the cask work, or pin the wrong previous
+      # version and open a PR that conflicts with the open one.
+      - name: Require no pending claude-proxymate tap branch
+        run: |
+          set -euo pipefail
+          BRANCHES="$(git -C tap ls-remote --heads origin 'refs/heads/claude-proxymate/*' | awk '{print $2}' | sed 's|^refs/heads/||')"
+          if [ -n "$BRANCHES" ]; then
+            echo "error: kevin-lee/homebrew-tap already has these claude-proxymate branches. Merge or close their PRs and delete the branches, then re-run this job:"
+            while IFS= read -r branch; do
+              echo "  - $branch"
+            done <<< "$BRANCHES"
+            exit 1
+          fi
+          echo "No pending claude-proxymate branch in kevin-lee/homebrew-tap."
+
       # The published release assets are what brew downloads, so they are the
       # files checked. Each DMG is checked against the .sha256 written in its
       # build job, so a corrupted download fails here instead of reaching the
@@ -326,7 +345,15 @@ jobs:
           fi
           brew style --cask "${TOKENS[@]}"
 
-      - name: Commit and push
+      # The release goes to the tap as a pull request from
+      # claude-proxymate/<version>, not a push to main, so it is reviewed and
+      # merged by hand. The push has no --force, and the step above has checked
+      # that no such branch exists. The PR is assigned to kevin-lee and labelled
+      # pr. Do not label it pr-pull. The tap's publish.yml runs brew pr-pull on
+      # that label, which is for bottled formulae.
+      - name: Commit, push the branch and open the PR
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: |
           set -euo pipefail
           cd tap
@@ -350,7 +377,30 @@ jobs:
           else
             git commit -m "$TITLE"
           fi
-          # Picks up a tap push from another release, such as token-watchroo's,
-          # made since the checkout.
-          git pull --rebase origin main
-          git push origin HEAD:main
+          BRANCH="claude-proxymate/$VERSION"
+          git push origin "HEAD:refs/heads/$BRANCH"
+          RELEASE_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$GITHUB_REF_NAME"
+          RUN_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          BODY_FILE="$RUNNER_TEMP/tap-pr-body.md"
+          # The backticks are literal Markdown for the PR body.
+          # shellcheck disable=SC2016
+          {
+            echo '## Changes'
+            echo
+            if [ -n "$PREVIOUS" ]; then
+              printf -- '- `claude-proxymate`: `%s` => `%s` ([release %s](%s))\n' "$PREVIOUS" "$VERSION" "$GITHUB_REF_NAME" "$RELEASE_URL"
+              echo
+              printf 'Add `Casks/claude-proxymate@%s.rb` so `%s` stays installable after the bump.\n' "$PREVIOUS" "$PREVIOUS"
+            else
+              printf -- '- `claude-proxymate`: `%s` ([release %s](%s))\n' "$VERSION" "$GITHUB_REF_NAME" "$RELEASE_URL"
+            fi
+            echo
+            echo '## Verification'
+            echo
+            printf -- '- `Claude-Proxy-%s-arm64.dmg` and `Claude-Proxy-%s-x64.dmg` downloaded from the published release, and each matched its published `.sha256` with `shasum -a 256 -c`\n' "$VERSION" "$VERSION"
+            echo '- `brew style --cask` on the changed casks - no offenses'
+            echo '- `brew audit` and `brew install` were not run'
+            echo
+            printf 'Workflow run: %s\n' "$RUN_URL"
+          } > "$BODY_FILE"
+          gh pr create --repo kevin-lee/homebrew-tap --base main --head "$BRANCH" --title "$TITLE" --body-file "$BODY_FILE" --assignee kevin-lee --label pr
