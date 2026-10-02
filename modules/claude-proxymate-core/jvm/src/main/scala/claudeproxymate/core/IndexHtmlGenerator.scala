@@ -148,7 +148,7 @@ object IndexHtmlGenerator {
         div(cls := "gs-app-body")(
           div(cls := "gs-app-list")(
             div(cls := "gs-app-list-head", i18n := "proxy.capturedRequests")(tx(m, "proxy.capturedRequests")),
-            List("claude-opus-5-5", "claude-sonnet-5", "claude-haiku-4-5").zipWithIndex.map {
+            List("claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-4-5").zipWithIndex.map {
               case (model, index) =>
                 div(cls := s"gs-app-row gs-app-row-${index + 1}")(
                   span(cls := "gs-app-method")("POST"),
