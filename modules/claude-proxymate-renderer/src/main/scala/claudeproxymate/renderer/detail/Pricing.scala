@@ -86,6 +86,7 @@ enum ModelTier {
   case Opus5_5
   case OpusPremium
   case OpusLegacy
+  case Sonnet5_5
   case Sonnet5
   case Sonnet
   case Haiku4_5
@@ -99,7 +100,7 @@ object ModelTier {
   /** Date the rates below were last verified against the official pricing
     * page. Shown in the token popover.
     */
-  val PricingDate: String = "2026-09-27"
+  val PricingDate: String = "2026-10-02"
 
   /** Web search costs $10 per 1,000 searches. It is billed per search, not
     * per token, so fast mode and inference geo do not affect it.
@@ -123,6 +124,7 @@ object ModelTier {
       case Opus5_5 => Rates(4.0, 20.0, 0.2, 5.0, 8.0)
       case OpusPremium => Rates(5.0, 25.0, 0.5, 6.25, 10.0)
       case OpusLegacy => Rates(15.0, 75.0, 1.5, 18.75, 30.0)
+      case Sonnet5_5 => Rates(2.0, 10.0, 0.2, 2.5, 4.0)
       case Sonnet5 => Rates(2.0, 10.0, 0.2, 2.5, 4.0)
       case Sonnet => Rates(3.0, 15.0, 0.3, 3.75, 6.0)
       case Haiku4_5 => Rates(1.0, 5.0, 0.1, 1.25, 2.0)
@@ -151,9 +153,10 @@ object ModelTier {
     *
     * The first layer matches known IDs, most-specific substring first, so the
     * broader branches cannot swallow a newer sub-variant. `opus-5-5` sits
-    * above `opus-5` for the same reason `fable-5-1` sits above `fable-5`.
-    * `claude-sonnet-4-5` and `claude-3-5-sonnet-…` do not contain the
-    * substring `sonnet-5`, so the Sonnet 5 branch is safe above them.
+    * above `opus-5`, and `sonnet-5-5` above `sonnet-5`, for the same reason
+    * `fable-5-1` sits above `fable-5`. `claude-sonnet-4-5` and
+    * `claude-3-5-sonnet-…` contain neither `sonnet-5-5` nor `sonnet-5`, so
+    * the Sonnet 5.5 and Sonnet 5 branches are safe above them.
     *
     * The second layer matches a bare family name and maps it to the *current*
     * tier of that family, so a model released after this table was written is
@@ -181,6 +184,7 @@ object ModelTier {
       model.contains("3-opus") ||
       model.contains("opus-3")
     ) OpusLegacy
+    else if (model.contains("sonnet-5-5")) Sonnet5_5
     else if (model.contains("sonnet-5")) Sonnet5
     else if (
       model.contains("sonnet-4") ||
@@ -190,7 +194,7 @@ object ModelTier {
     ) Sonnet
     else if (model.contains("fable") || model.contains("mythos")) Fable5_1
     else if (model.contains("opus")) Opus5_5
-    else if (model.contains("sonnet")) Sonnet5
+    else if (model.contains("sonnet")) Sonnet5_5
     else if (model.contains("haiku")) Haiku4_5
     else Unknown
   }
