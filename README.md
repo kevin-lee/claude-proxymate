@@ -310,14 +310,19 @@ then builds the app with `sbt prodUi` + electron-builder on both an Apple
 Silicon and an Intel macOS runner — each architecture must build on matching
 hardware because the Scala Native proxy binary is compiled for the host CPU —
 verifies each DMG (image integrity, single arch, matching binary
-architectures, and — when signing is configured — Developer ID signature,
-notarization, and stapled ticket), and attaches the DMGs to a GitHub Release.
-With the `CSC_LINK` / `CSC_KEY_PASSWORD` / `APPLE_ID` /
-`APPLE_APP_SPECIFIC_PASSWORD` / `APPLE_TEAM_ID` repository secrets configured,
-the DMGs are Developer-ID signed and notarized; without them, electron-builder
-falls back to an ad-hoc signature and skips notarization. The
-`GA_MEASUREMENT_ID` / `GA_API_SECRET` repository secrets are passed to the
-build step for the GA4 analytics integration. Both workflows set
+architectures, Developer ID signature, notarization, and stapled ticket), and
+attaches the DMGs to a GitHub Release.
+The release secrets are environment secrets of the `release` environment, not
+repository secrets. Its deployment rule allows only tags that match `v*`, so
+the jobs that use them (`build` and `tap`) run only for a `v*` tag push or a
+manual dispatch on a `v*` tag. A manual dispatch on a branch is refused at
+`build`, and nothing is published. The `CSC_LINK` / `CSC_KEY_PASSWORD` /
+`APPLE_ID` / `APPLE_APP_SPECIFIC_PASSWORD` / `APPLE_TEAM_ID` secrets make the
+DMGs Developer-ID signed and notarized, and the `GA_MEASUREMENT_ID` /
+`GA_API_SECRET` secrets are passed to the build step for the GA4 analytics
+integration. The `build` job fails before it builds anything if one of these
+seven is missing, so a release cannot fall back to an ad-hoc signed or
+analytics-free build. Both workflows set
 `SCALANATIVE_GC_TRAP_BASED_YIELDPOINTS=0` at the workflow level, which
 `build.sbt`'s `checkNativeLinkEnv` requires before linking the proxy binary.
 
@@ -332,9 +337,9 @@ casks, pushes the change to a `claude-proxymate/<version>` branch of the tap and
 opens a pull request to the tap's `main`, which is merged by hand. The job fails
 before changing anything if the tap already has a `claude-proxymate/*` branch,
 so a release PR has to be merged, or closed and its branch deleted, before the
-next release. `HOMEBREW_TAP_TOKEN` needs read and write access to contents and
-pull requests on `kevin-lee/homebrew-tap`. A manual tap update uses the same
-command:
+next release. `HOMEBREW_TAP_TOKEN`, also a `release` environment secret, needs
+read and write access to contents and pull requests on `kevin-lee/homebrew-tap`.
+A manual tap update uses the same command:
 `scripts/update-cask.sh <version> <arm64-sha256> <x64-sha256> <tap-checkout>`.
 The workflows run with a read-only `GITHUB_TOKEN`, and only the release job
 gets `contents: write`. Actions are pinned to commit SHAs, and Dependabot

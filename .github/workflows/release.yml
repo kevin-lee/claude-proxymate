@@ -39,6 +39,11 @@ jobs:
 
   build:
     needs: test
+    # The signing, notarization and GA secrets are environment secrets of
+    # `release`. Its deployment rule allows only tags that match v*, so this
+    # job runs for a v* tag push or a dispatch on a v* tag. A dispatch on a
+    # branch is refused here, and release and tap are then skipped.
+    environment: release
     # Scala.js fullLinkJS (Closure full optimization) is heap-hungry; the sbt
     # launcher default of 1 GB OOMs during the renderer link. .jvmopts sets the
     # heap for local + CI builds; this reasserts it in CI in case a runner image
@@ -64,6 +69,30 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
+      # electron-builder does not fail without signing credentials. It ad-hoc
+      # signs and skips notarization, and build.sbt builds without analytics
+      # when the GA values are empty. A release must not ship like that, so
+      # stop before anything is built. This tests presence only and never
+      # prints a value.
+      - name: Require the release secrets
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          GA_MEASUREMENT_ID: ${{ secrets.GA_MEASUREMENT_ID }}
+          GA_API_SECRET: ${{ secrets.GA_API_SECRET }}
+        run: |
+          MISSING=0
+          for name in CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID GA_MEASUREMENT_ID GA_API_SECRET; do
+            if [ -z "${!name}" ]; then
+              echo "error: release environment secret $name is not set"
+              MISSING=1
+            fi
+          done
+          exit "$MISSING"
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
@@ -101,8 +130,8 @@ jobs:
 
       # Signs with the Developer ID cert from CSC_LINK and notarizes via the
       # APPLE_* credentials ("notarize": true in project/package.json.template;
-      # hardenedRuntime + entitlements are configured there too). Required repo
-      # secrets:
+      # hardenedRuntime + entitlements are configured there too). Required
+      # `release` environment secrets:
       #   CSC_LINK                     base64-encoded Developer ID .p12
       #   CSC_KEY_PASSWORD             password for the .p12
       #   APPLE_ID                     Apple ID email of the developer account
@@ -112,6 +141,9 @@ jobs:
       # with NO credentials set, electron-builder ad-hoc signs and skips
       # notarization with a warning (downloaders then need the Gatekeeper
       # workaround in the README); with PARTIAL credentials it fails the build.
+      # This job does not use that fallback: "Require the release secrets"
+      # stops the job when a credential is missing, and Verify DMG requires a
+      # Developer ID signature, notarization and a stapled ticket.
       #
       # electron-builder must be >= 26.16.1 (pinned in
       # project/package.json.template). Up to 26.15.3 it passed the .p12
@@ -149,11 +181,9 @@ jobs:
 
       # Guard against the failure modes that broke v0.1.0: a runner building
       # more than its own arch, a DMG whose bundled native proxy binary doesn't
-      # match the DMG's arch, and (when signing credentials are configured) an
-      # app that isn't actually Developer-ID signed + notarized + stapled.
+      # match the DMG's arch, and an app that isn't actually Developer-ID
+      # signed + notarized + stapled.
       - name: Verify DMG
-        env:
-          HAS_SIGNING: ${{ secrets.CSC_LINK != '' }}
         run: |
           set -euo pipefail
           cd electron-app/release
@@ -168,15 +198,11 @@ jobs:
           # At minimum an ad-hoc signature with a valid resource seal; a
           # seal-less app is reported by macOS as "damaged" with no recovery.
           codesign --verify --deep --strict "$MNT/Claude Proxymate.app"
-          if [ "$HAS_SIGNING" = "true" ]; then
-            # Fail the release if the app is not Developer-ID signed, accepted
-            # by Gatekeeper as notarized, and carrying a stapled ticket.
-            codesign -dvvv "$MNT/Claude Proxymate.app" 2>&1 | grep "Authority=Developer ID Application"
-            spctl -a -vvv "$MNT/Claude Proxymate.app"
-            xcrun stapler validate "$MNT/Claude Proxymate.app"
-          else
-            echo "No signing credentials configured — shipping ad-hoc signed build."
-          fi
+          # Fail the release if the app is not Developer-ID signed, accepted
+          # by Gatekeeper as notarized, and carrying a stapled ticket.
+          codesign -dvvv "$MNT/Claude Proxymate.app" 2>&1 | grep "Authority=Developer ID Application"
+          spctl -a -vvv "$MNT/Claude Proxymate.app"
+          xcrun stapler validate "$MNT/Claude Proxymate.app"
           EXPECTED="${{ matrix.arch == 'x64' && 'x86_64' || 'arm64' }}"
           for bin in "Contents/MacOS/Claude Proxymate" "Contents/Resources/claude-proxymate"; do
             ARCH_INFO=$(file "$MNT/Claude Proxymate.app/$bin")
@@ -211,6 +237,8 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
+    # softprops/action-gh-release creates the GitHub release and uploads the
+    # DMGs and checksums to it, which needs contents: write.
     permissions:
       contents: write
     steps:
@@ -255,13 +283,16 @@ jobs:
     # brew style needs Homebrew.
     runs-on: macos-latest
     if: startsWith(github.ref, 'refs/tags/')
+    # HOMEBREW_TAP_TOKEN is an environment secret of `release`, whose
+    # deployment rule allows only tags that match v*.
+    environment: release
     steps:
       - name: Require the tap token
         env:
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: |
           if [ -z "$HOMEBREW_TAP_TOKEN" ]; then
-            echo "error: repository secret HOMEBREW_TAP_TOKEN is not set"
+            echo "error: release environment secret HOMEBREW_TAP_TOKEN is not set"
             exit 1
           fi
 
