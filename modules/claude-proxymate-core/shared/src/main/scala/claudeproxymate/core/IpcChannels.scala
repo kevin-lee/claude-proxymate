@@ -14,6 +14,15 @@ object IpcChannels {
   val FilterConfigGet: String     = "filter-config-get"
   val FilterConfigSet: String     = "filter-config-set"
   val ClaudeInventoryScan: String = "claude-inventory-scan"
+  val AppVersion: String          = "app-version"
+  val UpdateStateGet: String      = "update-state-get"
+  val UpdateCheck: String         = "update-check"
+  val UpdateDownload: String      = "update-download"
+  val UpdateInstall: String       = "update-install"
+  val UpdateSettingsGet: String   = "update-settings-get"
+  val UpdateSettingsSet: String   = "update-settings-set"
+  val UpdateStateEvent: String    = "update-state"
+  val UpdateReveal: String        = "update-reveal"
   val BridgeName: String          = "electronAPI"
 
   val invokeChannels: List[String] =
@@ -25,7 +34,15 @@ object IpcChannels {
       RouteModeSet,
       FilterConfigGet,
       FilterConfigSet,
-      ClaudeInventoryScan
+      ClaudeInventoryScan,
+      AppVersion,
+      UpdateStateGet,
+      UpdateCheck,
+      UpdateDownload,
+      UpdateInstall,
+      UpdateSettingsGet,
+      UpdateSettingsSet,
     )
-  val eventChannels: List[String]  = List(ProxyRequest, ProxyResponse, ProxyState, RouteModeEvent)
+  val eventChannels: List[String]  =
+    List(ProxyRequest, ProxyResponse, ProxyState, RouteModeEvent, UpdateStateEvent, UpdateReveal)
 }

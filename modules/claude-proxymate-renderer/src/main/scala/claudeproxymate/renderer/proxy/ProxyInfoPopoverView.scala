@@ -22,9 +22,13 @@ object ProxyInfoPopoverView {
   /** Marks the button that replays Getting Started (handled by ProxyInfoPopover). */
   val ReplayAttr: String = "data-onboard-replay"
 
-  def buildPopoverFrag(labels: ProxyInfoPopoverLabels): Frag =
+  /** Wraps the update section (status, "Check now", auto update) between the title and the links. */
+  val UpdateSectionClass: String = s"$PopoverClass-update"
+
+  def buildPopoverFrag(labels: ProxyInfoPopoverLabels, updateSection: Frag): Frag =
     frag(
       div(cls := s"$PopoverClass-title")(labels.title),
+      div(cls := UpdateSectionClass)(updateSection),
       div(cls := s"$PopoverClass-body")(
         div(cls := s"$PopoverClass-link-row")(
           button(tpe := "button", cls := s"$PopoverClass-replay", attr(ReplayAttr) := "true")(

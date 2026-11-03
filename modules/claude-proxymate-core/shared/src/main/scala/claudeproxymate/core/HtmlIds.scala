@@ -17,7 +17,7 @@ object HtmlIds {
   // ── Header ──
   val AppHeader: String      = "appHeader"
   val BuildVer: String       = "buildVer"
-  val UpdateBadge: String    = "updateBadge"
+  val UpdatePill: String     = "updatePill"
   val LogoIcon: String       = "logoIcon"
   val LangToggleBtn: String  = "langToggleBtn"
   val ThemeToggleBtn: String = "themeToggleBtn"
@@ -70,4 +70,5 @@ object HtmlIds {
   val MsgFilterBar: String           = "msgFilterBar"
   val BadgeMenu: String              = "badgeMenu"
   val SelectionMenu: String          = "selectionMenu"
+  val UpdatePanel: String            = "updatePanel"
 }

@@ -14,6 +14,7 @@ object ElectronApp extends js.Object {
   def quit(): Unit                                                = js.native
   def getPath(name: String): String                               = js.native
   def getAppPath(): String                                        = js.native
+  def getVersion(): String                                        = js.native
   val isPackaged: Boolean                                         = js.native
 }
 
@@ -45,4 +46,11 @@ object IpcMain extends js.Object {
 @JSImport("electron", "shell")
 object Shell extends js.Object {
   def openExternal(url: String): js.Promise[Unit] = js.native
+}
+
+@js.native
+@JSImport("electron", "Menu")
+object Menu extends js.Object {
+  def buildFromTemplate(template: js.Array[js.Object]): js.Object = js.native
+  def setApplicationMenu(menu: js.Object): Unit                   = js.native
 }

@@ -31,15 +31,15 @@ object IndexHtmlGenerator {
     *     CSS-injection risk is minimal; tightening this to `'self'`
     *     would require moving ~60+ inline styles into `styles.css`
     *     (separate refactor).
-    *   - `connect-src` includes `https://api.github.com` for the
-    *     in-app update check (`UpdateChecker.checkForUpdate`).
+    *   - `connect-src` is `'self'` only. The update check runs in the
+    *     main process (electron-updater), not in the renderer.
     */
   val ContentSecurityPolicy: String =
     "default-src 'self'; " +
       "script-src 'self'; " +
       "style-src 'self' 'unsafe-inline'; " +
       "img-src 'self'; " +
-      "connect-src 'self' https://api.github.com; " +
+      "connect-src 'self'; " +
       "object-src 'none'; " +
       "base-uri 'self'; " +
       "form-action 'none'; " +
@@ -216,7 +216,7 @@ object IndexHtmlGenerator {
         span(cls := "logo-text")("Claude Proxymate"),
         span(cls := "logo-sub", i18n := "header.logoSub")(tx(m, "header.logoSub")),
         span(cls := "logo-ver", id := HtmlIds.BuildVer),
-        a(cls := "update-badge", id := HtmlIds.UpdateBadge, href := "#", target := "_blank", rel := "noopener"),
+        span(id := HtmlIds.UpdatePill, cls := "update-pill-slot"),
       ),
       div(cls := "header-right")(
         button(

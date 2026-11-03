@@ -41,7 +41,9 @@ brew tap kevin-lee/tap
 brew install --cask claude-proxymate
 ```
 
-Upgrade to the latest release:
+The app updates itself (see [Updates](#updates)), so you do not need Homebrew
+to get new releases. The cask has `auto_updates true` for this reason.
+`brew upgrade` still works:
 
 ```bash
 brew upgrade --cask claude-proxymate
@@ -61,7 +63,8 @@ the one matching your Mac:
 - **Apple Silicon** (M1/M2/M3/…): `Claude-Proxy-<version>-arm64.dmg`
 - **Intel**: `Claude-Proxy-<version>-x64.dmg`
 
-Open the DMG and drag **Claude Proxymate** to Applications.
+Open the DMG and drag **Claude Proxymate** to Applications. You download a DMG
+only once. Later releases come from inside the app (see [Updates](#updates)).
 
 ### First launch (Gatekeeper)
 
@@ -84,6 +87,30 @@ opening one of those:
 - **macOS 14 and earlier**: in **Applications**, right-click (or Control-click)
   **Claude Proxymate**, choose **Open**, then confirm **Open** in the dialog.
   macOS remembers this choice, so subsequent launches work by double-click.
+
+### Updates
+
+The app updates itself, whether you installed it with Homebrew or from the DMG.
+It checks for a new release when it starts. You can also check at any time with
+**Check now** in the ℹ popover (top right) or with **Claude Proxymate → Check
+for Updates…** in the app menu.
+
+When a new release is found, a pill shows next to the version in the header:
+
+1. **↑ Update to vX.Y.Z**: click it to see the versions, and click
+   **Download and install**.
+2. **Downloading vX.Y.Z · N%**: the download is in progress. You can keep
+   using the app.
+3. **Restart to update vX.Y.Z**: click it, then **Restart now**. Restarting
+   stops the proxy and clears the captured requests. If you click **Later**,
+   the update installs when you quit the app.
+
+**Update automatically when the app starts** (in the ℹ popover, on by default)
+downloads a new release at start without a click. The app never restarts by
+itself. You still choose when to restart.
+
+macOS installs an update only if it is signed with the same Developer ID as the
+installed app. Updates come from the GitHub Releases of this repository.
 
 
 ## Architecture
@@ -309,9 +336,10 @@ Pushing a `v*` tag (or manual dispatch) triggers
 then builds the app with `sbt prodUi` + electron-builder on both an Apple
 Silicon and an Intel macOS runner — each architecture must build on matching
 hardware because the Scala Native proxy binary is compiled for the host CPU —
-verifies each DMG (image integrity, single arch, matching binary
-architectures, Developer ID signature, notarization, and stapled ticket), and
-attaches the DMGs to a GitHub Release.
+verifies each DMG and each zip (image integrity, single arch, matching binary
+architectures, Developer ID signature, notarization, and stapled ticket, and
+for the zip the embedded `app-update.yml`), and attaches them to a GitHub
+Release.
 The release secrets are environment secrets of the `release` environment, not
 repository secrets. Its deployment rule allows only tags that match `v*`, so
 the jobs that use them (`build` and `tap`) run only for a `v*` tag push or a
@@ -326,13 +354,20 @@ analytics-free build. Both workflows set
 `SCALANATIVE_GC_TRAP_BASED_YIELDPOINTS=0` at the workflow level, which
 `build.sbt`'s `checkNativeLinkEnv` requires before linking the proxy binary.
 
-Each build job writes a `.sha256` next to its DMG, and the release job verifies
-the checksums and publishes them with the DMGs. After the GitHub Release, the
+Each build job writes a `.sha256` next to its DMG and its zip, and the release
+job verifies the checksums and publishes them with the DMGs. The zips and their
+`.zip.blockmap` files are the self-update payload. electron-builder runs with
+`--publish never`, so the build jobs upload nothing to GitHub. The release job
+writes `latest-mac.yml`, the self-update feed for both architectures, with
+[`scripts/write-latest-mac-yml.sh`](scripts/write-latest-mac-yml.sh) and
+publishes it in the same release as the zips, after both architecture builds
+have passed. After the GitHub Release, the
 `tap` job checks the published DMGs against their published `.sha256` files
 and runs [`scripts/update-cask.sh`](scripts/update-cask.sh) on a checkout of
 [`kevin-lee/homebrew-tap`](https://github.com/kevin-lee/homebrew-tap). That
 updates `claude-proxymate.rb` in place and keeps the previous release as
-`claude-proxymate@<previous>.rb`. The job then runs `brew style` on the changed
+`claude-proxymate@<previous>.rb`. It also adds `auto_updates true` to the
+current cask if the cask does not have it. The job then runs `brew style` on the changed
 casks, pushes the change to a `claude-proxymate/<version>` branch of the tap and
 opens a pull request to the tap's `main`, which is merged by hand. The job fails
 before changing anything if the tap already has a `claude-proxymate/*` branch,
@@ -402,6 +437,14 @@ Once the app is running:
    ANTHROPIC_BASE_URL=http://localhost:8888 claude
    ```
 3. Use Claude Code normally. All API requests and responses appear in the inspector UI in real-time.
+
+Self-update is off in a development run (`npm start`): the ℹ popover shows
+"Updates are not available in this build". To test the update flow with a local
+feed, set `CLAUDE_PROXYMATE_UPDATE_FEED_URL` to a folder served over HTTP that
+holds a `latest-mac.yml` (from `scripts/write-latest-mac-yml.sh`) and the zips it
+names. For example, `CLAUDE_PROXYMATE_UPDATE_FEED_URL=http://localhost:8000/`.
+macOS installs the update only if the app and the update are signed with the
+same Developer ID, so a full install test needs two signed builds.
 
 The UI visualizes:
 - Request/response pairs with timing
@@ -607,7 +650,7 @@ claude-proxymate/
 │           ├── detail/                       # Detail view, pricing, token popover
 │           ├── copy/                         # CopyUtil, MaskedCopy (WYSIWYG clipboard)
 │           ├── filter/                       # Request Filter sheet, Messages tab badge/selection menus, filter bar
-│           ├── update/                       # GitHub release update check
+│           ├── update/                       # Self-update UI (pill, panel, ℹ section)
 │           └── onboarding/                   # First-run Getting Started (motion intro + guided tour)
 │           # convention: each *View.scala renders ScalaTags to a string and is unit-tested;
 │           #             its sibling module wires that output to the DOM
@@ -621,7 +664,8 @@ claude-proxymate/
 │   ├── icon.icns
 │   └── logo/                         # light/dark logo SVG variants
 └── scripts/
-    └── update-cask.sh                # Update the cask in kevin-lee/homebrew-tap
+    ├── update-cask.sh                # Update the cask in kevin-lee/homebrew-tap
+    └── write-latest-mac-yml.sh       # Write the self-update feed (latest-mac.yml) for a release
 ```
 
 ## Tech Stack

@@ -3,7 +3,10 @@
 # Casks/claude-proxymate@<previous>.rb. The cask is edited, not regenerated, so content added by hand in the tap (such as
 # preflight_steps) is kept. The pinned copy gets the tap's versioned-cask form: livecheck skipped, and preflight guards
 # pointed at Caskroom/claude-proxymate/<v> under :homebrew_prefix, because a versioned cask's own caskroom_path only ever
-# holds its own version. Used by .github/workflows/release.yml and by hand. Does not commit.
+# holds its own version. The current cask gets `auto_updates true` when it does not have it yet, because the app updates
+# itself (electron-updater) and `brew upgrade` must not fight that. The pinned copy is made before that line is added, so
+# a pinned cask has it only if the cask it was made from had it. Used by .github/workflows/release.yml and by hand. Does
+# not commit.
 #
 # usage: scripts/update-cask.sh <version> <arm64-sha256> <x64-sha256> <tap-checkout>
 set -euo pipefail
@@ -119,9 +122,37 @@ sed \
   "$CURRENT" > "$CURRENT.tmp"
 mv "$CURRENT.tmp" "$CURRENT"
 
+# `auto_updates true` goes in the stanza group of `depends_on`, on the line right before the first `depends_on`. Without
+# a `depends_on`, it goes before the `app` stanza as a group of its own, followed by a blank line.
+if ! grep -q '^  auto_updates ' "$CURRENT"; then
+  if grep -q '^  depends_on ' "$CURRENT"; then
+    ANCHOR='^  depends_on '
+    GAP=""
+  elif grep -q '^  app "Claude Proxymate.app"$' "$CURRENT"; then
+    ANCHOR='^  app "Claude Proxymate.app"$'
+    GAP="yes"
+  else
+    echo "error: no depends_on or app stanza to put auto_updates before: $CURRENT" >&2
+    exit 1
+  fi
+  awk -v anchor="$ANCHOR" -v gap="$GAP" '
+    !done && $0 ~ anchor {
+      print "  auto_updates true"
+      if (gap != "") print ""
+      done = 1
+    }
+    { print }
+  ' "$CURRENT" > "$CURRENT.tmp"
+  mv "$CURRENT.tmp" "$CURRENT"
+fi
+
 parse_cask "$CURRENT"
 if [ "$CASK_VERSION" != "$VERSION" ] || [ "$CASK_ARM" != "$ARM_SHA" ] || [ "$CASK_INTEL" != "$INTEL_SHA" ]; then
   echo "error: failed to update $CURRENT" >&2
+  exit 1
+fi
+if [ "$(grep -c '^  auto_updates true$' "$CURRENT")" -ne 1 ]; then
+  echo "error: expected exactly one auto_updates true line in $CURRENT" >&2
   exit 1
 fi
 

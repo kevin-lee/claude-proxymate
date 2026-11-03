@@ -45,6 +45,9 @@ object ElectronMain {
         } else ()
 
         createWindow()
+
+        if (platform === "darwin") AppMenu.install(() => UpdateService.revealFromMenu()) else ()
+        UpdateService.start()
       }
     )
 
@@ -93,6 +96,7 @@ object ElectronMain {
     )
 
     IpcHandlers.register(() => mainWindow.get())
+    UpdateService.register(() => mainWindow.get(), () => quitConfirmed.set(true), () => createWindow())
   }
 
   private def createWindow(): Unit = {

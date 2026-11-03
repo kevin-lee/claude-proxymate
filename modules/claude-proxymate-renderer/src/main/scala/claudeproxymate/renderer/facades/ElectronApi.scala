@@ -20,6 +20,15 @@ trait ElectronApi extends js.Object {
   def filterConfigGet(): js.Promise[js.Dynamic]                  = js.native
   def filterConfigSet(config: js.Any): js.Promise[js.Dynamic]    = js.native
   def claudeInventoryScan(): js.Promise[js.Dynamic]              = js.native
+  def appVersion(): js.Promise[String]                           = js.native
+  def updateStateGet(): js.Promise[js.Dynamic]                   = js.native
+  def updateCheck(): js.Promise[js.Dynamic]                      = js.native
+  def updateDownload(): js.Promise[js.Dynamic]                   = js.native
+  def updateInstall(): js.Promise[js.Dynamic]                    = js.native
+  def updateSettingsGet(): js.Promise[js.Dynamic]                = js.native
+  def updateSettingsSet(settings: js.Any): js.Promise[js.Dynamic] = js.native
+  def onUpdateState(cb: js.Function1[js.Dynamic, Unit]): Unit    = js.native
+  def onUpdateReveal(cb: js.Function1[js.Dynamic, Unit]): Unit   = js.native
 }
 
 object ElectronApi {

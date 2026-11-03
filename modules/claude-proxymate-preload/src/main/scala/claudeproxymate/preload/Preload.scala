@@ -80,6 +80,49 @@ object Preload {
         claudeInventoryScan = { () =>
           IpcRenderer.invoke(IpcChannels.ClaudeInventoryScan)
         }: js.Function0[js.Promise[js.Any]],
+        appVersion = { () =>
+          IpcRenderer.invoke(IpcChannels.AppVersion)
+        }: js.Function0[js.Promise[js.Any]],
+        updateStateGet = { () =>
+          IpcRenderer.invoke(IpcChannels.UpdateStateGet)
+        }: js.Function0[js.Promise[js.Any]],
+        updateCheck = { () =>
+          IpcRenderer.invoke(IpcChannels.UpdateCheck)
+        }: js.Function0[js.Promise[js.Any]],
+        updateDownload = { () =>
+          IpcRenderer.invoke(IpcChannels.UpdateDownload)
+        }: js.Function0[js.Promise[js.Any]],
+        updateInstall = { () =>
+          IpcRenderer.invoke(IpcChannels.UpdateInstall)
+        }: js.Function0[js.Promise[js.Any]],
+        updateSettingsGet = { () =>
+          IpcRenderer.invoke(IpcChannels.UpdateSettingsGet)
+        }: js.Function0[js.Promise[js.Any]],
+        updateSettingsSet = { (settings: js.Any) =>
+          IpcRenderer.invoke(IpcChannels.UpdateSettingsSet, settings)
+        }: js.Function1[js.Any, js.Promise[js.Any]],
+        onUpdateState = { (cb: js.Function1[js.Dynamic, Unit]) =>
+          /* Self-cleaning: a renderer reload re-registers, so drop any
+           * previous listener first. */
+          IpcRenderer.removeAllListeners(IpcChannels.UpdateStateEvent)
+          IpcRenderer.on(
+            IpcChannels.UpdateStateEvent,
+            { (_: js.Dynamic, data: js.Dynamic) =>
+              cb(data)
+            }: js.Function2[js.Dynamic, js.Dynamic, Unit]
+          )
+        }: js.Function1[js.Function1[js.Dynamic, Unit], Unit],
+        onUpdateReveal = { (cb: js.Function1[js.Dynamic, Unit]) =>
+          /* Self-cleaning: a renderer reload re-registers, so drop any
+           * previous listener first. */
+          IpcRenderer.removeAllListeners(IpcChannels.UpdateReveal)
+          IpcRenderer.on(
+            IpcChannels.UpdateReveal,
+            { (_: js.Dynamic, data: js.Dynamic) =>
+              cb(data)
+            }: js.Function2[js.Dynamic, js.Dynamic, Unit]
+          )
+        }: js.Function1[js.Function1[js.Dynamic, Unit], Unit],
       )
 
     ContextBridge.exposeInMainWorld(IpcChannels.BridgeName, api.asInstanceOf[js.Object])

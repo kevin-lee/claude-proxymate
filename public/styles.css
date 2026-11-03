@@ -33,19 +33,72 @@
     .logo-text { font-size: 15px; font-weight: 700; }
     .logo-sub { font-size: 11px; color: var(--dim); }
     .logo-ver { font-size: 10px; color: var(--dim); opacity: 0.6; }
-    .update-badge {
-      font-size: 10px;
+
+    /* ── Self-update pill (in .logo, next to the version) ── */
+    .update-pill-slot { display: inline-flex; align-items: center; }
+    .update-pill-slot:empty { display: none; }
+    .update-pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      font: inherit; font-size: 11px; font-weight: 600; line-height: 1.4;
+      border-radius: 4px; padding: 2px 8px; white-space: nowrap;
+      -webkit-app-region: no-drag; transition: background .15s;
+    }
+    button.update-pill { cursor: pointer; }
+    .update-pill-available {
       color: var(--green);
       background: color-mix(in srgb, var(--green) 12%, transparent);
       border: 1px solid color-mix(in srgb, var(--green) 35%, transparent);
-      border-radius: 4px;
-      padding: 1px 5px;
-      cursor: pointer;
-      text-decoration: none;
-      white-space: nowrap;
-      display: none;
     }
-    .update-badge:hover { background: color-mix(in srgb, var(--green) 22%, transparent); }
+    .update-pill-available:hover { background: color-mix(in srgb, var(--green) 22%, transparent); }
+    .update-pill-downloading {
+      color: var(--blue);
+      background: color-mix(in srgb, var(--blue) 10%, transparent);
+      border: 1px solid color-mix(in srgb, var(--blue) 30%, transparent);
+    }
+    .update-pill-ready { color: #fff; background: var(--blue); border: 1px solid var(--blue); }
+    .update-pill-ready:hover { background: color-mix(in srgb, var(--blue) 85%, #000); }
+    .update-pill-failed {
+      color: var(--red);
+      background: color-mix(in srgb, var(--red) 10%, transparent);
+      border: 1px solid color-mix(in srgb, var(--red) 35%, transparent);
+    }
+    .update-pill-failed:hover { background: color-mix(in srgb, var(--red) 18%, transparent); }
+    .update-progress {
+      display: inline-block; width: 48px; height: 4px; border-radius: 2px; overflow: hidden;
+      background: color-mix(in srgb, var(--blue) 22%, transparent);
+    }
+    .update-progress-fill { display: block; height: 100%; background: var(--blue); transition: width .2s; }
+
+    /* ── Self-update panel (under the pill, appended to the header) ── */
+    .update-panel {
+      position: absolute; z-index: 900; width: 320px;
+      -webkit-app-region: no-drag;
+      background: var(--surface); border: 1px solid color-mix(in srgb, var(--green) 35%, transparent);
+      border-radius: 8px; padding: 12px 14px;
+      box-shadow: 0 8px 24px color-mix(in srgb, var(--text) 22%, transparent);
+      animation: popFadeIn 0.15s ease-out;
+    }
+    .update-panel-title {
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .7px; color: var(--green); margin-bottom: 8px;
+    }
+    .update-panel-body {
+      display: flex; flex-direction: column; gap: 8px;
+      background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 10px;
+      font-size: 12px; color: var(--text);
+    }
+    .update-panel-versions { display: flex; justify-content: space-between; gap: 12px; }
+    .update-panel-new { color: var(--green); font-weight: 700; }
+    .update-panel-note { font-size: 11px; color: var(--dim); line-height: 1.5; }
+    .update-panel-actions { display: flex; align-items: center; gap: 8px; }
+    .update-panel-link { margin-left: auto; color: var(--blue); text-decoration: underline; cursor: pointer; }
+    .update-btn-primary, .update-btn-secondary {
+      font: inherit; font-size: 12px; border-radius: 5px; padding: 5px 12px; cursor: pointer;
+    }
+    .update-btn-primary { font-weight: 600; color: #fff; background: var(--blue); border: 1px solid var(--blue); }
+    .update-btn-primary:hover { background: color-mix(in srgb, var(--blue) 85%, #000); }
+    .update-btn-secondary { color: var(--text); background: none; border: 1px solid var(--border); }
+    .update-btn-secondary:hover { border-color: var(--blue); }
 
     /* ── Theme Toggle ── */
     .theme-toggle-btn {
@@ -315,6 +368,23 @@
       background: none; border: none; padding: 0; font: inherit;
       color: var(--blue); text-decoration: underline; cursor: pointer;
     }
+    /* update section of the info popover (status, Check now, auto update) */
+    .proxy-info-popover-update {
+      display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px;
+      background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 10px;
+      font-size: 12px; color: var(--text);
+    }
+    .proxy-info-popover-update-status-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .proxy-info-popover-update-check {
+      font: inherit; font-size: 11px; font-weight: 600; white-space: nowrap;
+      color: var(--blue); background: none; border: 1px solid var(--blue);
+      border-radius: 5px; padding: 3px 10px; cursor: pointer;
+    }
+    .proxy-info-popover-update-check:hover { background: color-mix(in srgb, var(--blue) 12%, transparent); }
+    .proxy-info-popover-update-check:disabled { opacity: .5; cursor: default; background: none; }
+    .proxy-info-popover-update-checked { font-size: 11px; color: var(--dim); }
+    .proxy-info-popover-update-auto { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+    .proxy-info-popover-update-auto input { margin: 0; accent-color: var(--blue); }
 
     /* ── Messages view ── */
     .msg-filter {
