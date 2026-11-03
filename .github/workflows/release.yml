@@ -186,7 +186,7 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: cd electron-app && npx electron-builder --mac --${{ matrix.arch }}
+        run: cd electron-app && npx electron-builder --mac --${{ matrix.arch }} --publish never
 
       # Guard against the failure modes that broke v0.1.0: a runner building
       # more than its own arch, a DMG whose bundled native proxy binary doesn't

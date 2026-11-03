@@ -75,7 +75,7 @@ jobs:
       # release.yml's comments). This deliberately avoids the slow notarization
       # round-trip.
       - name: Package with electron-builder (unsigned)
-        run: cd electron-app && npx electron-builder --mac --arm64
+        run: cd electron-app && npx electron-builder --mac --arm64 --publish never
 
       # Reduced version of release.yml's verify: this job never has signing
       # credentials. The codesign seal check is intentionally omitted here —
