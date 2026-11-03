@@ -26,7 +26,8 @@ object IndexHtmlGeneratorSpec extends Properties {
     example("CSP meta tag is emitted in <head>", testCspMetaPresent),
     example("CSP locks script-src to 'self' (no unsafe-inline / unsafe-eval)", testCspScriptSrcStrict),
     example("CSP includes object-src 'none'", testCspObjectSrcNone),
-    example("CSP allows api.github.com in connect-src for the update check", testCspGitHubApiAllowed),
+    example("CSP does not allow api.github.com (the update check runs in main)", testCspGitHubApiNotAllowed),
+    example("header has the update pill slot and no old update badge", testUpdatePillSlot),
     example("CSP includes base-uri / form-action / frame-ancestors hardening", testCspDefenceInDepth),
   )
 
@@ -275,10 +276,20 @@ object IndexHtmlGeneratorSpec extends Properties {
       .assert(rendered.contains("object-src 'none'"))
       .log("`object-src 'none'` missing from CSP")
 
-  def testCspGitHubApiAllowed: Result =
+  def testCspGitHubApiNotAllowed: Result =
     Result
-      .assert(rendered.contains("https://api.github.com"))
-      .log("`https://api.github.com` missing from CSP connect-src")
+      .assert(!rendered.contains("https://api.github.com"))
+      .log("`https://api.github.com` must not be in CSP connect-src")
+
+  def testUpdatePillSlot: Result =
+    Result.all(
+      List(
+        Result
+          .assert(rendered.contains(s"""id="${HtmlIds.UpdatePill}""""))
+          .log(s"`id=\"${HtmlIds.UpdatePill}\"` missing from generated HTML"),
+        Result.assert(!rendered.contains("updateBadge")).log("the old `updateBadge` must be gone"),
+      )
+    )
 
   def testCspDefenceInDepth: Result =
     Result.all(

@@ -145,7 +145,7 @@ jobs:
       # stops the job when a credential is missing, and Verify DMG requires a
       # Developer ID signature, notarization and a stapled ticket.
       #
-      # electron-builder must be >= 26.16.1 (pinned in
+      # electron-builder must be >= 26.18.1 (pinned in
       # project/package.json.template). Up to 26.15.3 it passed the .p12
       # password to `security set-key-partition-list -k`, which wants the
       # temporary keychain's own password. That mismatch was harmless while
@@ -157,6 +157,15 @@ jobs:
       # any higher one that also satisfies the range, and 26.16.x shipped under
       # the `v26` tag while `latest` stayed on the broken 26.15.3, so `^26.8.1`
       # resolved to 26.15.3. The floor has to sit above `latest` to win.
+      # The same holds for 26.18.1, the newest 26.x (tag `v26`) while
+      # `latest` is 26.18.0.
+      #
+      # Self-update: mac.target also builds a zip, the payload Squirrel.Mac
+      # installs, and the GitHub `publish` config makes electron-builder embed
+      # Contents/Resources/app-update.yml in the app before signing. The
+      # build stays `--publish never`: nothing is uploaded and no token is
+      # needed. The latest-mac.yml each runner writes lists only its own arch,
+      # so it is not uploaded. The release job writes the merged one.
       #
       # The template's mac.target deliberately has NO "arch" list: an explicit
       # arch list in config overrides the CLI --arm64/--x64 flag, which made
@@ -182,8 +191,9 @@ jobs:
       # Guard against the failure modes that broke v0.1.0: a runner building
       # more than its own arch, a DMG whose bundled native proxy binary doesn't
       # match the DMG's arch, and an app that isn't actually Developer-ID
-      # signed + notarized + stapled.
-      - name: Verify DMG
+      # signed + notarized + stapled. The zip holds the app that self-update
+      # installs, so it gets the same checks, plus the updater config.
+      - name: Verify DMG and zip
         run: |
           set -euo pipefail
           cd electron-app/release
@@ -192,38 +202,65 @@ jobs:
             echo "Expected exactly 1 DMG for ${{ matrix.arch }}, got: ${DMGS[*]}"
             exit 1
           fi
+          ZIPS=(*.zip)
+          if [ "${#ZIPS[@]}" -ne 1 ]; then
+            echo "Expected exactly 1 zip for ${{ matrix.arch }}, got: ${ZIPS[*]}"
+            exit 1
+          fi
+          EXPECTED="${{ matrix.arch == 'x64' && 'x86_64' || 'arm64' }}"
+          # verify_app <app>: signature, notarization, stapled ticket and arch.
+          verify_app() {
+            local app="$1"
+            # At minimum an ad-hoc signature with a valid resource seal; a
+            # seal-less app is reported by macOS as "damaged" with no recovery.
+            codesign --verify --deep --strict "$app"
+            # Fail the release if the app is not Developer-ID signed, accepted
+            # by Gatekeeper as notarized, and carrying a stapled ticket.
+            codesign -dvvv "$app" 2>&1 | grep "Authority=Developer ID Application"
+            spctl -a -vvv "$app"
+            xcrun stapler validate "$app"
+            for bin in "Contents/MacOS/Claude Proxymate" "Contents/Resources/claude-proxymate"; do
+              ARCH_INFO=$(file "$app/$bin")
+              echo "$ARCH_INFO"
+              if ! echo "$ARCH_INFO" | grep -q "$EXPECTED"; then
+                echo "ERROR: $bin is not $EXPECTED"
+                exit 1
+              fi
+            done
+          }
           hdiutil verify "${DMGS[0]}"
           MNT=$(hdiutil attach "${DMGS[0]}" -nobrowse -readonly | awk -F'\t' '/\/Volumes\//{print $NF}')
           trap 'hdiutil detach "$MNT" -quiet' EXIT
-          # At minimum an ad-hoc signature with a valid resource seal; a
-          # seal-less app is reported by macOS as "damaged" with no recovery.
-          codesign --verify --deep --strict "$MNT/Claude Proxymate.app"
-          # Fail the release if the app is not Developer-ID signed, accepted
-          # by Gatekeeper as notarized, and carrying a stapled ticket.
-          codesign -dvvv "$MNT/Claude Proxymate.app" 2>&1 | grep "Authority=Developer ID Application"
-          spctl -a -vvv "$MNT/Claude Proxymate.app"
-          xcrun stapler validate "$MNT/Claude Proxymate.app"
-          EXPECTED="${{ matrix.arch == 'x64' && 'x86_64' || 'arm64' }}"
-          for bin in "Contents/MacOS/Claude Proxymate" "Contents/Resources/claude-proxymate"; do
-            ARCH_INFO=$(file "$MNT/Claude Proxymate.app/$bin")
-            echo "$ARCH_INFO"
-            if ! echo "$ARCH_INFO" | grep -q "$EXPECTED"; then
-              echo "ERROR: $bin is not $EXPECTED"
+          verify_app "$MNT/Claude Proxymate.app"
+          ZIPCHECK="$RUNNER_TEMP/zipcheck"
+          rm -rf "$ZIPCHECK"
+          mkdir -p "$ZIPCHECK"
+          ditto -x -k "${ZIPS[0]}" "$ZIPCHECK"
+          verify_app "$ZIPCHECK/Claude Proxymate.app"
+          # electron-updater reads its feed from this file. It is inside the
+          # signature, so it must already be right here.
+          UPDATE_YML="$ZIPCHECK/Claude Proxymate.app/Contents/Resources/app-update.yml"
+          cat "$UPDATE_YML"
+          for line in "provider: github" "owner: kevin-lee" "repo: claude-proxymate"; do
+            if ! grep -qx "$line" "$UPDATE_YML"; then
+              echo "ERROR: app-update.yml has no '$line'"
               exit 1
             fi
           done
 
       # Taken after electron-builder has finished and the read-only
-      # verification above has run, so it describes the bytes that are uploaded
-      # and published. The release and tap jobs check every copy against it.
-      # Verify DMG has already checked that there is exactly one DMG.
-      - name: Write the DMG checksum
+      # verification above has run, so they describe the bytes that are
+      # uploaded and published. The release and tap jobs check every copy
+      # against them. Verify DMG and zip has already checked that there is
+      # exactly one DMG and one zip.
+      - name: Write the checksums
         run: |
           set -euo pipefail
           cd electron-app/release
-          DMGS=(*.dmg)
-          shasum -a 256 "${DMGS[0]}" > "${DMGS[0]}.sha256"
-          shasum -a 256 -c "${DMGS[0]}.sha256"
+          for file in *.dmg *.zip; do
+            shasum -a 256 "$file" > "$file.sha256"
+            shasum -a 256 -c "$file.sha256"
+          done
 
       - name: Upload artifacts
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -232,6 +269,9 @@ jobs:
           path: |
             electron-app/release/*-${{ matrix.arch }}.dmg
             electron-app/release/*-${{ matrix.arch }}.dmg.sha256
+            electron-app/release/*-${{ matrix.arch }}.zip
+            electron-app/release/*-${{ matrix.arch }}.zip.sha256
+            electron-app/release/*-${{ matrix.arch }}.zip.blockmap
 
   release:
     needs: build
@@ -242,40 +282,54 @@ jobs:
     permissions:
       contents: write
     steps:
+      # This repository, for scripts/write-latest-mac-yml.sh.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: artifacts
           merge-multiple: true
 
-      # Each artifact now carries only its own arch's DMG and checksum file, so
-      # merge-multiple cannot collide. Assert we have exactly one DMG and one
-      # checksum file per arch, and that every DMG matches the checksum written
-      # in its build job, before publishing anything.
+      # Each artifact carries only its own arch's files, so merge-multiple
+      # cannot collide. Assert we have exactly one DMG, one zip, one zip
+      # blockmap and their checksum files per arch, and that every DMG and zip
+      # matches the checksum written in its build job, before publishing
+      # anything.
       - name: Sanity-check artifacts
         run: |
           set -euo pipefail
           shopt -s nullglob
           ls -la artifacts/
           for arch in arm64 x64; do
-            DMGS=(artifacts/*-"$arch".dmg)
-            if [ "${#DMGS[@]}" -ne 1 ]; then
-              echo "ERROR: expected exactly 1 $arch DMG, found ${#DMGS[@]}"
-              exit 1
-            fi
-            SUMS=(artifacts/*-"$arch".dmg.sha256)
-            if [ "${#SUMS[@]}" -ne 1 ]; then
-              echo "ERROR: expected exactly 1 $arch checksum file, found ${#SUMS[@]}"
-              exit 1
-            fi
+            for pattern in "*-$arch.dmg" "*-$arch.dmg.sha256" "*-$arch.zip" "*-$arch.zip.sha256" "*-$arch.zip.blockmap"; do
+              # The pattern is a glob on purpose.
+              # shellcheck disable=SC2206
+              FILES=(artifacts/$pattern)
+              if [ "${#FILES[@]}" -ne 1 ]; then
+                echo "ERROR: expected exactly 1 $pattern, found ${#FILES[@]}"
+                exit 1
+              fi
+            done
           done
           (cd artifacts && sha256sum -c ./*.sha256)
+
+      # The electron-updater feed for both arches. It goes up together with
+      # the zips it names, after both arch builds have passed.
+      - name: Write latest-mac.yml
+        run: |
+          set -euo pipefail
+          scripts/write-latest-mac-yml.sh "${GITHUB_REF_NAME#v}" artifacts
+          cat artifacts/latest-mac.yml
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           files: |
             artifacts/**/*.dmg
+            artifacts/**/*.zip
+            artifacts/**/*.zip.blockmap
             artifacts/**/*.sha256
+            artifacts/latest-mac.yml
           generate_release_notes: true
 
   tap:

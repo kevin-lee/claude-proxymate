@@ -123,5 +123,6 @@ object I18n {
     claudeproxymate.renderer.filter.RequestFilterSheet.renderButton()
     claudeproxymate.renderer.filter.RequestFilterSheet.rerenderIfOpen()
     claudeproxymate.renderer.theme.Theme.apply()
+    claudeproxymate.renderer.update.UpdateControl.rerender()
   }
 }

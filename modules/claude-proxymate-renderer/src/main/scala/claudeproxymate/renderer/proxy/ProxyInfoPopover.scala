@@ -4,6 +4,7 @@ import cats.syntax.all.*
 import claudeproxymate.core.HtmlIds
 import claudeproxymate.renderer.i18n.I18n
 import claudeproxymate.renderer.onboarding.Onboarding
+import claudeproxymate.renderer.update.UpdateControl
 import claudeproxymate.renderer.view.ViewHelpers
 import org.scalajs.dom
 
@@ -47,6 +48,24 @@ object ProxyInfoPopover {
     if (existing != null) {
       locally { val _ = existing.parentNode.removeChild(existing) }
     } else {
+      create(bar)
+    }
+  }
+
+  /** Opens the popover if it is not open (the app menu's "Check for Updates…"). */
+  def open(): Unit = {
+    val bar = dom.document.getElementById(HtmlIds.AppHeader)
+    if (bar != null && bar.querySelector("." + ProxyInfoPopoverView.PopoverClass) == null) create(bar) else ()
+  }
+
+  /** If the popover is open, re-renders only its update section. */
+  def refreshUpdateSection(): Unit = {
+    val section = dom.document.querySelector(s".${ProxyInfoPopoverView.UpdateSectionClass}")
+    if (section != null) ViewHelpers.setInnerHtml(section, UpdateControl.infoSection()) else ()
+  }
+
+  private def create(bar: dom.Element): Unit = {
+    locally {
       val pop    = dom.document.createElement("div").asInstanceOf[dom.html.Div]
       pop.className = ProxyInfoPopoverView.PopoverClass
       val labels = ProxyInfoPopoverLabels(
@@ -55,7 +74,7 @@ object ProxyInfoPopover {
         bugReportLabel = I18n.t("proxy.aboutBugReport"),
         gettingStartedLabel = I18n.t("proxy.aboutGettingStarted"),
       )
-      ViewHelpers.setInnerHtml(pop, ProxyInfoPopoverView.buildPopoverFrag(labels))
+      ViewHelpers.setInnerHtml(pop, ProxyInfoPopoverView.buildPopoverFrag(labels, UpdateControl.infoSection()))
       locally { val _ = bar.appendChild(pop) }
     }
   }

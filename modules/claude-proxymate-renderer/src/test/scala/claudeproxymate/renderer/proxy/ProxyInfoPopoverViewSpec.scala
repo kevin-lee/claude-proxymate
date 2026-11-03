@@ -3,6 +3,7 @@ package claudeproxymate.renderer.proxy
 import claudeproxymate.renderer.detail.TokenPopoverLinks
 import hedgehog.*
 import hedgehog.runner.*
+import scalatags.Text.all.*
 
 object ProxyInfoPopoverViewSpec extends Properties {
 
@@ -15,11 +16,14 @@ object ProxyInfoPopoverViewSpec extends Properties {
     example("buildPopoverFrag links carry external-link, _blank and noopener", testLinkAttrs),
     example("buildPopoverFrag renders both link labels", testLinkLabels),
     example("buildPopoverFrag renders the Getting Started replay button", testReplayButton),
+    example("buildPopoverFrag renders the update section between the title and the links", testUpdateSection),
     property("buildPopoverFrag never leaks raw <script> from labels", testNoScriptLeak),
   )
 
   private def render(labels: ProxyInfoPopoverLabels): String =
-    ProxyInfoPopoverView.buildPopoverFrag(labels).render
+    ProxyInfoPopoverView.buildPopoverFrag(labels, sampleUpdateSection).render
+
+  private val sampleUpdateSection: Frag = span(cls := "sample-update")("UPDATE-SECTION")
 
   private val sampleLabels = ProxyInfoPopoverLabels(
     title = "About Claude Proxymate",
@@ -87,6 +91,17 @@ object ProxyInfoPopoverViewSpec extends Properties {
         Result.assert(html.contains("Getting Started")).log(s"replay label missing: $html"),
       )
     )
+  }
+
+  def testUpdateSection: Result = {
+    val html    = render(sampleLabels)
+    val title   = html.indexOf(s"${ProxyInfoPopoverView.PopoverClass}-title")
+    val section = html.indexOf(s"""class="${ProxyInfoPopoverView.UpdateSectionClass}"""")
+    val content = html.indexOf("UPDATE-SECTION")
+    val body    = html.indexOf(s"${ProxyInfoPopoverView.PopoverClass}-body")
+    Result
+      .assert(title >= 0 && title < section && section < content && content < body)
+      .log(s"expected title < update section < body: $html")
   }
 
   def testNoScriptLeak: Property =

@@ -19,7 +19,7 @@ import claudeproxymate.renderer.route.RouteControl
 import claudeproxymate.renderer.search.{ProxyDetailSearchListeners, SearchNavigation}
 import claudeproxymate.renderer.state.{AppState, PresenterMode}
 import claudeproxymate.renderer.theme.Theme
-import claudeproxymate.renderer.update.UpdateChecker
+import claudeproxymate.renderer.update.UpdateControl
 import org.scalajs.dom
 
 import scala.scalajs.js
@@ -27,7 +27,7 @@ import scala.scalajs.js
 /** Scala.js renderer entry point for the Electron renderer process.
   *
   * Ports the Init section from renderer.js: keydown handlers,
-  * platform detection, build-info fetch, applyI18n, proxy status sync,
+  * platform detection, app version, applyI18n, proxy status sync,
   * onboarding, and token popover installation.
   */
 object RendererMain {
@@ -35,7 +35,7 @@ object RendererMain {
     Theme.init()
     installKeydownHandler()
     detectPlatform()
-    fetchBuildInfo()
+    fetchAppVersion()
     locally {
       val _ = I18n
         .loadLocales()
@@ -56,6 +56,7 @@ object RendererMain {
     ProxyList.install()
     ProxyList.renderProxyList()
     ProxyInfoPopover.install()
+    UpdateControl.install()
     JsonTreeViewer.install()
     MechChips.install()
     MessageRenderer.install()
@@ -163,23 +164,20 @@ object RendererMain {
     }
   }
 
-  private def fetchBuildInfo(): Unit = {
-    locally {
-      val _ = dom
-        .window
-        .fetch("build-info.json")
-        .`then`[js.Dynamic] { (r: dom.Response) => r.json().asInstanceOf[js.Promise[js.Dynamic]] }
-        .`then`[Unit] { (b: js.Dynamic) =>
-          val version  = b.version.asInstanceOf[String]
-          val hash     = b.hash.asInstanceOf[String]
-          val buildVer = dom.document.getElementById(HtmlIds.BuildVer)
-          if (buildVer != null) buildVer.textContent = s"v$version ($hash)"
-          UpdateChecker.checkForUpdate(version)
-        }
-        .asInstanceOf[js.Dynamic]
-        .`catch`({ (_: Any) => () }: js.Function1[Any, Unit])
+  /** Shows the app version (from Electron's `app.getVersion()`) in the header. */
+  private def fetchAppVersion(): Unit =
+    ElectronApi.get.foreach { api =>
+      locally {
+        val _ = api
+          .appVersion()
+          .`then`[Unit] { (version: String) =>
+            val buildVer = dom.document.getElementById(HtmlIds.BuildVer)
+            if (buildVer != null) buildVer.textContent = s"v$version"
+          }
+          .asInstanceOf[js.Dynamic]
+          .`catch`({ (_: Any) => () }: js.Function1[Any, Unit])
+      }
     }
-  }
 
   private def showProxyUi(): Unit = {
     val bar   = dom.document.getElementById(HtmlIds.ProxyBar)
