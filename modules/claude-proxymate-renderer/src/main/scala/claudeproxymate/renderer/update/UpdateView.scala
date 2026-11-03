@@ -98,7 +98,7 @@ object UpdateView {
     case UpdateState.Failed(UpdatePhase.Download | UpdatePhase.Install, _, _, _) =>
       button(tpe := "button", cls := s"$PillClass $PillClass-failed")(labels.pillFailed).some
     case UpdateState.Unsupported | UpdateState.Idle | UpdateState.Checking(_) | UpdateState.UpToDate(_) |
-        UpdateState.Failed(UpdatePhase.Check, _, _, _) =>
+         UpdateState.Failed(UpdatePhase.Check, _, _, _) =>
       none[Frag]
   }
 
@@ -158,7 +158,7 @@ object UpdateView {
         ),
       ).some
     case UpdateState.Unsupported | UpdateState.Idle | UpdateState.Checking(_) | UpdateState.UpToDate(_) |
-        UpdateState.Downloading(_, _) =>
+         UpdateState.Downloading(_, _) =>
       none[Frag]
   }
 
@@ -191,7 +191,7 @@ object UpdateView {
     case UpdateState.Available(_, checkedAt) => checkedAt.some
     case UpdateState.Failed(_, _, _, checkedAt) => checkedAt
     case UpdateState.Unsupported | UpdateState.Idle | UpdateState.Checking(_) | UpdateState.Downloading(_, _) |
-        UpdateState.Ready(_) =>
+         UpdateState.Ready(_) =>
       none[Double]
   }
 
@@ -226,7 +226,7 @@ object UpdateView {
           case UpdateState.Unsupported =>
             if (settings.autoUpdate) checkbox(checked := true, disabled := true) else checkbox(disabled := true)
           case UpdateState.Idle | UpdateState.Checking(_) | UpdateState.UpToDate(_) | UpdateState.Available(_, _) |
-              UpdateState.Downloading(_, _) | UpdateState.Ready(_) | UpdateState.Failed(_, _, _, _) =>
+               UpdateState.Downloading(_, _) | UpdateState.Ready(_) | UpdateState.Failed(_, _, _, _) =>
             if (settings.autoUpdate) checkbox(checked := true) else checkbox
         },
         labels.autoUpdate,

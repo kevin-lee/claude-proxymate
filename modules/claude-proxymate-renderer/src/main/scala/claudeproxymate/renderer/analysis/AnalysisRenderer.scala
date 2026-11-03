@@ -233,6 +233,7 @@ object AnalysisRenderer {
       lblStream = I18n.t("anatomy.lblStream"),
       noteFastMode = I18n.t("token.noteFastMode"),
       noteUsInference = I18n.t("token.noteUsInference"),
+      noteLongPrompt = I18n.t("token.noteLongPrompt"),
     )
 
   private def readModelName(body: js.Dynamic): Option[String] = {

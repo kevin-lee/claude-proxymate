@@ -19,8 +19,8 @@ object TokenPopoverViewSpec extends Properties {
     example("buildCopyText includes all rows", testCopyTextAllRows),
     property("buildPopoverFrag output never contains literal <script>", testNoScriptLeak),
     example("per-search row renders count × price in popover and copy text", testPerSearchRow),
-    example("fast-mode and US-only notes render when Some", testModifierNotesIncluded),
-    example("fast-mode and US-only notes are omitted when None", testModifierNotesOmitted),
+    example("fast-mode, US-only and long-prompt notes render when Some", testModifierNotesIncluded),
+    example("fast-mode, US-only and long-prompt notes are omitted when None", testModifierNotesOmitted),
   )
 
   private val sampleRow = TokenPopoverRow(
@@ -55,6 +55,7 @@ object TokenPopoverViewSpec extends Properties {
     noteCacheSaving = Some("Cache 75%"),
     noteFastMode = None,
     noteUsInference = None,
+    noteLongPrompt = None,
   )
 
   private val sampleDescriptions = Map(
@@ -166,29 +167,37 @@ object TokenPopoverViewSpec extends Properties {
   }
 
   def testModifierNotesIncluded: Result = {
-    val labels = sampleLabels.copy(noteFastMode = Some("Fast 2x"), noteUsInference = Some("US 1.1x"))
+    val labels = sampleLabels.copy(
+      noteFastMode = Some("Fast 2x"),
+      noteUsInference = Some("US 1.1x"),
+      noteLongPrompt = Some("Long 5x"),
+    )
     val html   = render(labels = labels)
     val text   = TokenPopoverView.buildCopyText(sampleData(), labels)
     Result.all(
       List(
         Result.assert(html.contains("Fast 2x")).log(html),
         Result.assert(html.contains("US 1.1x")).log(html),
+        Result.assert(html.contains("Long 5x")).log(html),
         Result.assert(text.contains("Fast 2x")).log(text),
         Result.assert(text.contains("US 1.1x")).log(text),
+        Result.assert(text.contains("Long 5x")).log(text),
       )
     )
   }
 
   def testModifierNotesOmitted: Result = {
-    val labels = sampleLabels.copy(noteFastMode = None, noteUsInference = None)
+    val labels = sampleLabels.copy(noteFastMode = None, noteUsInference = None, noteLongPrompt = None)
     val html   = render(labels = labels)
     val text   = TokenPopoverView.buildCopyText(sampleData(), labels)
     Result.all(
       List(
         Result.assert(!html.contains("Fast 2x")).log(html),
         Result.assert(!html.contains("US 1.1x")).log(html),
+        Result.assert(!html.contains("Long 5x")).log(html),
         Result.assert(!text.contains("Fast 2x")).log(text),
         Result.assert(!text.contains("US 1.1x")).log(text),
+        Result.assert(!text.contains("Long 5x")).log(text),
       )
     )
   }

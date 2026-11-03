@@ -33,6 +33,8 @@ object PricingSpec extends Properties {
     example("Sonnet 4 legacy ID -> Sonnet", testSonnet4Legacy),
     example("Sonnet 3.7 full ID -> Sonnet", testSonnet3_7),
     example("Sonnet 3.5 full ID -> Sonnet (not Sonnet5)", testSonnet3_5),
+    example("Haiku 5.5 alias -> Haiku5_5", testHaiku5_5),
+    example("Haiku 5.5 Bedrock ID -> Haiku5_5", testHaiku5_5Bedrock),
     example("Haiku 4.5 alias -> Haiku4_5", testHaiku4_5Alias),
     example("Haiku 4.5 full ID -> Haiku4_5", testHaiku4_5FullId),
     example("Haiku 3.5 full ID -> Haiku3_5", testHaiku3_5),
@@ -40,7 +42,7 @@ object PricingSpec extends Properties {
     example("unreleased Fable -> Fable5_1 (family fallback)", testFutureFable),
     example("unreleased Opus -> Opus5_5 (family fallback)", testFutureOpus),
     example("unreleased Sonnet -> Sonnet5_5 (family fallback)", testFutureSonnet),
-    example("unreleased Haiku -> Haiku4_5 (family fallback)", testFutureHaiku),
+    example("unreleased Haiku -> Haiku5_5 (family fallback)", testFutureHaiku),
     example("empty model -> Unknown", testEmptyUnknown),
     example("arbitrary string -> Unknown", testArbitraryUnknown),
     example("Fable5_1 rates match pricing doc", testRatesFable5_1),
@@ -51,16 +53,27 @@ object PricingSpec extends Properties {
     example("Sonnet5_5 rates match pricing doc", testRatesSonnet5_5),
     example("Sonnet5 rates match pricing doc", testRatesSonnet5),
     example("Sonnet rates match pricing doc", testRatesSonnet),
+    example("Haiku5_5 rates match pricing doc", testRatesHaiku5_5),
+    example("Haiku5_5 long-prompt rates match pricing doc", testLongPromptRatesHaiku5_5),
     example("Haiku4_5 rates match pricing doc", testRatesHaiku4_5),
     example("Haiku3_5 rates match pricing doc", testRatesHaiku3_5),
     example("Haiku3 rates match pricing doc", testRatesHaiku3),
     example("Unknown rates equal OpusPremium rates (fallback)", testUnknownFallback),
-    property("ratesFor Standard + Global equals rates on every tier", testStandardGlobalUnchanged),
+    property(
+      "ratesFor Standard + Global + Standard prompt equals rates on every tier",
+      testStandardGlobalUnchanged,
+    ),
     example("ratesFor Opus5_5 fast matches fast-mode pricing doc", testFastOpus5_5),
     example("ratesFor OpusPremium fast matches fast-mode pricing doc", testFastOpusPremium),
     example("ratesFor Sonnet5 US-only is 1.1x", testUsSonnet5),
     example("ratesFor Sonnet5_5 US-only is 1.1x", testUsSonnet5_5),
     example("ratesFor Opus5_5 fast + US-only stacks to 2.2x", testFastUsOpus5_5),
+    example("ratesFor Haiku5_5 Long uses the long-prompt card", testLongHaiku5_5),
+    example("ratesFor Haiku5_5 Long + US-only is 1.1x of the long card", testLongUsHaiku5_5),
+    example("billedPromptLength Haiku5_5 Long -> Long", testBilledLongHaiku5_5),
+    example("billedPromptLength Haiku4_5 Long -> Standard", testBilledLongHaiku4_5),
+    property("ratesFor Long equals ratesFor Standard on every tier except Haiku5_5", testLongUnchangedWithoutCard),
+    property("longPromptRates is None on every tier except Haiku5_5", testNoLongPromptRates),
     example("Speed.fromUsage fast -> Fast", testSpeedFast),
     example("Speed.fromUsage standard -> Standard", testSpeedStandard),
     example("Speed.fromUsage unknown string -> Standard", testSpeedUnknown),
@@ -68,6 +81,9 @@ object PricingSpec extends Properties {
     example("InferenceGeo.fromUsage us -> Us", testGeoUs),
     example("InferenceGeo.fromUsage global -> Global", testGeoGlobal),
     example("InferenceGeo.fromUsage missing -> Global", testGeoMissing),
+    example("PromptLength.fromPromptTokens 0 -> Standard", testPromptLengthZero),
+    example("PromptLength.fromPromptTokens 100,000 -> Standard", testPromptLengthAtThreshold),
+    example("PromptLength.fromPromptTokens 100,001 -> Long", testPromptLengthOverThreshold),
     example("webSearchCost is $0.01 per search", testWebSearchCost),
   )
 
@@ -100,6 +116,8 @@ object PricingSpec extends Properties {
   def testSonnet4Legacy: Result    = ModelTier.forModel("claude-sonnet-4-20250514") ==== Sonnet
   def testSonnet3_7: Result        = ModelTier.forModel("claude-3-7-sonnet-20250219") ==== Sonnet
   def testSonnet3_5: Result        = ModelTier.forModel("claude-3-5-sonnet-20241022") ==== Sonnet
+  def testHaiku5_5: Result         = ModelTier.forModel("claude-haiku-5-5") ==== Haiku5_5
+  def testHaiku5_5Bedrock: Result  = ModelTier.forModel("anthropic.claude-haiku-5-5") ==== Haiku5_5
   def testHaiku4_5Alias: Result    = ModelTier.forModel("claude-haiku-4-5") ==== Haiku4_5
   def testHaiku4_5FullId: Result   = ModelTier.forModel("claude-haiku-4-5-20251001") ==== Haiku4_5
   def testHaiku3_5: Result         = ModelTier.forModel("claude-3-5-haiku-20241022") ==== Haiku3_5
@@ -107,7 +125,7 @@ object PricingSpec extends Properties {
   def testFutureFable: Result      = ModelTier.forModel("claude-fable-6") ==== Fable5_1
   def testFutureOpus: Result       = ModelTier.forModel("claude-opus-6") ==== Opus5_5
   def testFutureSonnet: Result     = ModelTier.forModel("claude-sonnet-6") ==== Sonnet5_5
-  def testFutureHaiku: Result      = ModelTier.forModel("claude-haiku-5") ==== Haiku4_5
+  def testFutureHaiku: Result      = ModelTier.forModel("claude-haiku-6") ==== Haiku5_5
   def testEmptyUnknown: Result     = ModelTier.forModel("") ==== Unknown
   def testArbitraryUnknown: Result = ModelTier.forModel("gpt-4") ==== Unknown
 
@@ -116,30 +134,59 @@ object PricingSpec extends Properties {
   def testRatesOpus5_5: Result     = Opus5_5.rates ==== Rates(4.0, 20.0, 0.2, 5.0, 8.0)
   def testRatesOpusPremium: Result = OpusPremium.rates ==== Rates(5.0, 25.0, 0.5, 6.25, 10.0)
   def testRatesOpusLegacy: Result  = OpusLegacy.rates ==== Rates(15.0, 75.0, 1.5, 18.75, 30.0)
-  def testRatesSonnet5_5: Result   = Sonnet5_5.rates ==== Rates(2.0, 10.0, 0.2, 2.5, 4.0)
+  def testRatesSonnet5_5: Result   = Sonnet5_5.rates ==== Rates(2.0, 10.0, 0.1, 2.5, 4.0)
   def testRatesSonnet5: Result     = Sonnet5.rates ==== Rates(2.0, 10.0, 0.2, 2.5, 4.0)
   def testRatesSonnet: Result      = Sonnet.rates ==== Rates(3.0, 15.0, 0.3, 3.75, 6.0)
+  def testRatesHaiku5_5: Result    = Haiku5_5.rates ==== Rates(0.1, 0.5, 0.01, 0.125, 0.2)
   def testRatesHaiku4_5: Result    = Haiku4_5.rates ==== Rates(1.0, 5.0, 0.1, 1.25, 2.0)
   def testRatesHaiku3_5: Result    = Haiku3_5.rates ==== Rates(0.8, 4.0, 0.08, 1.0, 1.6)
   def testRatesHaiku3: Result      = Haiku3.rates ==== Rates(0.25, 1.25, 0.03, 0.3, 0.5)
+
+  def testLongPromptRatesHaiku5_5: Result =
+    Haiku5_5.longPromptRates ==== Some(Rates(0.5, 2.5, 0.05, 0.625, 1.0))
 
   def testUnknownFallback: Result = Unknown.rates ==== OpusPremium.rates
 
   def testStandardGlobalUnchanged: Property =
     for {
       tier <- Gen.element(ModelTier.values.head, ModelTier.values.toList.drop(1)).log("tier")
-    } yield tier.ratesFor(Speed.Standard, InferenceGeo.Global) ==== tier.rates
+    } yield tier.ratesFor(Speed.Standard, InferenceGeo.Global, PromptLength.Standard) ==== tier.rates
 
   def testFastOpus5_5: Result     =
-    Opus5_5.ratesFor(Speed.Fast, InferenceGeo.Global) ==== Rates(8.0, 40.0, 0.4, 10.0, 16.0)
+    Opus5_5.ratesFor(Speed.Fast, InferenceGeo.Global, PromptLength.Standard) ==== Rates(8.0, 40.0, 0.4, 10.0, 16.0)
   def testFastOpusPremium: Result =
-    OpusPremium.ratesFor(Speed.Fast, InferenceGeo.Global) ==== Rates(10.0, 50.0, 1.0, 12.5, 20.0)
+    OpusPremium.ratesFor(Speed.Fast, InferenceGeo.Global, PromptLength.Standard) ==== Rates(
+      10.0, 50.0, 1.0, 12.5, 20.0
+    )
   def testUsSonnet5: Result       =
-    Sonnet5.ratesFor(Speed.Standard, InferenceGeo.Us) ==== Rates(2.2, 11.0, 0.22, 2.75, 4.4)
+    Sonnet5.ratesFor(Speed.Standard, InferenceGeo.Us, PromptLength.Standard) ==== Rates(2.2, 11.0, 0.22, 2.75, 4.4)
   def testUsSonnet5_5: Result     =
-    Sonnet5_5.ratesFor(Speed.Standard, InferenceGeo.Us) ==== Rates(2.2, 11.0, 0.22, 2.75, 4.4)
+    Sonnet5_5.ratesFor(Speed.Standard, InferenceGeo.Us, PromptLength.Standard) ==== Rates(2.2, 11.0, 0.11, 2.75, 4.4)
   def testFastUsOpus5_5: Result   =
-    Opus5_5.ratesFor(Speed.Fast, InferenceGeo.Us) ==== Rates(8.8, 44.0, 0.44, 11.0, 17.6)
+    Opus5_5.ratesFor(Speed.Fast, InferenceGeo.Us, PromptLength.Standard) ==== Rates(8.8, 44.0, 0.44, 11.0, 17.6)
+
+  def testLongHaiku5_5: Result   =
+    Haiku5_5.ratesFor(Speed.Standard, InferenceGeo.Global, PromptLength.Long) ==== Rates(0.5, 2.5, 0.05, 0.625, 1.0)
+  def testLongUsHaiku5_5: Result =
+    Haiku5_5.ratesFor(Speed.Standard, InferenceGeo.Us, PromptLength.Long) ==== Rates(0.55, 2.75, 0.055, 0.6875, 1.1)
+
+  def testBilledLongHaiku5_5: Result = Haiku5_5.billedPromptLength(PromptLength.Long) ==== PromptLength.Long
+  def testBilledLongHaiku4_5: Result = Haiku4_5.billedPromptLength(PromptLength.Long) ==== PromptLength.Standard
+
+  private val tiersWithoutLongCard: List[ModelTier] = ModelTier.values.toList.filterNot(_ == Haiku5_5)
+
+  private def genTierWithoutLongCard: Gen[ModelTier] =
+    Gen.element(tiersWithoutLongCard.head, tiersWithoutLongCard.drop(1))
+
+  def testLongUnchangedWithoutCard: Property =
+    for {
+      tier <- genTierWithoutLongCard.log("tier")
+    } yield tier.ratesFor(Speed.Standard, InferenceGeo.Global, PromptLength.Long) ==== tier.rates
+
+  def testNoLongPromptRates: Property =
+    for {
+      tier <- genTierWithoutLongCard.log("tier")
+    } yield tier.longPromptRates ==== None
 
   def testSpeedFast: Result     = Speed.fromUsage(Some("fast")) ==== Speed.Fast
   def testSpeedStandard: Result = Speed.fromUsage(Some("standard")) ==== Speed.Standard
@@ -148,6 +195,10 @@ object PricingSpec extends Properties {
   def testGeoUs: Result         = InferenceGeo.fromUsage(Some("us")) ==== InferenceGeo.Us
   def testGeoGlobal: Result     = InferenceGeo.fromUsage(Some("global")) ==== InferenceGeo.Global
   def testGeoMissing: Result    = InferenceGeo.fromUsage(None) ==== InferenceGeo.Global
+
+  def testPromptLengthZero: Result          = PromptLength.fromPromptTokens(0) ==== PromptLength.Standard
+  def testPromptLengthAtThreshold: Result   = PromptLength.fromPromptTokens(100000) ==== PromptLength.Standard
+  def testPromptLengthOverThreshold: Result = PromptLength.fromPromptTokens(100001) ==== PromptLength.Long
 
   def testWebSearchCost: Result =
     Result
