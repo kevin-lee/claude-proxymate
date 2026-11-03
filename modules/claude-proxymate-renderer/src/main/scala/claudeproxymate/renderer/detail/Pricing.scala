@@ -74,6 +74,30 @@ object InferenceGeo {
   }
 }
 
+/** Prompt length band a request is priced at.
+  *
+  * The prompt length is every input token of the request: uncached input,
+  * cache reads and cache writes. A prompt over 100,000 tokens is [[Long]].
+  * Each request is priced on its own, so a long request does not change the
+  * price of earlier requests. Only a tier with a long-prompt rate card (see
+  * `ModelTier.longPromptRates`) bills a [[Long]] prompt differently.
+  */
+enum PromptLength {
+  case Standard
+  case Long
+}
+
+object PromptLength {
+
+  /** A prompt over this many tokens is [[Long]]. Exactly this many is still
+    * [[Standard]].
+    */
+  val LongPromptThreshold: Int = 100000
+
+  def fromPromptTokens(promptTokens: Int): PromptLength =
+    if (promptTokens > LongPromptThreshold) Long else Standard
+}
+
 /** Pricing tier for a Claude model.
   *
   * Retired models stay in the table so older captures still price
@@ -89,6 +113,7 @@ enum ModelTier {
   case Sonnet5_5
   case Sonnet5
   case Sonnet
+  case Haiku5_5
   case Haiku4_5
   case Haiku3_5
   case Haiku3
@@ -100,7 +125,7 @@ object ModelTier {
   /** Date the rates below were last verified against the official pricing
     * page. Shown in the token popover.
     */
-  val PricingDate: String = "2026-10-02"
+  val PricingDate: String = "2026-11-04"
 
   /** Web search costs $10 per 1,000 searches. It is billed per search, not
     * per token, so fast mode and inference geo do not affect it.
@@ -115,7 +140,12 @@ object ModelTier {
       *
       * Pure: every rate is a constant, so no clock is consulted. Cache reads
       * are 0.1x the base input price on every tier except [[Fable5_1]], which
-      * bills them at 0.025x, and [[Opus5_5]], which bills them at 0.05x.
+      * bills them at 0.025x, and [[Opus5_5]] and [[Sonnet5_5]], which bill
+      * them at 0.05x.
+      *
+      * This is the standard rate card, for prompts up to 100,000 tokens. For
+      * [[Haiku5_5]], the rate card for prompts over 100,000 tokens is in
+      * [[longPromptRates]].
       */
     @tailrec
     def rates: Rates = tier match {
@@ -124,26 +154,54 @@ object ModelTier {
       case Opus5_5 => Rates(4.0, 20.0, 0.2, 5.0, 8.0)
       case OpusPremium => Rates(5.0, 25.0, 0.5, 6.25, 10.0)
       case OpusLegacy => Rates(15.0, 75.0, 1.5, 18.75, 30.0)
-      case Sonnet5_5 => Rates(2.0, 10.0, 0.2, 2.5, 4.0)
+      case Sonnet5_5 => Rates(2.0, 10.0, 0.1, 2.5, 4.0)
       case Sonnet5 => Rates(2.0, 10.0, 0.2, 2.5, 4.0)
       case Sonnet => Rates(3.0, 15.0, 0.3, 3.75, 6.0)
+      case Haiku5_5 => Rates(0.1, 0.5, 0.01, 0.125, 0.2)
       case Haiku4_5 => Rates(1.0, 5.0, 0.1, 1.25, 2.0)
       case Haiku3_5 => Rates(0.8, 4.0, 0.08, 1.0, 1.6)
       case Haiku3 => Rates(0.25, 1.25, 0.03, 0.3, 0.5)
       case Unknown => OpusPremium.rates
     }
 
-    /** Pricing rates in $/MTok for this tier at the given speed and inference
-      * geo.
+    /** Pricing rates in $/MTok for prompts over 100,000 tokens, when this
+      * tier prices them differently.
       *
-      * The pricing page applies the prompt-caching multipliers and data
-      * residency on top of fast-mode pricing, so all five rates scale by the
-      * same stacked factor. When neither modifier applies, [[rates]] is
-      * returned untouched, so ordinary captures price exactly as before.
+      * Only [[Haiku5_5]] has prompt-length pricing today. Every other tier
+      * bills the full context window at [[rates]].
       */
-    def ratesFor(speed: Speed, inferenceGeo: InferenceGeo): Rates = {
+    def longPromptRates: Option[Rates] = tier match {
+      case Haiku5_5 => Some(Rates(0.5, 2.5, 0.05, 0.625, 1.0))
+      case _ => None
+    }
+
+    /** The prompt length this tier actually bills at.
+      *
+      * It is `promptLength` when this tier has a long-prompt rate card, and
+      * [[PromptLength.Standard]] otherwise. A view uses it to show the
+      * long-prompt note only when the higher rate card was used.
+      */
+    def billedPromptLength(promptLength: PromptLength): PromptLength =
+      if (longPromptRates.isDefined) promptLength else PromptLength.Standard
+
+    /** Pricing rates in $/MTok for this tier at the given speed, inference
+      * geo and prompt length.
+      *
+      * The base rate card is [[longPromptRates]] for a billed
+      * [[PromptLength.Long]] prompt, and [[rates]] otherwise. The pricing page
+      * applies the prompt-caching multipliers and data residency on top of
+      * fast-mode pricing, and data residency also applies to the long-prompt
+      * rate card, so all five rates scale by the same stacked factor. When
+      * neither modifier applies, the base rate card is returned untouched, so
+      * ordinary captures price exactly as before.
+      */
+    def ratesFor(speed: Speed, inferenceGeo: InferenceGeo, promptLength: PromptLength): Rates = {
+      val base   = (billedPromptLength(promptLength), longPromptRates) match {
+        case (PromptLength.Long, Some(longRates)) => longRates
+        case _ => rates
+      }
       val factor = speed.multiplier * inferenceGeo.multiplier
-      if (factor == 1.0) rates else rates.scaled(factor)
+      if (factor == 1.0) base else base.scaled(factor)
     }
   }
 
@@ -156,16 +214,18 @@ object ModelTier {
     * above `opus-5`, and `sonnet-5-5` above `sonnet-5`, for the same reason
     * `fable-5-1` sits above `fable-5`. `claude-sonnet-4-5` and
     * `claude-3-5-sonnet-…` contain neither `sonnet-5-5` nor `sonnet-5`, so
-    * the Sonnet 5.5 and Sonnet 5 branches are safe above them.
+    * the Sonnet 5.5 and Sonnet 5 branches are safe above them. `haiku-5-5`
+    * sits first among the Haiku IDs.
     *
     * The second layer matches a bare family name and maps it to the *current*
     * tier of that family, so a model released after this table was written is
     * priced as that family's latest instead of falling through to
-    * [[Unknown]].
+    * [[Unknown]]. The bare `haiku` family maps to [[Haiku5_5]].
     */
   def forModel(model: String): ModelTier = {
     if (model.contains("fable-5-1") || model.contains("mythos-5-1")) Fable5_1
     else if (model.contains("fable-5") || model.contains("mythos-5")) Fable5
+    else if (model.contains("haiku-5-5")) Haiku5_5
     else if (model.contains("haiku-4-5")) Haiku4_5
     else if (model.contains("3-5-haiku") || model.contains("haiku-3-5")) Haiku3_5
     else if (model.contains("3-haiku") || model.contains("haiku-3")) Haiku3
@@ -195,7 +255,7 @@ object ModelTier {
     else if (model.contains("fable") || model.contains("mythos")) Fable5_1
     else if (model.contains("opus")) Opus5_5
     else if (model.contains("sonnet")) Sonnet5_5
-    else if (model.contains("haiku")) Haiku4_5
+    else if (model.contains("haiku")) Haiku5_5
     else Unknown
   }
 }

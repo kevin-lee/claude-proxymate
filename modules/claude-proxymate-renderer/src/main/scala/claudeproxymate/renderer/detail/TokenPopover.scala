@@ -102,6 +102,7 @@ object TokenPopover {
     }
     val fastMode                         = boolField("fastMode")
     val usInference                      = boolField("usInference")
+    val longPrompt                       = boolField("longPrompt")
 
     val data = TokenPopoverData(
       model = d.model.asInstanceOf[String],
@@ -137,6 +138,7 @@ object TokenPopover {
         Option.when(data.cachePct >= 50)(I18n.t("token.noteCacheSaving", Map("pct" -> data.cachePct.toString))),
       noteFastMode = Option.when(fastMode)(I18n.t("token.noteFastMode")),
       noteUsInference = Option.when(usInference)(I18n.t("token.noteUsInference")),
+      noteLongPrompt = Option.when(longPrompt)(I18n.t("token.noteLongPrompt")),
     )
 
     val pop = dom.document.createElement("div").asInstanceOf[dom.html.Div]

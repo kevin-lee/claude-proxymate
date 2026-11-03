@@ -18,6 +18,7 @@ object AnatomyViewSpec extends Properties {
     example("no inline event handlers in output", testNoInlineHandlers),
     example("cost with modifiers -> fast/US notes + web search row", testCostModifiersShown),
     example("standard cost -> no modifier notes, no web search row", testCostModifiersAbsent),
+    example("Haiku 5.5 long prompt -> long-prompt note", testCostLongPromptNote),
   )
 
   private val labels = AnatomyLabels(
@@ -39,6 +40,7 @@ object AnatomyViewSpec extends Properties {
     lblStream = "stream",
     noteFastMode = "Fast mode 2x",
     noteUsInference = "US-only 1.1x",
+    noteLongPrompt = "Long prompt 5x",
   )
 
   private val structure = StructureFacts(
@@ -239,8 +241,27 @@ object AnatomyViewSpec extends Properties {
       List(
         Result.assert(!out.contains("Fast mode 2x")).log(s"fast-mode note leaked: $out"),
         Result.assert(!out.contains("US-only 1.1x")).log(s"US-only note leaked: $out"),
+        Result.assert(!out.contains("Long prompt 5x")).log(s"long-prompt note leaked: $out"),
         Result.assert(!out.contains("web search")).log(s"web search row leaked: $out"),
       )
     )
+  }
+
+  def testCostLongPromptNote: Result = {
+    val out = render(
+      AnatomyCost.fromUsage(
+        "claude-haiku-5-5",
+        "1.0",
+        150000,
+        0,
+        0,
+        0,
+        100,
+        Speed.Standard,
+        InferenceGeo.Global,
+        0
+      )
+    )
+    Result.assert(out.contains("Long prompt 5x")).log(s"long-prompt note missing: $out")
   }
 }

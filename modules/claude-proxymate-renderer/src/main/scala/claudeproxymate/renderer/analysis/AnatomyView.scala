@@ -2,7 +2,7 @@ package claudeproxymate.renderer.analysis
 
 import cats.syntax.all.*
 import claudeproxymate.core.{AnomalyKind, RequestAnatomy, StructureFacts}
-import claudeproxymate.renderer.detail.{InferenceGeo, Speed}
+import claudeproxymate.renderer.detail.{InferenceGeo, PromptLength, Speed}
 import scalatags.Text.all.*
 
 /** Display-resolved segment row (label already i18n-resolved). */
@@ -33,6 +33,7 @@ final case class AnatomyLabels(
   lblStream: String,
   noteFastMode: String,
   noteUsInference: String,
+  noteLongPrompt: String,
 )
 
 /** Pure Scalatags view for the Request Anatomy dashboard. No DOM, no inline
@@ -109,6 +110,10 @@ object AnatomyView {
           cost.inferenceGeo match {
             case InferenceGeo.Us => div(cls := "anatomy-note")(labels.noteUsInference)
             case InferenceGeo.Global => frag()
+          },
+          cost.promptLength match {
+            case PromptLength.Long => div(cls := "anatomy-note")(labels.noteLongPrompt)
+            case PromptLength.Standard => frag()
           },
         )
       },

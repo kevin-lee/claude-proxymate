@@ -7,16 +7,16 @@ import scala.scalajs.js
 /** The subset of electron-updater's `AppUpdater` used by UpdateService. */
 @js.native
 trait AppUpdater extends js.Object {
-  var autoDownload: Boolean                           = js.native
-  var autoInstallOnAppQuit: Boolean                   = js.native
-  var autoRunAppAfterInstall: Boolean                 = js.native
-  var forceDevUpdateConfig: Boolean                   = js.native
-  var logger: js.Any                                  = js.native
-  def checkForUpdates(): js.Promise[js.Any]           = js.native
-  def downloadUpdate(): js.Promise[js.Any]            = js.native
-  def quitAndInstall(): Unit                          = js.native
-  def setFeedURL(options: js.Object): Unit            = js.native
-  def on(event: String, cb: js.Function): AppUpdater  = js.native
+  var autoDownload: Boolean                          = js.native
+  var autoInstallOnAppQuit: Boolean                  = js.native
+  var autoRunAppAfterInstall: Boolean                = js.native
+  var forceDevUpdateConfig: Boolean                  = js.native
+  var logger: js.Any                                 = js.native
+  def checkForUpdates(): js.Promise[js.Any]          = js.native
+  def downloadUpdate(): js.Promise[js.Any]           = js.native
+  def quitAndInstall(): Unit                         = js.native
+  def setFeedURL(options: js.Object): Unit           = js.native
+  def on(event: String, cb: js.Function): AppUpdater = js.native
 }
 
 /** The subset of the `electron-updater` npm module used by UpdateService. */

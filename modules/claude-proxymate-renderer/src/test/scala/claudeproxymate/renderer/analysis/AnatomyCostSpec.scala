@@ -1,6 +1,6 @@
 package claudeproxymate.renderer.analysis
 
-import claudeproxymate.renderer.detail.{InferenceGeo, Speed}
+import claudeproxymate.renderer.detail.{InferenceGeo, PromptLength, Speed}
 import hedgehog.*
 import hedgehog.runner.*
 
@@ -14,6 +14,9 @@ object AnatomyCostSpec extends Properties {
     property("unknown model falls back to OpusPremium rates", testUnknownFallback),
     property("fromUsage applies the fast-mode and US-only multipliers", testFastUsModifiers),
     property("fromUsage adds web search cost outside the segments", testWebSearchCost),
+    property("fromUsage Haiku 5.5 over 100K prompt tokens uses the long-prompt card", testHaiku5_5LongPrompt),
+    property("fromUsage Haiku 5.5 at exactly 100K prompt tokens uses the standard card", testHaiku5_5AtThreshold),
+    property("fromUsage long prompt on a tier without a long card stays Standard", testLongPromptWithoutCard),
   )
 
   /* Haiku 4.5 rates: input 1.0, output 5.0, cacheRead 0.1, cacheWrite5m 1.25,
@@ -164,5 +167,73 @@ object AnatomyCostSpec extends Properties {
         .log(s"cost=${card.totalCostUsd} (expected 0.03)")
         .and(Result.assert(card.webSearches == 3).log(s"webSearches=${card.webSearches}"))
         .and(Result.assert(card.segments.size == 4).log(s"segments=${card.segments.size}"))
+    }
+
+  /* Haiku 5.5 long-prompt card: input 0.5, output 2.5 ($/MTok). */
+  def testHaiku5_5LongPrompt: Property =
+    for { _ <- Gen.constant(()).forAll } yield {
+      val card     = AnatomyCost.fromUsage(
+        "claude-haiku-5-5",
+        "1.0",
+        inputTokens = 100001,
+        cacheRead = 0,
+        cacheWrite5m = 0,
+        cacheWrite1h = 0,
+        outputTokens = 1000,
+        speed = Speed.Standard,
+        inferenceGeo = InferenceGeo.Global,
+        webSearches = 0,
+      )
+      val expected = 100001 * 0.5 / 1e6 + 1000 * 2.5 / 1e6
+      Result
+        .assert(math.abs(card.totalCostUsd - expected) < 1e-9)
+        .log(s"cost=${card.totalCostUsd} expected=$expected")
+        .and(Result.assert(card.promptLength == PromptLength.Long).log(s"promptLength=${card.promptLength}"))
+    }
+
+  /* The prompt length counts input, cache read and cache write tokens. A sum
+   * of exactly 100,000 stays on the standard card: input 0.1, cache read
+   * 0.01, 5m write 0.125, output 0.5 ($/MTok). */
+  def testHaiku5_5AtThreshold: Property =
+    for { _ <- Gen.constant(()).forAll } yield {
+      val card     = AnatomyCost.fromUsage(
+        "claude-haiku-5-5",
+        "1.0",
+        inputTokens = 40000,
+        cacheRead = 50000,
+        cacheWrite5m = 10000,
+        cacheWrite1h = 0,
+        outputTokens = 1000,
+        speed = Speed.Standard,
+        inferenceGeo = InferenceGeo.Global,
+        webSearches = 0,
+      )
+      val expected = (40000 * 0.1 + 50000 * 0.01 + 10000 * 0.125 + 1000 * 0.5) / 1e6
+      Result
+        .assert(math.abs(card.totalCostUsd - expected) < 1e-9)
+        .log(s"cost=${card.totalCostUsd} expected=$expected")
+        .and(Result.assert(card.promptLength == PromptLength.Standard).log(s"promptLength=${card.promptLength}"))
+    }
+
+  /* Haiku 4.5 has no long-prompt card, so a long prompt keeps input 1.0. */
+  def testLongPromptWithoutCard: Property =
+    for { _ <- Gen.constant(()).forAll } yield {
+      val card     = AnatomyCost.fromUsage(
+        "claude-haiku-4-5-20251001",
+        "1.0",
+        inputTokens = 200000,
+        cacheRead = 0,
+        cacheWrite5m = 0,
+        cacheWrite1h = 0,
+        outputTokens = 0,
+        speed = Speed.Standard,
+        inferenceGeo = InferenceGeo.Global,
+        webSearches = 0,
+      )
+      val expected = 200000 * 1.0 / 1e6
+      Result
+        .assert(math.abs(card.totalCostUsd - expected) < 1e-9)
+        .log(s"cost=${card.totalCostUsd} expected=$expected")
+        .and(Result.assert(card.promptLength == PromptLength.Standard).log(s"promptLength=${card.promptLength}"))
     }
 }

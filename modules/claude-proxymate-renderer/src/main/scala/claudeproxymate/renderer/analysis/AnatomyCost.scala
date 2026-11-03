@@ -1,12 +1,16 @@
 package claudeproxymate.renderer.analysis
 
-import claudeproxymate.renderer.detail.{InferenceGeo, ModelTier, Speed}
+import claudeproxymate.renderer.detail.{InferenceGeo, ModelTier, PromptLength, Speed}
 
 /** One colored slice of the cost breakdown. */
 final case class CostSegment(label: String, tokens: Int, costUsd: Double, color: String)
 
 /** Resolved Cost & Tokens card data. In estimate mode (`estimated = true`)
   * there is no usage, so the token-class split and cost are unavailable.
+  *
+  * `promptLength` is the billed prompt length from
+  * `ModelTier.billedPromptLength`, so it is [[PromptLength.Long]] only when
+  * the long-prompt rate card was used.
   */
 final case class CostCard(
   model: String,
@@ -20,6 +24,7 @@ final case class CostCard(
   estTokens: Int,
   speed: Speed,
   inferenceGeo: InferenceGeo,
+  promptLength: PromptLength,
   webSearches: Int,
   webSearchCostUsd: Double,
 )
@@ -45,9 +50,11 @@ object AnatomyCost {
     inferenceGeo: InferenceGeo,
     webSearches: Int,
   ): CostCard = {
-    val rates    = ModelTier.forModel(model).ratesFor(speed, inferenceGeo)
-    val totalIn  = inputTokens + cacheRead + cacheWrite5m + cacheWrite1h
-    val cachePct = if (totalIn > 0) math.round(cacheRead.toDouble / totalIn * 100).toInt else 0
+    val totalIn      = inputTokens + cacheRead + cacheWrite5m + cacheWrite1h
+    val tier         = ModelTier.forModel(model)
+    val promptLength = tier.billedPromptLength(PromptLength.fromPromptTokens(totalIn))
+    val rates        = tier.ratesFor(speed, inferenceGeo, promptLength)
+    val cachePct     = if (totalIn > 0) math.round(cacheRead.toDouble / totalIn * 100).toInt else 0
 
     def cost(tokens: Int, rate: Double): Double = tokens * rate / 1000000.0
 
@@ -87,6 +94,7 @@ object AnatomyCost {
       estTokens = 0,
       speed = speed,
       inferenceGeo = inferenceGeo,
+      promptLength = promptLength,
       webSearches = webSearches,
       webSearchCostUsd = webSearchCost,
     )
@@ -105,6 +113,7 @@ object AnatomyCost {
       estTokens = estTokens,
       speed = Speed.Standard,
       inferenceGeo = InferenceGeo.Global,
+      promptLength = PromptLength.Standard,
       webSearches = 0,
       webSearchCostUsd = 0.0,
     )

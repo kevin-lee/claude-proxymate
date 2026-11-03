@@ -38,8 +38,8 @@ final case class TokenPopoverData(
   * `notePricingDate` should be the i18n template already filled with the
   * pricing-date placeholder. `noteCacheSaving` is `Some` only when the
   * cache-hit rate is high enough that the note should appear.
-  * `noteFastMode` and `noteUsInference` are `Some` only when the capture
-  * was billed with that pricing modifier.
+  * `noteFastMode`, `noteUsInference` and `noteLongPrompt` are `Some` only
+  * when the capture was billed with that pricing modifier.
   */
 final case class TokenPopoverLabels(
   costTitle: String,
@@ -55,6 +55,7 @@ final case class TokenPopoverLabels(
   noteCacheSaving: Option[String],
   noteFastMode: Option[String],
   noteUsInference: Option[String],
+  noteLongPrompt: Option[String],
 )
 
 /** Pure view functions for the token-cost popover. */
@@ -88,6 +89,7 @@ object TokenPopoverView {
     builder += s"${labels.cacheHitRateLabel}: ${data.cachePct}%"
     builder ++= labels.noteFastMode.toList
     builder ++= labels.noteUsInference.toList
+    builder ++= labels.noteLongPrompt.toList
     builder.mkString("\n")
   }
 
@@ -125,6 +127,11 @@ object TokenPopoverView {
     }
 
     val noteUsInferenceFrag: Frag = labels.noteUsInference match {
+      case Some(s) => frag(br, s)
+      case None => frag()
+    }
+
+    val noteLongPromptFrag: Frag = labels.noteLongPrompt match {
       case Some(s) => frag(br, s)
       case None => frag()
     }
@@ -169,6 +176,7 @@ object TokenPopoverView {
         noteCacheSavingFrag,
         noteFastModeFrag,
         noteUsInferenceFrag,
+        noteLongPromptFrag,
       ),
     )
   }

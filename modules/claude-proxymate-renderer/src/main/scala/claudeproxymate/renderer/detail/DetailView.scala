@@ -331,12 +331,14 @@ object DetailView {
       else ""
     }
 
-    val rates = ModelTier.forModel(model).ratesFor(speed, inferenceGeo)
-    val inP   = rates.input
-    val outP  = rates.output
-    val crP   = rates.cacheRead
-    val cw5P  = rates.cacheWrite5m
-    val cw1P  = rates.cacheWrite1h
+    val tier         = ModelTier.forModel(model)
+    val promptLength = tier.billedPromptLength(PromptLength.fromPromptTokens(totalIn))
+    val rates        = tier.ratesFor(speed, inferenceGeo, promptLength)
+    val inP          = rates.input
+    val outP         = rates.output
+    val crP          = rates.cacheRead
+    val cw5P         = rates.cacheWrite5m
+    val cw1P         = rates.cacheWrite1h
 
     val webSearchCost = ModelTier.webSearchCost(webSearches)
 
@@ -427,6 +429,7 @@ object DetailView {
             "cachePct"    -> cachePct,
             "fastMode"    -> (speed == Speed.Fast),
             "usInference" -> (inferenceGeo == InferenceGeo.Us),
+            "longPrompt"  -> (promptLength == PromptLength.Long),
           )
       )
 

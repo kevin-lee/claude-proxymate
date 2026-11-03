@@ -192,7 +192,7 @@ object UpdateControl {
         state.get() match {
           case UpdateState.Downloading(_, _) => ()
           case UpdateState.Unsupported | UpdateState.Idle | UpdateState.Checking(_) | UpdateState.UpToDate(_) |
-              UpdateState.Available(_, _) | UpdateState.Ready(_) | UpdateState.Failed(_, _, _, _) =>
+               UpdateState.Available(_, _) | UpdateState.Ready(_) | UpdateState.Failed(_, _, _, _) =>
             togglePanel()
         }
       } else if (target.closest(s"#${HtmlIds.UpdatePanel}") == null) {
