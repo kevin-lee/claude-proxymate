@@ -186,7 +186,30 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: cd electron-app && npx electron-builder --mac --${{ matrix.arch }} --publish never
+        # electron-builder staples the notarization ticket as its last step.
+        # Stapling downloads the ticket from Apple's CloudKit server, and the
+        # connection from the hosted runners sometimes drops ("Failed to
+        # staple your application with code: 68"). Run the build again only
+        # for that error. Any other error fails at once.
+        run: |
+          set -uo pipefail
+          cd electron-app
+          LOG="$RUNNER_TEMP/electron-builder.log"
+          for attempt in 1 2 3; do
+            if npx electron-builder --mac --${{ matrix.arch }} --publish never 2>&1 | tee "$LOG"; then
+              exit 0
+            fi
+            if ! grep -q "Failed to staple your application" "$LOG"; then
+              exit 1
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "ERROR: stapling failed 3 times"
+              exit 1
+            fi
+            echo "Stapling failed (attempt $attempt), building again in 60s"
+            sleep 60
+            rm -rf release
+          done
 
       # Guard against the failure modes that broke v0.1.0: a runner building
       # more than its own arch, a DMG whose bundled native proxy binary doesn't
@@ -218,7 +241,21 @@ jobs:
             # by Gatekeeper as notarized, and carrying a stapled ticket.
             codesign -dvvv "$app" 2>&1 | grep "Authority=Developer ID Application"
             spctl -a -vvv "$app"
-            xcrun stapler validate "$app"
+            # stapler validate looks the ticket up on Apple's CloudKit server.
+            # The connection from the hosted runners sometimes drops (error 68,
+            # NSURLErrorDomain -1005), so retry before failing the release.
+            local attempt
+            for attempt in 1 2 3 4 5; do
+              if xcrun stapler validate "$app"; then
+                break
+              fi
+              if [ "$attempt" -eq 5 ]; then
+                echo "ERROR: stapler validate failed 5 times for $app"
+                exit 1
+              fi
+              echo "stapler validate failed (attempt $attempt), retrying in $((attempt * 15))s"
+              sleep $((attempt * 15))
+            done
             for bin in "Contents/MacOS/Claude Proxymate" "Contents/Resources/claude-proxymate"; do
               ARCH_INFO=$(file "$app/$bin")
               echo "$ARCH_INFO"
