@@ -6,8 +6,12 @@ import hedgehog.runner.*
 object PricingSpec extends Properties {
 
   override def tests: List[Test] = List(
-    example("Fable 5.1 alias -> Fable5_1", testFable5_1),
-    example("Mythos 5.1 alias -> Fable5_1", testMythos5_1),
+    example("Fable 5.2 alias -> Fable5_2", testFable5_2),
+    example("Fable 5.2 Bedrock ID -> Fable5_2", testFable5_2Bedrock),
+    example("Mythos 5.2 alias -> Fable5_2", testMythos5_2),
+    example("Mythos 5.2 Bedrock ID -> Fable5_2", testMythos5_2Bedrock),
+    example("Fable 5.1 alias -> Fable5_1 (not Fable5_2)", testFable5_1),
+    example("Mythos 5.1 alias -> Fable5_1 (not Fable5_2)", testMythos5_1),
     example("Fable 5 alias -> Fable5 (not Fable5_1)", testFable5),
     example("Mythos 5 alias -> Fable5 (not Fable5_1)", testMythos5),
     example("Opus 5.5 alias -> Opus5_5", testOpus5_5),
@@ -39,12 +43,13 @@ object PricingSpec extends Properties {
     example("Haiku 4.5 full ID -> Haiku4_5", testHaiku4_5FullId),
     example("Haiku 3.5 full ID -> Haiku3_5", testHaiku3_5),
     example("Haiku 3 full ID -> Haiku3", testHaiku3),
-    example("unreleased Fable -> Fable5_1 (family fallback)", testFutureFable),
+    example("unreleased Fable -> Fable5_2 (family fallback)", testFutureFable),
     example("unreleased Opus -> Opus5_5 (family fallback)", testFutureOpus),
     example("unreleased Sonnet -> Sonnet5_5 (family fallback)", testFutureSonnet),
     example("unreleased Haiku -> Haiku5_5 (family fallback)", testFutureHaiku),
     example("empty model -> Unknown", testEmptyUnknown),
     example("arbitrary string -> Unknown", testArbitraryUnknown),
+    example("Fable5_2 rates match pricing doc", testRatesFable5_2),
     example("Fable5_1 rates match pricing doc", testRatesFable5_1),
     example("Fable5 rates match pricing doc", testRatesFable5),
     example("Opus5_5 rates match pricing doc", testRatesOpus5_5),
@@ -63,6 +68,7 @@ object PricingSpec extends Properties {
       "ratesFor Standard + Global + Standard prompt equals rates on every tier",
       testStandardGlobalUnchanged,
     ),
+    example("ratesFor Fable5_2 fast matches fast-mode pricing doc", testFastFable5_2),
     example("ratesFor Opus5_5 fast matches fast-mode pricing doc", testFastOpus5_5),
     example("ratesFor OpusPremium fast matches fast-mode pricing doc", testFastOpusPremium),
     example("ratesFor Sonnet5 US-only is 1.1x", testUsSonnet5),
@@ -89,6 +95,10 @@ object PricingSpec extends Properties {
 
   import ModelTier.*
 
+  def testFable5_2: Result         = ModelTier.forModel("claude-fable-5-2") ==== Fable5_2
+  def testFable5_2Bedrock: Result  = ModelTier.forModel("anthropic.claude-fable-5-2") ==== Fable5_2
+  def testMythos5_2: Result        = ModelTier.forModel("claude-mythos-5-2") ==== Fable5_2
+  def testMythos5_2Bedrock: Result = ModelTier.forModel("anthropic.claude-mythos-5-2") ==== Fable5_2
   def testFable5_1: Result         = ModelTier.forModel("claude-fable-5-1") ==== Fable5_1
   def testMythos5_1: Result        = ModelTier.forModel("claude-mythos-5-1") ==== Fable5_1
   def testFable5: Result           = ModelTier.forModel("claude-fable-5") ==== Fable5
@@ -122,13 +132,14 @@ object PricingSpec extends Properties {
   def testHaiku4_5FullId: Result   = ModelTier.forModel("claude-haiku-4-5-20251001") ==== Haiku4_5
   def testHaiku3_5: Result         = ModelTier.forModel("claude-3-5-haiku-20241022") ==== Haiku3_5
   def testHaiku3: Result           = ModelTier.forModel("claude-3-haiku-20240307") ==== Haiku3
-  def testFutureFable: Result      = ModelTier.forModel("claude-fable-6") ==== Fable5_1
+  def testFutureFable: Result      = ModelTier.forModel("claude-fable-6") ==== Fable5_2
   def testFutureOpus: Result       = ModelTier.forModel("claude-opus-6") ==== Opus5_5
   def testFutureSonnet: Result     = ModelTier.forModel("claude-sonnet-6") ==== Sonnet5_5
   def testFutureHaiku: Result      = ModelTier.forModel("claude-haiku-6") ==== Haiku5_5
   def testEmptyUnknown: Result     = ModelTier.forModel("") ==== Unknown
   def testArbitraryUnknown: Result = ModelTier.forModel("gpt-4") ==== Unknown
 
+  def testRatesFable5_2: Result    = Fable5_2.rates ==== Rates(8.0, 40.0, 0.2, 10.0, 16.0)
   def testRatesFable5_1: Result    = Fable5_1.rates ==== Rates(10.0, 50.0, 0.25, 12.5, 20.0)
   def testRatesFable5: Result      = Fable5.rates ==== Rates(10.0, 50.0, 1.0, 12.5, 20.0)
   def testRatesOpus5_5: Result     = Opus5_5.rates ==== Rates(4.0, 20.0, 0.2, 5.0, 8.0)
@@ -152,6 +163,8 @@ object PricingSpec extends Properties {
       tier <- Gen.element(ModelTier.values.head, ModelTier.values.toList.drop(1)).log("tier")
     } yield tier.ratesFor(Speed.Standard, InferenceGeo.Global, PromptLength.Standard) ==== tier.rates
 
+  def testFastFable5_2: Result    =
+    Fable5_2.ratesFor(Speed.Fast, InferenceGeo.Global, PromptLength.Standard) ==== Rates(16.0, 80.0, 0.4, 20.0, 32.0)
   def testFastOpus5_5: Result     =
     Opus5_5.ratesFor(Speed.Fast, InferenceGeo.Global, PromptLength.Standard) ==== Rates(8.0, 40.0, 0.4, 10.0, 16.0)
   def testFastOpusPremium: Result =

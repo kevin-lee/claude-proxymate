@@ -105,6 +105,7 @@ object PromptLength {
   * and the Sonnet 4, 3.7 and 3.5 IDs inside [[Sonnet]].
   */
 enum ModelTier {
+  case Fable5_2
   case Fable5_1
   case Fable5
   case Opus5_5
@@ -125,7 +126,7 @@ object ModelTier {
   /** Date the rates below were last verified against the official pricing
     * page. Shown in the token popover.
     */
-  val PricingDate: String = "2026-11-04"
+  val PricingDate: String = "2026-11-10"
 
   /** Web search costs $10 per 1,000 searches. It is billed per search, not
     * per token, so fast mode and inference geo do not affect it.
@@ -139,9 +140,9 @@ object ModelTier {
     /** Pricing rates in $/MTok for this tier.
       *
       * Pure: every rate is a constant, so no clock is consulted. Cache reads
-      * are 0.1x the base input price on every tier except [[Fable5_1]], which
-      * bills them at 0.025x, and [[Opus5_5]] and [[Sonnet5_5]], which bill
-      * them at 0.05x.
+      * are 0.1x the base input price on every tier except [[Fable5_2]] and
+      * [[Fable5_1]], which bill them at 0.025x, and [[Opus5_5]] and
+      * [[Sonnet5_5]], which bill them at 0.05x.
       *
       * This is the standard rate card, for prompts up to 100,000 tokens. For
       * [[Haiku5_5]], the rate card for prompts over 100,000 tokens is in
@@ -149,6 +150,7 @@ object ModelTier {
       */
     @tailrec
     def rates: Rates = tier match {
+      case Fable5_2 => Rates(8.0, 40.0, 0.2, 10.0, 16.0)
       case Fable5_1 => Rates(10.0, 50.0, 0.25, 12.5, 20.0)
       case Fable5 => Rates(10.0, 50.0, 1.0, 12.5, 20.0)
       case Opus5_5 => Rates(4.0, 20.0, 0.2, 5.0, 8.0)
@@ -212,7 +214,7 @@ object ModelTier {
     * The first layer matches known IDs, most-specific substring first, so the
     * broader branches cannot swallow a newer sub-variant. `opus-5-5` sits
     * above `opus-5`, and `sonnet-5-5` above `sonnet-5`, for the same reason
-    * `fable-5-1` sits above `fable-5`. `claude-sonnet-4-5` and
+    * `fable-5-2` and `fable-5-1` sit above `fable-5`. `claude-sonnet-4-5` and
     * `claude-3-5-sonnet-…` contain neither `sonnet-5-5` nor `sonnet-5`, so
     * the Sonnet 5.5 and Sonnet 5 branches are safe above them. `haiku-5-5`
     * sits first among the Haiku IDs.
@@ -220,10 +222,12 @@ object ModelTier {
     * The second layer matches a bare family name and maps it to the *current*
     * tier of that family, so a model released after this table was written is
     * priced as that family's latest instead of falling through to
-    * [[Unknown]]. The bare `haiku` family maps to [[Haiku5_5]].
+    * [[Unknown]]. The bare `haiku` family maps to [[Haiku5_5]]. The bare
+    * `fable` and `mythos` families map to [[Fable5_2]].
     */
   def forModel(model: String): ModelTier = {
-    if (model.contains("fable-5-1") || model.contains("mythos-5-1")) Fable5_1
+    if (model.contains("fable-5-2") || model.contains("mythos-5-2")) Fable5_2
+    else if (model.contains("fable-5-1") || model.contains("mythos-5-1")) Fable5_1
     else if (model.contains("fable-5") || model.contains("mythos-5")) Fable5
     else if (model.contains("haiku-5-5")) Haiku5_5
     else if (model.contains("haiku-4-5")) Haiku4_5
@@ -252,7 +256,7 @@ object ModelTier {
       model.contains("3-5-sonnet") ||
       model.contains("sonnet-3")
     ) Sonnet
-    else if (model.contains("fable") || model.contains("mythos")) Fable5_1
+    else if (model.contains("fable") || model.contains("mythos")) Fable5_2
     else if (model.contains("opus")) Opus5_5
     else if (model.contains("sonnet")) Sonnet5_5
     else if (model.contains("haiku")) Haiku5_5
