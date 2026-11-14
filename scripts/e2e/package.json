@@ -1,0 +1,11 @@
+{
+  "name": "claude-proxymate-e2e",
+  "private": true,
+  "description": "The Electron end-to-end test of the proxy exit handling (issue #95)",
+  "scripts": {
+    "test": "node proxy-exit-test.js"
+  },
+  "devDependencies": {
+    "playwright-core": "1.65.1"
+  }
+}

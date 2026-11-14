@@ -35,7 +35,7 @@ jobs:
       - uses: sbt/setup-sbt@b113b960ba361e87e08ce02a390d51871b7ee459 # v1.5.13
 
       - name: Run core tests
-        run: sbt "clean; coreJVM/test; coreJS/test; coreNative/test; proxyServer/test; renderer/test"
+        run: sbt "clean; coreJVM/test; coreJS/test; coreNative/test; proxyServer/test; renderer/test; electron/test"
 
   build:
     needs: test
@@ -111,11 +111,32 @@ jobs:
 #
 #      - name: Build Scala.js Electron main
 #        run: sbt electron/fullLinkJS
+      # proxyServer/test runs here too, so that EvpDigestShimSpec runs on macOS
+      # for both arm64 and x64. On macOS it tests the libcrypto digest shim
+      # (claudeproxymate_evp_digest_darwin.c, issue #95). The test job runs on
+      # Linux, where the real libcrypto is used.
+      - name: Run proxy server tests on macOS
+        run: sbt "clean; proxyServer/test"
+
+      # EvpDigestShimSpec gives the same values with Homebrew's libcrypto, so
+      # only this check shows that the test binary used the shim. It must run
+      # before prodUi, because prodUi runs clean first.
+      - name: Check the proxy test binary's load commands
+        run: scripts/check-macos-load-commands.sh modules/claude-proxymate-server/target/scala-*/claude-proxymate-server-test
+
+      # prodUi runs clean itself.
       - name: Build binary for production
         env:
           GA_MEASUREMENT_ID: ${{ secrets.GA_MEASUREMENT_ID }}
           GA_API_SECRET: ${{ secrets.GA_API_SECRET }}
-        run: sbt "clean; prodUi"
+        run: sbt prodUi
+
+      # Issue #95: a load command for a library outside the system folders (for
+      # example Homebrew's libcrypto) stops the proxy at start on a Mac without
+      # that file. Fail before packaging. A run of the binary here cannot find
+      # this, because the runner has Homebrew.
+      - name: Check the proxy binary's load commands
+        run: scripts/check-macos-load-commands.sh electron-app/claude-proxymate
 
 #      - name: Assemble electron-app
 #        run: |
@@ -214,7 +235,9 @@ jobs:
       # Guard against the failure modes that broke v0.1.0: a runner building
       # more than its own arch, a DMG whose bundled native proxy binary doesn't
       # match the DMG's arch, and an app that isn't actually Developer-ID
-      # signed + notarized + stapled. The zip holds the app that self-update
+      # signed + notarized + stapled. Also guard against the v0.8.1 failure
+      # (issue #95): a bundled proxy binary that loads a library outside
+      # /usr/lib/ and /System/Library/. The zip holds the app that self-update
       # installs, so it gets the same checks, plus the updater config.
       - name: Verify DMG and zip
         run: |
@@ -264,6 +287,9 @@ jobs:
                 exit 1
               fi
             done
+            # Issue #95: this checks the bytes that users download, after
+            # electron-builder has packaged and signed the app.
+            "$GITHUB_WORKSPACE/scripts/check-macos-load-commands.sh" "$app/Contents/Resources/claude-proxymate"
           }
           hdiutil verify "${DMGS[0]}"
           MNT=$(hdiutil attach "${DMGS[0]}" -nobrowse -readonly | awk -F'\t' '/\/Volumes\//{print $NF}')

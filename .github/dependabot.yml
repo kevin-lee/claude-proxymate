@@ -13,3 +13,12 @@ updates:
       npm-dependencies:
         patterns:
           - "*"
+
+  - package-ecosystem: "npm"
+    directory: "/scripts/e2e"
+    schedule:
+      interval: "weekly"
+    groups:
+      npm-dependencies:
+        patterns:
+          - "*"
