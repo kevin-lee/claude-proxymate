@@ -29,6 +29,7 @@ object ProxyControl {
     case Started(port: Int)
     case Stopped
     case ErrorState(message: String)
+    case Crashed(message: String)
   }
 
   def parseStateEvent(state: String, port: Int, message: String): Option[ProxyStateEvent] =
@@ -36,6 +37,7 @@ object ProxyControl {
       case "started" => ProxyStateEvent.Started(port).some
       case "stopped" => ProxyStateEvent.Stopped.some
       case "error" => ProxyStateEvent.ErrorState(message).some
+      case "crashed" => ProxyStateEvent.Crashed(message).some
       case _ => none[ProxyStateEvent]
     }
 
@@ -143,6 +145,12 @@ object ProxyControl {
         enableStartBtn()
         renderProxyStatus()
         dom.window.alert(I18n.t("proxy.startFail") + msg)
+      case Some(ProxyStateEvent.Crashed(msg)) =>
+        cancelWatchdog()
+        AppState.proxyRunning = false
+        enableStartBtn()
+        renderProxyStatus()
+        dom.window.alert(I18n.t("proxy.crashed") + msg)
       case None =>
         ()
     }

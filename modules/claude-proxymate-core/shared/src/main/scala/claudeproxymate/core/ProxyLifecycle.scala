@@ -6,7 +6,7 @@ import cats.syntax.all.*
 
 /** The Electron main process's view of the native proxy child process.
   *
-  *   - [[Idle]]: no child - never spawned, or the last one's `exit` event
+  *   - [[Idle]]: no child - never spawned, or the last one's `close` event
   *     has been seen.
   *   - [[Running]]: spawned, no stop requested.
   *   - [[Stopping]]: a termination signal has been sent, the child has not
@@ -18,7 +18,7 @@ import cats.syntax.all.*
   * Collapsing straight from [[Running]] to [[Idle]] the moment the signal
   * went out is what let a surviving child become unreachable and keep the
   * port, so the next start failed with `Address already in use`. Only the
-  * child's own `exit` event may move the state back to [[Idle]].
+  * child's own `close` event may move the state back to [[Idle]].
   */
 enum ProxyLifecycle derives CanEqual, Eq, Hash, Show {
   case Idle

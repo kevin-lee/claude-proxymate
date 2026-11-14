@@ -85,7 +85,7 @@ object RouteSync {
 
   /** Proxy is down (stop / crash / explicit kill) — remove from the
     * active target. Strictly idempotent: the second of a double-fire
-    * (SIGTERM then child `exit`) finds nothing to remove and writes
+    * (SIGTERM then child `close`) finds nothing to remove and writes
     * nothing.
     */
   def onProxyStopped(getMainWindow: () => Option[BrowserWindow]): Unit = {

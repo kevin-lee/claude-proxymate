@@ -1,7 +1,16 @@
 package claudeproxymate.electron
 
 import cats.syntax.all.*
-import claudeproxymate.core.{IpcChannels, JsonLineProtocol, ProxyEvent, ProxyLifecycle, RouteMode, UrlScheme}
+import claudeproxymate.core.{
+  IpcChannels,
+  JsonLineProtocol,
+  ProxyEvent,
+  ProxyExit,
+  ProxyExitOutcome,
+  ProxyLifecycle,
+  RouteMode,
+  UrlScheme
+}
 import claudeproxymate.electron.facades._
 
 import java.util.concurrent.atomic.AtomicReference
@@ -16,13 +25,15 @@ object IpcHandlers {
     port: Option[Int],
     buffer: String,
     lifecycle: ProxyLifecycle,
+    started: Boolean,
+    stderrTail: String,
   )
 
   private object ProxyState {
-    val empty: ProxyState = ProxyState(none[ChildProcess], none[Int], "", ProxyLifecycle.Idle)
+    val empty: ProxyState = ProxyState(none[ChildProcess], none[Int], "", ProxyLifecycle.Idle, false, "")
   }
 
-  /** Handles for the two timers armed by [[stopProxy]], so the child's `exit`
+  /** Handles for the two timers armed by [[stopProxy]], so the child's `close`
     * event can cancel them.
     */
   final private case class PendingTimers(
@@ -193,7 +204,7 @@ object IpcHandlers {
   /** Stop the proxy child process, running `whenGone` once it is actually
     * gone. Called by the `proxy-stop` IPC handler and by `before-quit`.
     *
-    * The child's handle deliberately stays in [[state]] until its `exit`
+    * The child's handle deliberately stays in [[state]] until its `close`
     * event arrives: Node's `child.killed` only reports that a signal was
     * *sent*, so dropping the handle on the send is what previously left a
     * surviving child unreachable and still holding the port.
@@ -271,7 +282,7 @@ object IpcHandlers {
               .asInstanceOf[js.Object],
           )
 
-          state.set(ProxyState(child.some, port.some, "", nextLifecycle))
+          state.set(ProxyState(child.some, port.some, "", nextLifecycle, false, ""))
 
           child.stdout.setEncoding("utf8")
 
@@ -302,20 +313,48 @@ object IpcHandlers {
             .on(
               "data",
               { (chunk: js.Any) =>
-                val _ = js.Dynamic.global.console.warn("proxy stderr:", chunk.toString)
+                val text = chunk.toString
+                val _    = js.Dynamic.global.console.warn("proxy stderr:", text)
+                /* Kept for the error message when the proxy exits unexpectedly
+                 * (issue #95: the dyld message is only in stderr). */
+                state.updateAndGet(s => s.copy(stderrTail = ProxyExit.appendStderr(s.stderrTail, text))): Unit
               }: js.Function1[js.Any, Unit]
             )
 
           child.on(
-            "exit",
-            { (_: js.Any) =>
-              /* The only authority on the child being gone. */
-              clearPendingTimers()
-              state.set(ProxyState.empty)
-              RouteSync.onProxyStopped(getMainWindow)
-              pushProxyState(js.Dynamic.literal(state = "stopped"), getMainWindow)
-              drainWhenGone()
-            }: js.Function1[js.Any, Unit]
+            "close",
+            { (codeArg: js.Any, signalArg: js.Any) =>
+              /* The only authority on the child being gone. "close", not
+               * "exit": Node emits "close" after the stdout and stderr pipes
+               * have closed, so the stderr text (for example the dyld message
+               * of issue #95) is in stderrTail. "exit" can arrive before the
+               * last stderr data. The proxy starts no subprocess, so nothing
+               * else holds the pipes open. */
+              val current = state.get()
+              /* Ignore the "close" that Node emits after the "error" event (the
+               * "error" handler has already reset the state), and a late
+               * "close" of an earlier child. */
+              if (ProxyClose.isCurrentChild(current.process, child)) {
+                val code    = ProxyClose.exitCode(codeArg)
+                val signal  = ProxyClose.exitSignal(signalArg)
+                val outcome =
+                  ProxyExit.classify(current.lifecycle, current.started, code, signal, current.stderrTail)
+                clearPendingTimers()
+                state.set(ProxyState.empty)
+                RouteSync.onProxyStopped(getMainWindow)
+                outcome match {
+                  case ProxyExitOutcome.Stopped =>
+                    pushProxyState(js.Dynamic.literal(state = "stopped"), getMainWindow)
+                  case ProxyExitOutcome.StartFailed(detail) =>
+                    val _ = js.Dynamic.global.console.warn("proxy exited before it started:", detail)
+                    pushProxyState(js.Dynamic.literal(state = "error", message = detail), getMainWindow)
+                  case ProxyExitOutcome.Crashed(detail) =>
+                    val _ = js.Dynamic.global.console.warn("proxy stopped unexpectedly:", detail)
+                    pushProxyState(js.Dynamic.literal(state = "crashed", message = detail), getMainWindow)
+                }
+                drainWhenGone()
+              } else ()
+            }: js.Function2[js.Any, js.Any, Unit]
           )
 
           child.on(
@@ -373,6 +412,7 @@ object IpcHandlers {
             /* Authoritative "proxy is up" signal: carries the port the
              * binary actually bound, unlike startProxy's optimistic
              * return. */
+            state.updateAndGet(_.copy(started = true)): Unit
             RouteSync.onProxyStarted(port, getMainWindow)
             pushProxyState(js.Dynamic.literal(state = "started", port = port), getMainWindow)
           case ProxyEvent.ProxyStopped =>
