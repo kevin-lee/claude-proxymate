@@ -103,10 +103,21 @@ lazy val proxyServer = (project in file("modules/claude-proxymate-server"))
       libs.fs2Io.value,
     ) ++ libs.tests.munitNative.value,
 //    testFrameworks += new TestFramework("munit.Framework"),
+    /* -dead_strip_dylibs is a macOS linker option. It removes the load command of
+     * a dylib from which no symbol is used. With
+     * src/main/resources/scala-native/claudeproxymate_evp_digest_darwin.c, which
+     * supplies the two libcrypto functions that http4s-crypto imports, this
+     * removes the Homebrew libcrypto load command from the binary (issue #95).
+     * The host is the target here (no cross build), so the host check is enough.
+     * The link still needs a libcrypto on the build machine for -lcrypto, but the
+     * binary does not load it. This applies to the Compile and Test links. */
     nativeConfig ~= { c =>
-      c.withLTO(LTO.none)
+      val base = c
+        .withLTO(LTO.none)
         .withMode(Mode.releaseFast)
         .withGC(GC.commix)
+      if (scala.util.Properties.isMac) base.withLinkingOptions(base.linkingOptions :+ "-Wl,-dead_strip_dylibs")
+      else base
     },
     /* Scala Native 0.5.x release builds (Mode.releaseFast above) default to
      * trap-based GC yieldpoints, which lose fault delivery under concurrent load
@@ -144,7 +155,7 @@ lazy val electron = (project in file("modules/claude-proxymate-electron"))
     name := prefixedProjectName("electron"),
     scalaVersion := props.ScalaVersion,
     scalacOptions ++= List("-no-indent", "-explain"),
-    libraryDependencies ++= List(libs.catsCore.value, libs.scalaJsDom.value),
+    libraryDependencies ++= List(libs.catsCore.value, libs.scalaJsDom.value) ++ libs.tests.hedgehog.value,
     scalaJSUseMainModuleInitializer := true,
     /* Bake GA credentials into the artifact at build time: sys.env in Scala.js
      * resolves process.env on the end user's machine at runtime, where the CI

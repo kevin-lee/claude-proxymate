@@ -37,7 +37,7 @@ jobs:
       - uses: sbt/setup-sbt@b113b960ba361e87e08ce02a390d51871b7ee459 # v1.5.13
 
       - name: Run core tests
-        run: sbt "coreJVM/test; coreJS/test; coreNative/test; proxyServer/test; renderer/test"
+        run: sbt "coreJVM/test; coreJS/test; coreNative/test; proxyServer/test; renderer/test; electron/test"
 
   electron-mac:
     needs: test
@@ -64,11 +64,38 @@ jobs:
         with:
           node-version: 24
 
+      # proxyServer/test runs here too, because EvpDigestShimSpec must run on
+      # macOS, where it tests the libcrypto digest shim
+      # (claudeproxymate_evp_digest_darwin.c, issue #95). The test job runs on
+      # Linux, where the real libcrypto is used.
+      - name: Run proxy server tests on macOS
+        run: sbt proxyServer/test
+
+      # EvpDigestShimSpec gives the same values with Homebrew's libcrypto, so
+      # only this check shows that the test binary used the shim. It must run
+      # before prodUi, because prodUi runs clean first.
+      - name: Check the proxy test binary's load commands
+        run: scripts/check-macos-load-commands.sh modules/claude-proxymate-server/target/scala-*/claude-proxymate-server-test
+
       - name: Build binary for production
         run: sbt prodUi
 
+      - name: Test the load command check script
+        run: scripts/test-check-macos-load-commands.sh
+
+      # Issue #95: a load command for a library outside the system folders (for
+      # example Homebrew's libcrypto) stops the proxy at start on a Mac without
+      # that file. Keep in sync with release.yml.
+      - name: Check the proxy binary's load commands
+        run: scripts/check-macos-load-commands.sh electron-app/claude-proxymate
+
       - name: Install Electron dependencies
         run: cd electron-app && npm install
+
+      # Issue #95: checks that the app shows the cause when the proxy stops before or after it started, and that a
+      # normal stop shows nothing. It uses the prodUi build from the step before.
+      - name: Run the Electron end-to-end test
+        run: cd scripts/e2e && npm ci && npm test
 
       # Smoke check only: no signing credentials are passed, so electron-builder
       # ad-hoc signs and skips notarization (graceful degradation, verified in
@@ -104,6 +131,8 @@ jobs:
               exit 1
             fi
           done
+          # Issue #95: the packaged proxy binary must load only system libraries.
+          "$GITHUB_WORKSPACE/scripts/check-macos-load-commands.sh" "$MNT/Claude Proxymate.app/Contents/Resources/claude-proxymate"
 
       - name: Upload artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

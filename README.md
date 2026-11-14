@@ -239,11 +239,11 @@ sbt compile
 
 ### Run tests
 
-Tests are written with [hedgehog](https://github.com/hedgehogqa/scala-hedgehog) (property-based) on the JVM and Scala.js, and [munit](https://scalameta.org/munit/) on Scala Native (the hedgehog test runner hangs on SN 0.5, so the Native platform runs deterministic munit ports of the shared core specs). 72 spec files in total.
+Tests are written with [hedgehog](https://github.com/hedgehogqa/scala-hedgehog) (property-based) on the JVM and Scala.js, and [munit](https://scalameta.org/munit/) on Scala Native (the hedgehog test runner hangs on SN 0.5, so the Native platform runs deterministic munit ports of the shared core specs). 78 spec files in total.
 
 ```bash
-# All tests (core on JVM + JS + Native, renderer on JS, server on Native)
-sbt "coreJVM/test; coreJS/test; coreNative/test; renderer/test; proxyServer/test"
+# All tests (core on JVM + JS + Native, renderer and electron on JS, server on Native)
+sbt "coreJVM/test; coreJS/test; coreNative/test; renderer/test; electron/test; proxyServer/test"
 
 # Core only — SSE/CLAUDE.md/mechanism parsers, Request Anatomy, request filter,
 #             masking primitives, JSON-line protocol, i18n loader, HTML gen
@@ -253,14 +253,26 @@ sbt coreJVM/test
 #                 JSON tree, i18n templating, presenter mode, request filter UI
 sbt renderer/test
 
+# Electron main process only — proxy close handling
+sbt electron/test
+
+# macOS only — the load command check script
+scripts/test-check-macos-load-commands.sh
+
+# macOS only, after sbt devUi and npm install in electron-app: the Electron end-to-end test
+(cd scripts/e2e && npm ci && npm test)
+
 # Server only (munit on Native) — command-line argument parsing,
-#             filter config loading, proxy error mapping
+#             filter config loading, proxy error mapping,
+#             the libcrypto digest shim
 sbt proxyServer/test
 ```
 
 ### Build the native proxy binary
 
-The proxy has two TLS backends. The default (`CurlMain`) uses the system's libcurl via Scala Native FFI — no extra dependencies on macOS:
+The proxy has two TLS backends. The default (`CurlMain`) uses the system's libcurl via Scala Native FFI.
+
+The link needs a `libcrypto` on the build machine (for example from `brew install openssl@3`), because `http4s-crypto` links it for the WebSocket handshake of the Ember server. The binary does not load it: `modules/claude-proxymate-server/src/main/resources/scala-native/claudeproxymate_evp_digest_darwin.c` supplies the two functions that are used, and `-Wl,-dead_strip_dylibs` removes the `libcrypto` load command. `scripts/check-macos-load-commands.sh <binary>` checks that a binary loads only libraries in `/usr/lib/` or `/System/Library/`.
 
 ```bash
 # Required: read by the Scala Native toolchain at link time; build.sbt refuses to link without it

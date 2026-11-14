@@ -9,6 +9,7 @@ object ProxyStateEventSpec extends Properties {
     property("started carries the port", testStarted),
     example("stopped parses", testStopped),
     property("error carries the message", testError),
+    property("crashed carries the message", testCrashed),
     property("unknown state strings parse to None", testUnknown),
   )
 
@@ -29,6 +30,14 @@ object ProxyStateEventSpec extends Properties {
     } yield {
       ProxyControl.parseStateEvent("error", 0, message) ====
         Some(ProxyControl.ProxyStateEvent.ErrorState(message))
+    }
+
+  def testCrashed: Property =
+    for {
+      message <- Gen.string(Gen.alphaNum, Range.linear(0, 40)).log("message")
+    } yield {
+      ProxyControl.parseStateEvent("crashed", 0, message) ====
+        Some(ProxyControl.ProxyStateEvent.Crashed(message))
     }
 
   def testUnknown: Property =
