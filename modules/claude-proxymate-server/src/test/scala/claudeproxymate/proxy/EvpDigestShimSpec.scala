@@ -31,7 +31,8 @@ class EvpDigestShimSpec extends munit.FunSuite {
   final private case class DigestResult(result: Int, size: Int, hex: String)
 
   /* Calls both functions the way http4s-crypto's HashPlatform does. Returns the
-   * result code and the digest bytes (as many as the reported size). */
+   * result code and the digest bytes (as many as the reported size). When the
+   * result is not 1, the digest bytes are empty, because *size is not set then. */
   private def runDigest(algorithm: String, input: Array[Byte]): (Int, Array[Byte]) =
     Zone.acquire { implicit z =>
       val digestType = EvpFfi.EVP_get_digestbyname(toCString(algorithm))
@@ -39,8 +40,9 @@ class EvpDigestShimSpec extends munit.FunSuite {
       input.indices.foreach(i => data(i) = input(i))
       val md         = alloc[CUnsignedChar](64.toUSize)
       val size       = alloc[CUnsignedInt]()
+      !size = 0.toUInt
       val result     = EvpFfi.EVP_Digest(data, input.length.toUSize, md, size, digestType, null)
-      (result, Array.tabulate((!size).toInt)(i => md(i).toByte))
+      (result, if (result == 1) Array.tabulate((!size).toInt)(i => md(i).toByte) else Array.emptyByteArray)
     }
 
   private def digest(algorithm: String, input: Array[Byte]): DigestResult = {
@@ -171,5 +173,12 @@ class EvpDigestShimSpec extends munit.FunSuite {
       digestAbcWith(nullData = false, nullMd = false, nullSize = true, sha1Type),
       (1, "a9993e364706816aba3e25717850c26c9cd0d89d"),
     )
+  }
+
+  /* On the shim, EVP_get_digestbyname("NOPE") gives null, and EVP_Digest with a
+   * null type gives 0. macOS only, because OpenSSL can crash with a null type. */
+  test("macOS shim: digest with an unknown name gives 0 and no bytes") {
+    assumeMacShim()
+    assertEquals(digest("NOPE", abc), DigestResult(0, 0, ""))
   }
 }

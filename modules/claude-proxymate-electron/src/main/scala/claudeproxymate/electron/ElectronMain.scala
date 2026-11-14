@@ -72,13 +72,13 @@ object ElectronMain {
      * not enough: the app can be gone before the child has processed it, and
      * the child then outlives the app still holding its port. So the first
      * pass defers the quit, stops the child, and re-issues the quit once the
-     * child's `exit` event arrives (or the escalation deadline forces it). */
+     * child's `close` event arrives (or the escalation deadline forces it). */
     ElectronApp.on(
       "before-quit",
       { (event: js.Dynamic) =>
         if (quitConfirmed.get()) ()
         else {
-          /* Reset + remove first so the child-exit event from the kill
+          /* Reset + remove first so the child's `close` event from the kill
            * below finds the route already off and no-ops. */
           RouteSync.onQuit()
           IpcHandlers.stopProxy { () =>
