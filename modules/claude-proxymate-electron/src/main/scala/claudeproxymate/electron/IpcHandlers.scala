@@ -33,7 +33,7 @@ object IpcHandlers {
     val empty: ProxyState = ProxyState(none[ChildProcess], none[Int], "", ProxyLifecycle.Idle, false, "")
   }
 
-  /** Handles for the two timers armed by [[stopProxy]], so the child's `exit`
+  /** Handles for the two timers armed by [[stopProxy]], so the child's `close`
     * event can cancel them.
     */
   final private case class PendingTimers(
@@ -204,7 +204,7 @@ object IpcHandlers {
   /** Stop the proxy child process, running `whenGone` once it is actually
     * gone. Called by the `proxy-stop` IPC handler and by `before-quit`.
     *
-    * The child's handle deliberately stays in [[state]] until its `exit`
+    * The child's handle deliberately stays in [[state]] until its `close`
     * event arrives: Node's `child.killed` only reports that a signal was
     * *sent*, so dropping the handle on the send is what previously left a
     * surviving child unreachable and still holding the port.
