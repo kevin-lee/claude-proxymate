@@ -16,7 +16,8 @@ object ProxyErrorHttp4s {
     case ProxyError.Upstream(_) => Status.BadGateway
     case ProxyError.CurlInitFailed => Status.BadGateway
     case ProxyError.CurlPerformFailed(_) => Status.BadGateway
-    case ProxyError.TmpFileFailed => Status.BadGateway
+    case ProxyError.CurlOptionFailed(_) => Status.BadGateway
+    case ProxyError.PipeFailed => Status.BadGateway
     case ProxyError.MalformedUpstreamResponse => Status.BadGateway
     case ProxyError.CurlException(_) => Status.BadGateway
   }
