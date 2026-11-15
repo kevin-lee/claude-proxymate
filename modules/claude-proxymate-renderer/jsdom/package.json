@@ -1,0 +1,8 @@
+{
+  "name": "claude-proxymate-renderer-test-dom",
+  "private": true,
+  "description": "jsdom for the renderer tests (sbt renderer/test runs them in JSDOMNodeJSEnv)",
+  "devDependencies": {
+    "jsdom": "31.0.1"
+  }
+}

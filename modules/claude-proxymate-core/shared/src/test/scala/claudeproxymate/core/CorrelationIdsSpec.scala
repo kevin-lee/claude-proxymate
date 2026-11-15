@@ -25,7 +25,20 @@ object CorrelationIdsSpec extends Properties {
     example("fingerprint(toolu) prefix-preserves and emits last-4", testFingerprintToolu),
     example("fingerprint(srvtoolu) prefix-preserves and emits last-4", testFingerprintSrvtoolu),
     example("fingerprint when raw is too short returns raw verbatim", testFingerprintShortReturnsRaw),
+    // Input with nothing to scan
+    example("scan(null) gives no matches", testScanNull),
+    example("scan(\"\") gives no matches", testScanEmpty),
+    example("fingerprint with a null raw gives \"\"", testFingerprintNull),
   )
+
+  def testScanNull: Result =
+    CorrelationIds.scan(null) ==== Nil // scalafix:ok DisableSyntax.null
+
+  def testScanEmpty: Result =
+    CorrelationIds.scan("") ==== Nil
+
+  def testFingerprintNull: Result =
+    CorrelationIds.fingerprint("msg", null) ==== "" // scalafix:ok DisableSyntax.null
 
   private def hasMatch(s: String, name: String): Boolean =
     CorrelationIds.scan(s).exists(_.name == name)

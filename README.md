@@ -241,6 +241,12 @@ sbt compile
 
 Tests are written with [hedgehog](https://github.com/hedgehogqa/scala-hedgehog) (property-based) on the JVM and Scala.js, and [munit](https://scalameta.org/munit/) on Scala Native (the hedgehog test runner hangs on SN 0.5, so the Native platform runs deterministic munit ports of the shared core specs). 78 spec files in total.
 
+The renderer tests run in [jsdom](https://github.com/jsdom/jsdom), so they can test the DOM event handlers. Install it once (and after a change of `package-lock.json`) before `renderer/test`:
+
+```bash
+(cd modules/claude-proxymate-renderer/jsdom && npm ci)
+```
+
 ```bash
 # All tests (core on JVM + JS + Native, renderer and electron on JS, server on Native)
 sbt "coreJVM/test; coreJS/test; coreNative/test; renderer/test; electron/test; proxyServer/test"
@@ -655,6 +661,7 @@ claude-proxymate/
 │   │       ├── Preload.scala              # Entry point: contextBridge.exposeInMainWorld
 │   │       └── facades/ElectronPreload.scala
 │   └── claude-proxymate-renderer/        # Scala.js only (depends on scalatags for views)
+│       ├── jsdom/                            # package.json for jsdom, the DOM of renderer/test
 │       └── src/main/scala/claudeproxymate/renderer/
 │           ├── RendererMain.scala           # Entry point: init, keydown, platform, build-info
 │           ├── facades/                      # window.electronAPI & browser API facades

@@ -34,6 +34,14 @@ jobs:
 
       - uses: sbt/setup-sbt@67d461eba2c4753196c230e02da850757ba4775e # v1.5.14
 
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+
+      # renderer/test runs in jsdom (Test / jsEnv in build.sbt).
+      - name: Install jsdom for the renderer tests
+        run: cd modules/claude-proxymate-renderer/jsdom && npm ci
+
       - name: Run core tests
         run: sbt "clean; coreJVM/test; coreJS/test; coreNative/test; proxyServer/test; renderer/test; electron/test"
 

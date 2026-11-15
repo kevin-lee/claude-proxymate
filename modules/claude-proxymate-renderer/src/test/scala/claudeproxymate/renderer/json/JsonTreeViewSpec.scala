@@ -83,6 +83,17 @@ object JsonTreeViewSpec extends Properties {
     example("resolvePath: $.arr[2].leaf returns mixed nesting", testResolvePathMixed),
     example("resolvePath: missing key returns null", testResolvePathMissingKey),
     example("resolvePath: out-of-range array index returns null", testResolvePathOutOfRange),
+    example("resolvePath: null path returns the root value", testResolvePathNullPath),
+    example("resolvePath: empty path returns the root value", testResolvePathEmptyPath),
+    example("resolvePath: path without a leading $ returns null", testResolvePathNoDollar),
+    example("resolvePath: missing last key returns undefined", testResolvePathMissingKeyIsUndefined),
+    example("resolvePath: key under a missing key returns null", testResolvePathUnderMissingKey),
+    example("resolvePath: out-of-range array index returns exactly null", testResolvePathOutOfRangeIsNull),
+    example("resolvePath: negative array index returns null", testResolvePathNegativeIndex),
+    example("resolvePath: non-number array index returns null", testResolvePathNonNumberIndex),
+    example("resolvePath: index without a closing ] returns null", testResolvePathNoClose),
+    example("resolvePath: index into an object returns null", testResolvePathIndexIntoObject),
+    example("resolvePath: unknown character after $ returns null", testResolvePathUnknownChar),
   )
 
   private def reset(): Unit = {
@@ -791,5 +802,67 @@ object JsonTreeViewSpec extends Properties {
     Result
       .assert(v == null || js.isUndefined(v))
       .log(s"out-of-range index should return null, got $v")
+  }
+
+  /* resolvePath gives JS null for "not found", and JS undefined only when
+   * the last key is missing. These tests keep the two apart. */
+  private def isJsNull(v: js.Dynamic): Boolean =
+    v == null && !js.isUndefined(v) // scalafix:ok DisableSyntax.null
+
+  def testResolvePathNullPath: Result = {
+    val root = parse("""{"a":1}""")
+    val v    = JsonTreeView.resolvePath(root, null) // scalafix:ok DisableSyntax.null
+    Result.assert(v == root).log(s"a null path should return root, got $v")
+  }
+
+  def testResolvePathEmptyPath: Result = {
+    val root = parse("""{"a":1}""")
+    val v    = JsonTreeView.resolvePath(root, "")
+    Result.assert(v == root).log(s"an empty path should return root, got $v")
+  }
+
+  def testResolvePathNoDollar: Result = {
+    val root = parse("""{"a":1}""")
+    Result.assert(isJsNull(JsonTreeView.resolvePath(root, "a"))).log("a path without $ should return null")
+  }
+
+  def testResolvePathMissingKeyIsUndefined: Result = {
+    val root = parse("""{"a":1}""")
+    Result.assert(js.isUndefined(JsonTreeView.resolvePath(root, "$.nope"))).log("a missing last key gives undefined")
+  }
+
+  def testResolvePathUnderMissingKey: Result = {
+    val root = parse("""{"a":1}""")
+    Result.assert(isJsNull(JsonTreeView.resolvePath(root, "$.nope.x"))).log("a key under a missing key gives null")
+  }
+
+  def testResolvePathOutOfRangeIsNull: Result = {
+    val root = parse("""[1,2]""")
+    Result.assert(isJsNull(JsonTreeView.resolvePath(root, "$[10]"))).log("an out-of-range index gives null")
+  }
+
+  def testResolvePathNegativeIndex: Result = {
+    val root = parse("""[1,2]""")
+    Result.assert(isJsNull(JsonTreeView.resolvePath(root, "$[-1]"))).log("a negative index gives null")
+  }
+
+  def testResolvePathNonNumberIndex: Result = {
+    val root = parse("""[1,2]""")
+    Result.assert(isJsNull(JsonTreeView.resolvePath(root, "$[x]"))).log("a non-number index gives null")
+  }
+
+  def testResolvePathNoClose: Result = {
+    val root = parse("""[1,2]""")
+    Result.assert(isJsNull(JsonTreeView.resolvePath(root, "$[1"))).log("an index without ] gives null")
+  }
+
+  def testResolvePathIndexIntoObject: Result = {
+    val root = parse("""{"a":{"b":1}}""")
+    Result.assert(isJsNull(JsonTreeView.resolvePath(root, "$.a[0]"))).log("an index into an object gives null")
+  }
+
+  def testResolvePathUnknownChar: Result = {
+    val root = parse("""{"a":1}""")
+    Result.assert(isJsNull(JsonTreeView.resolvePath(root, "$a"))).log("an unknown character after $ gives null")
   }
 }

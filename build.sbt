@@ -218,6 +218,15 @@ lazy val renderer = (project in file("modules/claude-proxymate-renderer"))
     // Override CommonJSModule from jsSettingsForFuture: renderer runs in a browser
     // <script> tag (Electron renderer process), not Node.js, so it needs NoModule.
     scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.NoModule) },
+    /* The renderer tests run in jsdom, so the DOM event handlers can be
+     * tested. jsdom is the npm package in modules/claude-proxymate-renderer/jsdom/:
+     * run `npm ci` in that folder before renderer/test. NODE_PATH lets the
+     * environment's `require("jsdom")` find it. */
+    Test / jsEnv := new org.scalajs.jsenv.jsdomnodejs.JSDOMNodeJSEnv(
+      org.scalajs.jsenv.jsdomnodejs.JSDOMNodeJSEnv
+        .Config()
+        .withEnv(Map("NODE_PATH" -> (baseDirectory.value / "jsdom" / "node_modules").getAbsolutePath))
+    ),
   )
   .settings(noPublish)
   .dependsOn(coreJs)
