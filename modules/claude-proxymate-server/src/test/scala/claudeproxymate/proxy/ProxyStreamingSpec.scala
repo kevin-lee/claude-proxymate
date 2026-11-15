@@ -96,23 +96,31 @@ class ProxyStreamingSpec extends munit.FunSuite {
       .build
       .map(server => Upstream(Uri.Scheme.http, "127.0.0.1", server.address.port.value))
 
-  private def proxyApp(settings: CurlHttpClient.Settings, upstream: Upstream): IO[HttpApp[IO]] =
+  private def proxyApp(
+    settings: CurlHttpClient.Settings,
+    bodyStartTimeout: FiniteDuration,
+    upstream: Upstream,
+  ): IO[HttpApp[IO]] =
     CurlHttpClient.globalInit *>
-      FilterConfigLoader.make(none[String]).map(ProxyServer.routes(CurlHttpClient.client(settings), upstream, _))
+      FilterConfigLoader
+        .make(none[String])
+        .map(ProxyServer.routes(CurlHttpClient.client(settings), upstream, bodyStartTimeout, _))
 
   private def run[A](io: IO[A]): Future[A] =
     io.timeout(20.seconds).unsafeToFuture()
 
-  private def withProxy[A](settings: CurlHttpClient.Settings)(f: (HttpApp[IO], Gates) => IO[A]): IO[A] =
+  private def withProxy[A](settings: CurlHttpClient.Settings, bodyStartTimeout: FiniteDuration)(
+    f: (HttpApp[IO], Gates) => IO[A]
+  ): IO[A] =
     gates.flatMap { g =>
-      upstreamServer(g).use(upstream => proxyApp(settings, upstream).flatMap(app => f(app, g)))
+      upstreamServer(g).use(upstream => proxyApp(settings, bodyStartTimeout, upstream).flatMap(app => f(app, g)))
     }
 
   private def post(path: String, body: String): Request[IO] =
     Request[IO](Method.POST, Uri.unsafeFromString(path)).withEntity(body)
 
   test("the first event reaches the client before the upstream ends the response") {
-    run(withProxy(Settings) { (app, g) =>
+    run(withProxy(Settings, ProxyServer.DefaultBodyStartTimeout) { (app, g) =>
       for {
         resp <- app.run(post("/v1/gated", "{}"))
         all  <- resp
@@ -134,7 +142,7 @@ class ProxyStreamingSpec extends munit.FunSuite {
   }
 
   test("status, headers and body of an error response are forwarded") {
-    run(withProxy(Settings) { (app, _) =>
+    run(withProxy(Settings, ProxyServer.DefaultBodyStartTimeout) { (app, _) =>
       for {
         resp <- app.run(Request[IO](Method.GET, uri"/v1/overloaded"))
         body <- resp.bodyText.compile.string
@@ -151,7 +159,7 @@ class ProxyStreamingSpec extends munit.FunSuite {
     /* 2 MiB: much larger than the pipe buffer (16 KiB to 64 KiB), so libcurl's
      * fwrite must wait for the reader many times. */
     val body = (0 until 2 * 1024 * 1024).map(i => ('a' + i % 26).toChar).mkString
-    run(withProxy(Settings) { (app, _) =>
+    run(withProxy(Settings, ProxyServer.DefaultBodyStartTimeout) { (app, _) =>
       for {
         resp     <- app.run(post("/v1/echo", body))
         received <- resp.bodyText.compile.string
@@ -164,7 +172,7 @@ class ProxyStreamingSpec extends munit.FunSuite {
   }
 
   test("when the client stops reading, the transfer stops and the upstream connection closes") {
-    run(withProxy(Settings) { (app, g) =>
+    run(withProxy(Settings, ProxyServer.DefaultBodyStartTimeout) { (app, g) =>
       for {
         resp  <- app.run(post("/v1/pings", "{}"))
         first <- resp
@@ -182,9 +190,20 @@ class ProxyStreamingSpec extends munit.FunSuite {
     })
   }
 
+  test("a response whose body is never read is released, and the upstream connection closes") {
+    run(withProxy(Settings, 500.millis) { (app, g) =>
+      for {
+        resp <- app.run(post("/v1/pings", "{}"))
+        _    <- g.upstreamClosed.get.timeout(10.seconds)
+      } yield {
+        assertEquals(resp.status, Status.Ok)
+      }
+    })
+  }
+
   test("an upstream that sends nothing for the idle timeout fails the body stream") {
     val settings = Settings.copy(idleTimeout = 2.seconds)
-    run(withProxy(settings) { (app, _) =>
+    run(withProxy(settings, ProxyServer.DefaultBodyStartTimeout) { (app, _) =>
       for {
         resp   <- app.run(post("/v1/silent", "{}"))
         result <- resp.body.compile.drain.attempt.timeout(15.seconds)
@@ -204,13 +223,14 @@ class ProxyStreamingSpec extends munit.FunSuite {
     /* Bind a port, then close the server, so nothing listens on it. */
     val closedPort = gates.flatMap(g => upstreamServer(g).use(upstream => IO.pure(upstream.port)))
     run(closedPort.flatMap { p =>
-      proxyApp(Settings, Upstream(Uri.Scheme.http, "127.0.0.1", p)).flatMap { app =>
-        app.run(post("/v1/echo", "{}")).flatMap { resp =>
-          resp.bodyText.compile.string.map { body =>
-            assertEquals(resp.status, Status.BadGateway)
-            assert(body.contains("curl_easy_perform failed with code 7"), body)
+      proxyApp(Settings, ProxyServer.DefaultBodyStartTimeout, Upstream(Uri.Scheme.http, "127.0.0.1", p)).flatMap {
+        app =>
+          app.run(post("/v1/echo", "{}")).flatMap { resp =>
+            resp.bodyText.compile.string.map { body =>
+              assertEquals(resp.status, Status.BadGateway)
+              assert(body.contains("curl_easy_perform failed with code 7"), body)
+            }
           }
-        }
       }
     })
   }

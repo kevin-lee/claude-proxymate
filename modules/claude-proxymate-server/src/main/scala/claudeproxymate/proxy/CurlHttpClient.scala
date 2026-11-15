@@ -38,11 +38,12 @@ import scala.scalanative.unsigned.UnsignedRichInt
   * Each stream uses two blocking threads for its full time. Requests share no
   * state, so parallel requests from many Claude Code instances are independent.
   *
-  * Release (when the body stream ends, fails or is cancelled, see
-  * [[AnthropicForwarder]]): set the abort flag, so libcurl stops within about
-  * one second also when no data comes, wait for a read that is in progress,
-  * close the read end, so an `fwrite` that waits on a full pipe fails, then wait
-  * for `curl_easy_perform`, and only then free the native memory.
+  * Release (when the body stream ends, fails or is cancelled, or when the
+  * body is never read, see [[BodyGuard]]): set the abort flag, so libcurl
+  * stops within about one second also when no data comes, wait for a read
+  * that is in progress, close the read end, so an `fwrite` that waits on a full
+  * pipe fails, then wait for `curl_easy_perform`, and only then free the native
+  * memory.
   */
 object CurlHttpClient {
 

@@ -19,14 +19,15 @@ object Upstream {
 /** Forwards requests to the [[Upstream]]. */
 object AnthropicForwarder {
 
-  /** Send the request and give the response with its body as a stream.
+  /** Send the request and give the response, with its body as a stream, and
+    * the release of the client `Resource` (for libcurl: the transfer, its pipe
+    * and its threads).
     *
-    * The client `Resource` (for libcurl: the transfer, its pipe and its
-    * threads) is released when the body stream ends, fails or is cancelled. The
-    * http4s server runs the body stream when it writes the response, so the
-    * release follows the client connection.
+    * The caller must run the body or the release. A body that the http4s
+    * server never runs would keep the transfer, so the caller wraps the
+    * response with [[BodyGuard]].
     */
-  def forward(client: Client[IO], upstream: Upstream, req: Request[IO], bodyBytes: Array[Byte]): IO[Response[IO]] = {
+  def forward(client: Client[IO], upstream: Upstream, req: Request[IO], bodyBytes: Array[Byte]): IO[Forwarded] = {
     /* Build upstream request with modified headers. The body may have been
      * rewritten by the request filter, so the client's Content-Length (and any
      * Transfer-Encoding) is dropped and the real length is set explicitly:
@@ -56,7 +57,7 @@ object AnthropicForwarder {
 
     client.run(upstreamReq).allocated.map {
       case (response, release) =>
-        response.withBodyStream(response.body.onFinalize(release))
+        Forwarded(response, release)
     }
   }
 }
