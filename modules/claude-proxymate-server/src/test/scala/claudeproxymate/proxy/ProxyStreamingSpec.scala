@@ -101,7 +101,7 @@ class ProxyStreamingSpec extends munit.FunSuite {
       .withHttpApp(upstreamApp(g))
       .withShutdownTimeout(1.second)
       .build
-      .map(server => Upstream(Uri.Scheme.http, "127.0.0.1", server.address.port.value))
+      .map(server => Upstream(Uri.Scheme.http, host"127.0.0.1", server.address.port))
 
   private def proxyApp(
     settings: CurlHttpClient.Settings,
@@ -229,12 +229,7 @@ class ProxyStreamingSpec extends munit.FunSuite {
         result <- resp.body.compile.drain.attempt.timeout(15.seconds)
       } yield {
         assertEquals(resp.status, Status.Ok)
-        result match {
-          case Left(ProxyErrorException(ProxyError.CurlPerformFailed(code))) =>
-            assertEquals(code, 28)
-          case other =>
-            fail(s"expected CurlPerformFailed(28), got $other")
-        }
+        assertEquals(result, Left(ProxyErrorException(ProxyError.CurlPerformFailed(28))))
       }
     })
   }
@@ -243,7 +238,7 @@ class ProxyStreamingSpec extends munit.FunSuite {
     /* Bind a port, then close the server, so nothing listens on it. */
     val closedPort = gates.flatMap(g => upstreamServer(g).use(upstream => IO.pure(upstream.port)))
     run(closedPort.flatMap { p =>
-      proxyApp(Settings, ProxyServer.DefaultBodyStartTimeout, Upstream(Uri.Scheme.http, "127.0.0.1", p)).flatMap {
+      proxyApp(Settings, ProxyServer.DefaultBodyStartTimeout, Upstream(Uri.Scheme.http, host"127.0.0.1", p)).flatMap {
         app =>
           app.run(post("/v1/echo", "{}")).flatMap { resp =>
             resp.bodyText.compile.string.map { body =>

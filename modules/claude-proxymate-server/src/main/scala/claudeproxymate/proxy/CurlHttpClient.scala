@@ -148,30 +148,38 @@ object CurlHttpClient {
       response <- Resource.eval(respond(run, buffer, flag, inFlight, settings))
     } yield response
 
-  private def easyHandle: Resource[IO, LibCurl.CURL] =
+  private def easyHandle: Resource[IO, LibCurl.Curl] =
     Resource
-      .make(IO(LibCurl.curl_easy_init()))(curl => IO(LibCurl.curl_easy_cleanup(curl)).whenA(curl != null))
-      .evalTap(curl => IO.raiseWhen(curl == null)(ProxyErrorException(ProxyError.CurlInitFailed)))
+      .make(IO(Option(LibCurl.curl_easy_init())))(_.traverse_(curl => IO(LibCurl.curl_easy_cleanup(curl))))
+      .evalMap(_.liftTo[IO](ProxyErrorException(ProxyError.CurlInitFailed)))
 
   private def abortFlag: Resource[IO, Ptr[CInt]] =
     Resource
-      .make(IO(stdlib.calloc(1.toUSize, sizeof[CInt]).asInstanceOf[Ptr[CInt]]))(flag => IO(stdlib.free(flag)))
-      .evalTap(flag => IO.raiseWhen(flag == null)(new OutOfMemoryError("calloc for the curl abort flag failed")))
+      .make(IO {
+        val flag =
+          stdlib.calloc(1.toUSize, sizeof[CInt]).asInstanceOf[Ptr[CInt]] // scalafix:ok DisableSyntax.asInstanceOf
+        Option(flag)
+      })(_.traverse_(flag => IO(stdlib.free(flag))))
+      .evalMap(_.liftTo[IO](new OutOfMemoryError("calloc for the curl abort flag failed")))
 
   private def readBuffer(bytes: Int): Resource[IO, Ptr[Byte]] =
     Resource
-      .make(IO(stdlib.malloc(bytes.toUSize)))(buffer => IO(stdlib.free(buffer)))
-      .evalTap(buffer => IO.raiseWhen(buffer == null)(new OutOfMemoryError("malloc for the pipe read buffer failed")))
+      .make(IO(Option(stdlib.malloc(bytes.toUSize))))(_.traverse_(buffer => IO(stdlib.free(buffer))))
+      .evalMap(_.liftTo[IO](new OutOfMemoryError("malloc for the pipe read buffer failed")))
 
   private def headerList(headers: Headers): Resource[IO, LibCurl.SList] =
-    Resource.make(IO(buildHeaderList(headers)))(list => IO(LibCurl.curl_slist_free_all(list)).whenA(list != null))
+    Resource
+      .make(IO(Option(buildHeaderList(headers))))(_.traverse_(list => IO(LibCurl.curl_slist_free_all(list))))
+      .evalMap(_.liftTo[IO](new OutOfMemoryError("curl_slist_append failed")))
 
   /* curl_slist_append copies each string, so the Zone can end here. */
   private def buildHeaderList(headers: Headers): LibCurl.SList =
     Zone {
-      val forwarded = headers.headers.filterNot(h => DroppedRequestHeaders.contains(h.name))
-      val lines     = forwarded.map(h => s"${h.name}: ${h.value}") ++ List("Accept-Encoding:", "Expect:")
-      lines.foldLeft(null.asInstanceOf[LibCurl.SList]) { (list, line) =>
+      val forwarded                = headers.headers.filterNot(h => DroppedRequestHeaders.contains(h.name))
+      val lines                    = forwarded.map(h => s"${h.name}: ${h.value}") ++ List("Accept-Encoding:", "Expect:")
+      /* libcurl needs a NULL pointer as the empty list. */
+      val emptyList: LibCurl.SList = null // scalafix:ok DisableSyntax.null
+      lines.foldLeft(emptyList) { (list, line) =>
         LibCurl.curl_slist_append(list, toCString(line))
       }
     }
@@ -182,22 +190,22 @@ object CurlHttpClient {
       if (unistd.pipe(fds) =!= 0) {
         none[Pipe]
       } else {
-        val writer = posixStdio.fdopen(fds(1), c"w")
-        if (writer == null) {
-          unistd.close(fds(0)): Unit
-          unistd.close(fds(1)): Unit
-          none[Pipe]
-        } else {
-          /* Unbuffered: each fwrite of libcurl goes into the pipe at once, so
-           * an SSE event is not held in a stdio buffer. */
-          stdio.setvbuf(writer, null, stdio._IONBF, 0.toUSize): Unit
-          Pipe(fds(0), writer).some
+        Option(posixStdio.fdopen(fds(1), c"w")) match {
+          case None =>
+            unistd.close(fds(0)): Unit
+            unistd.close(fds(1)): Unit
+            none[Pipe]
+          case Some(writer) =>
+            /* Unbuffered: each fwrite of libcurl goes into the pipe at once, so
+             * an SSE event is not held in a stdio buffer. */
+            stdio.setvbuf(writer, null, stdio._IONBF, 0.toUSize): Unit // scalafix:ok DisableSyntax.null
+            Pipe(fds(0), writer).some
         }
       }
     }.flatMap(_.liftTo[IO](ProxyErrorException(ProxyError.PipeFailed)))
 
   private def start(
-    curl: LibCurl.CURL,
+    curl: LibCurl.Curl,
     request: Request[IO],
     body: Array[Byte],
     list: LibCurl.SList,
@@ -220,7 +228,7 @@ object CurlHttpClient {
       run.perform.join.void
 
   private def configure(
-    curl: LibCurl.CURL,
+    curl: LibCurl.Curl,
     request: Request[IO],
     body: Array[Byte],
     list: LibCurl.SList,

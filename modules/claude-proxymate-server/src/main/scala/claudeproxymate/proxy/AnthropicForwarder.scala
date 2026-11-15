@@ -2,18 +2,19 @@ package claudeproxymate.proxy
 
 import cats.effect.IO
 import cats.syntax.all.*
+import com.comcast.ip4s.{host, port, Host as IpHost, Port}
 import org.http4s.*
 import org.http4s.client.Client
 import org.http4s.headers.{`Content-Length`, Host}
 import org.typelevel.ci.*
 
 /** Where the proxy sends requests. A parameter, so tests can use a local server. */
-final case class Upstream(scheme: Uri.Scheme, host: String, port: Int)
+final case class Upstream(scheme: Uri.Scheme, host: IpHost, port: Port)
 
 object Upstream {
 
   /** The Anthropic API. */
-  val Anthropic: Upstream = Upstream(Uri.Scheme.https, "api.anthropic.com", 443)
+  val Anthropic: Upstream = Upstream(Uri.Scheme.https, host"api.anthropic.com", port"443")
 }
 
 /** Forwards requests to the [[Upstream]]. */
@@ -39,11 +40,14 @@ object AnthropicForwarder {
         .filterNot(h =>
           h.name === ci"Accept-Encoding" || h.name === ci"Content-Length" || h.name === ci"Transfer-Encoding"
         )
-    ).put(Host(upstream.host, upstream.port.some), `Content-Length`.unsafeFromLong(bodyBytes.length.toLong))
+    ).put(
+      Host(upstream.host.toString, upstream.port.value.some),
+      `Content-Length`.unsafeFromLong(bodyBytes.length.toLong)
+    )
 
     val upstreamUri = Uri(
       scheme = upstream.scheme.some,
-      authority = Uri.Authority(host = Uri.RegName(upstream.host), port = upstream.port.some).some,
+      authority = Uri.Authority(host = Uri.Host.fromIp4sHost(upstream.host), port = upstream.port.value.some).some,
       path = req.uri.path,
       query = req.uri.query,
     )
