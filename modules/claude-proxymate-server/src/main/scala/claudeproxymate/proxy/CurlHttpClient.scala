@@ -4,7 +4,7 @@ import cats.effect.{FiberIO, IO, Ref, Resource}
 import cats.syntax.all.*
 import claudeproxymate.core.{ProxyError, UpstreamHead, UpstreamHeadError, UpstreamHeadParse}
 import fs2.{Chunk, Stream}
-import org.http4s.{Header, Headers, Request, Response, Status}
+import org.http4s.{Header, Headers, Method, Request, Response, Status}
 import org.http4s.client.Client
 import org.typelevel.ci.*
 
@@ -244,6 +244,12 @@ object CurlHttpClient {
               () => LibCurl.curl_easy_setopt(curl, CurlOpt.CopyPostFields, bodyPtr),
             )
           }
+        /* Without CURLOPT_NOBODY, libcurl waits for a body of Content-Length
+         * bytes after the headers of a HEAD response, and fails with code 18
+         * or waits until the idle limit. */
+        val headOptions: List[() => CInt] =
+          if (request.method === Method.HEAD) List(() => LibCurl.curl_easy_setopt(curl, CurlOpt.NoBody, 1L))
+          else Nil
         val options: List[() => CInt]     = List(
           () => LibCurl.curl_easy_setopt(curl, CurlOpt.Url, toCString(request.uri.renderString)),
           () => LibCurl.curl_easy_setopt(curl, CurlOpt.CustomRequest, toCString(request.method.name)),
@@ -255,8 +261,8 @@ object CurlHttpClient {
           () => LibCurl.curl_easy_setopt(curl, CurlOpt.LowSpeedLimit, 1L),
           () => LibCurl.curl_easy_setopt(curl, CurlOpt.LowSpeedTime, settings.idleTimeout.toSeconds),
           () => CurlTransferNative.claudeproxymate_curl_use_abort_flag(curl, flag),
-        ) ++ bodyOptions
-        options.collectFirstSome { option =>
+        )
+        (options ++ headOptions ++ bodyOptions).collectFirstSome { option =>
           val code = option()
           Option.when(code =!= CurlCode.Ok)(code)
         }

@@ -32,6 +32,7 @@ private[proxy] object CurlOpt {
   val Url: CInt            = 10002 // CURLOPT_URL
   val WriteData: CInt      = 10001 // CURLOPT_WRITEDATA
   val Header: CInt         = 42 // CURLOPT_HEADER (include headers in output)
+  val NoBody: CInt         = 44 // CURLOPT_NOBODY
   val CustomRequest: CInt  = 10036 // CURLOPT_CUSTOMREQUEST
   val HttpHeader: CInt     = 10023 // CURLOPT_HTTPHEADER
   val PostFieldSize: CInt  = 60 // CURLOPT_POSTFIELDSIZE
