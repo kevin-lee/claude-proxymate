@@ -3,7 +3,7 @@ package claudeproxymate.proxy
 import cats.effect.{IO, Ref}
 import cats.effect.kernel.Resource
 import cats.syntax.all.*
-import fs2.Chunk
+import fs2.{Chunk, Stream}
 import io.circe.Json
 import io.circe.parser.{parse => parseJson}
 import org.http4s.*
@@ -56,13 +56,14 @@ object ProxyServer {
       // 4. Forward to the upstream, 5. tee the response body to the client and to the capture
       resp <- AnthropicForwarder.forward(client, upstream, req, sendBytes).attempt.flatMap {
                 case Right(forwarded) =>
-                  tee(reqId, forwarded.response).flatMap { teed =>
-                    BodyGuard(
-                      Forwarded(teed, forwarded.release),
-                      bodyStartTimeout,
-                      emitAbandoned(reqId, forwarded.response.status),
-                    )
-                  }
+                  tee(reqId, forwarded.response, captured => EventEmitter.emit(ProxyEvent.ResponseCaptured(captured)))
+                    .flatMap { teed =>
+                      BodyGuard(
+                        Forwarded(teed, forwarded.release),
+                        bodyStartTimeout,
+                        emitAbandoned(reqId, forwarded.response.status),
+                      )
+                    }
                 case Left(err) =>
                   val pe     = ProxyError.upstream(err)
                   val errMsg = pe.message
@@ -78,24 +79,39 @@ object ProxyServer {
   }
 
   /** Give the response to the client as the upstream sends it, and keep a copy
-    * of the body. When the body stream ends, fails or is cancelled, emit
-    * `ResponseCaptured` with the copy. For a failure or a cancel, the event has
-    * an error text, and the body is the part that was received.
+    * of the body. When the body stream ends, fails or is cancelled, give the
+    * captured response to `onCaptured`. For a failure or a cancel, it has an
+    * error text, and the body is the part that was received.
     */
-  private def tee(reqId: Long, resp: Response[IO]): IO[Response[IO]] =
-    Ref.of[IO, Chunk[Byte]](Chunk.empty[Byte]).map { received =>
+  private[proxy] def tee(
+    reqId: Long,
+    resp: Response[IO],
+    onCaptured: ProxyResponse => IO[Unit],
+  ): IO[Response[IO]] =
+    for {
+      received       <- Ref.of[IO, Chunk[Byte]](Chunk.empty[Byte])
+      upstreamFailed <- Ref.of[IO, Option[Throwable]](none[Throwable])
+    } yield {
+      /* handleErrorWith on the upstream body sees only the errors of the
+       * upstream body. An error of the server that consumes the stream (for
+       * example a write to a closed client socket) does not go through it. */
       val body = resp
         .body
+        .handleErrorWith(e => Stream.exec(upstreamFailed.set(e.some)) ++ Stream.raiseError[IO](e))
         .chunks
         .evalTap(chunk => received.update(_ ++ chunk))
         .unchunks
         .onFinalizeCase { exitCase =>
-          received.get.flatMap { bytes =>
-            EventEmitter.emit(
-              ProxyEvent.ResponseCaptured(
-                ProxyResponse(reqId, resp.status.code, parseBody(bytes.toArray), streamError(exitCase))
+          (received.get, upstreamFailed.get).tupled.flatMap {
+            case (bytes, upstreamError) =>
+              onCaptured(
+                ProxyResponse(
+                  reqId,
+                  resp.status.code,
+                  parseBody(bytes.toArray),
+                  streamError(exitCase, upstreamError),
+                )
               )
-            )
           }
         }
       resp.withBodyStream(body)
@@ -114,13 +130,15 @@ object ProxyServer {
       )
     )
 
-  private def streamError(exitCase: Resource.ExitCase): Option[String] =
-    exitCase match {
-      case Resource.ExitCase.Succeeded =>
+  private[proxy] def streamError(exitCase: Resource.ExitCase, upstreamError: Option[Throwable]): Option[String] =
+    (exitCase, upstreamError) match {
+      case (Resource.ExitCase.Succeeded, _) =>
         none[String]
-      case Resource.ExitCase.Errored(e) =>
+      case (Resource.ExitCase.Errored(_), Some(e)) =>
         s"the upstream response stopped before its end: ${ProxyError.upstream(e).message}".some
-      case Resource.ExitCase.Canceled =>
+      case (Resource.ExitCase.Errored(e), None) =>
+        s"the connection to the client failed before the end of the response: ${ProxyError.upstream(e).message}".some
+      case (Resource.ExitCase.Canceled, _) =>
         "the client closed the connection before the end of the response".some
     }
 

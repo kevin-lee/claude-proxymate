@@ -76,6 +76,13 @@ class ProxyStreamingSpec extends munit.FunSuite {
               .putHeaders(Header.Raw(ci"x-method", req.method.name))
               .withBodyStream(req.body)
           )
+        case HEAD -> Root / "api" / "hello" =>
+          /* Content-Length 5 and no body, as a HEAD response may have. A client
+           * without CURLOPT_NOBODY waits for the 5 bytes. */
+          IO.pure(
+            Response[IO](Status.Ok)
+              .putHeaders(Header.Raw(ci"x-test", "v"), headers.`Content-Length`.unsafeFromLong(5L))
+          )
         case GET -> Root / "v1" / "overloaded" =>
           IO.pure(
             Response[IO](Status.fromInt(529).getOrElse(Status.ServiceUnavailable))
@@ -137,6 +144,19 @@ class ProxyStreamingSpec extends munit.FunSuite {
         assertEquals(resp.status, Status.Ok)
         assertEquals(resp.headers.get[`Content-Type`].map(_.mediaType), Some(MediaType.`text/event-stream`))
         assertEquals(all, FirstEvent + SecondEvent)
+      }
+    })
+  }
+
+  test("a HEAD request gives the status and the headers, and an empty body that ends without an error") {
+    run(withProxy(Settings, ProxyServer.DefaultBodyStartTimeout) { (app, _) =>
+      for {
+        resp <- app.run(Request[IO](Method.HEAD, uri"/api/hello"))
+        body <- resp.body.compile.to(Array).attempt.timeout(10.seconds)
+      } yield {
+        assertEquals(resp.status, Status.Ok)
+        assertEquals(resp.headers.get(ci"x-test").map(_.head.value), Some("v"))
+        assertEquals(body.map(_.length), Right(0))
       }
     })
   }
