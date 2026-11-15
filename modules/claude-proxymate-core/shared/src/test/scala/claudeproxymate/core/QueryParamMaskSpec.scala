@@ -31,6 +31,9 @@ object QueryParamMaskSpec extends Properties {
     example("repeated non-sensitive key unchanged", testRepeatedKeyNonSensitive),
     example("empty path returns empty", testEmptyPath),
     example("only `?` (empty query) returns unchanged", testOnlyQuestion),
+    example("null path returns null", testNullPath),
+    example("`?` then a fragment (empty query) returns unchanged", testEmptyQueryWithFragment),
+    example("isSensitive: null", testIsSensitiveNull),
     // property
     property("random `name=value` is masked iff isSensitive(name)", testRandomMaskingPredicate),
   )
@@ -102,6 +105,15 @@ object QueryParamMaskSpec extends Properties {
 
   def testOnlyQuestion: Result =
     equal(QueryParamMask.maskPath("/v1/x?"), "/v1/x?")
+
+  def testNullPath: Result =
+    QueryParamMask.maskPath(null) ==== null // scalafix:ok DisableSyntax.null
+
+  def testEmptyQueryWithFragment: Result =
+    equal(QueryParamMask.maskPath("/v1/x?#top"), "/v1/x?#top")
+
+  def testIsSensitiveNull: Result =
+    QueryParamMask.isSensitive(null) ==== false // scalafix:ok DisableSyntax.null
 
   // ── property ───────────────────────────────────────────────────────────
 

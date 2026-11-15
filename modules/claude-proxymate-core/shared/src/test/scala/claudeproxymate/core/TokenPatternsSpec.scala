@@ -34,6 +34,9 @@ object TokenPatternsSpec extends Properties {
     example("fingerprint exactly 8 chars: ***", testFingerprintEight),
     example("fingerprint short: ***", testFingerprintShort),
     example("fingerprint empty: ***", testFingerprintEmpty),
+    // Input with nothing to scan
+    example("scan(null) gives no matches", testScanNull),
+    example("scan(\"\") gives no matches", testScanEmpty),
     // Property
     property("random alphanumeric of length 50 with no recognized prefix produces zero matches", testRandomNoMatch),
     property(
@@ -111,6 +114,12 @@ object TokenPatternsSpec extends Properties {
   }
 
   // ---- negative cases ----------------------------------------------------
+
+  def testScanNull: Result =
+    TokenPatterns.scan(null) ==== Nil // scalafix:ok DisableSyntax.null
+
+  def testScanEmpty: Result =
+    TokenPatterns.scan("") ==== Nil
 
   def testPlainModel: Result =
     Result
