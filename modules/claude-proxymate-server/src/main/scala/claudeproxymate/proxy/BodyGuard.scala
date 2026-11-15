@@ -1,7 +1,6 @@
 package claudeproxymate.proxy
 
 import cats.effect.{IO, Ref}
-import cats.syntax.all.*
 import fs2.Stream
 import org.http4s.Response
 
@@ -22,6 +21,12 @@ private enum BodyState derives CanEqual {
   case Abandoned
 }
 
+/** Whether this side changed the state, and so owns the release. */
+private enum Claim derives CanEqual {
+  case Won
+  case Lost
+}
+
 /** Releases the client resource of a response whose body is never read.
   *
   * The http4s Ember server writes the head of a response before it pulls the
@@ -40,33 +45,39 @@ object BodyGuard {
   def apply(forwarded: Forwarded, startTimeout: FiniteDuration, onAbandoned: IO[Unit]): IO[Response[IO]] =
     for {
       state    <- Ref.of[IO, BodyState](BodyState.NotStarted)
-      watchdog <- (IO.sleep(startTimeout) *> abandon(state).flatMap { abandoned =>
-                    (logged(forwarded.release, "the release of an unread response") *>
-                      logged(onAbandoned, "the event for an unread response")).whenA(abandoned)
+      watchdog <- (IO.sleep(startTimeout) *> abandon(state).flatMap {
+                    case Claim.Won =>
+                      logged(forwarded.release, "the release of an unread response") *>
+                        logged(onAbandoned, "the event for an unread response")
+                    case Claim.Lost =>
+                      IO.unit
                   }).start
     } yield {
       val body =
         Stream
-          .bracket(claim(state))(claimed => (watchdog.cancel *> forwarded.release).whenA(claimed))
-          .flatMap { claimed =>
-            if (claimed) forwarded.response.body
-            else Stream.raiseError[IO](BodyStartedTooLate(startTimeout))
+          .bracket(claim(state)) {
+            case Claim.Won => watchdog.cancel *> forwarded.release
+            case Claim.Lost => IO.unit
+          }
+          .flatMap {
+            case Claim.Won => forwarded.response.body
+            case Claim.Lost => Stream.raiseError[IO](BodyStartedTooLate(startTimeout))
           }
       forwarded.response.withBodyStream(body)
     }
 
-  /* NotStarted becomes Started and gives true. Otherwise no change and false. */
-  private def claim(state: Ref[IO, BodyState]): IO[Boolean] =
+  /* NotStarted becomes Started and gives Won. Otherwise no change and Lost. */
+  private def claim(state: Ref[IO, BodyState]): IO[Claim] =
     state.modify {
-      case BodyState.NotStarted => (BodyState.Started, true)
-      case s @ (BodyState.Started | BodyState.Abandoned) => (s, false)
+      case BodyState.NotStarted => (BodyState.Started, Claim.Won)
+      case s @ (BodyState.Started | BodyState.Abandoned) => (s, Claim.Lost)
     }
 
-  /* NotStarted becomes Abandoned and gives true. Otherwise no change and false. */
-  private def abandon(state: Ref[IO, BodyState]): IO[Boolean] =
+  /* NotStarted becomes Abandoned and gives Won. Otherwise no change and Lost. */
+  private def abandon(state: Ref[IO, BodyState]): IO[Claim] =
     state.modify {
-      case BodyState.NotStarted => (BodyState.Abandoned, true)
-      case s @ (BodyState.Started | BodyState.Abandoned) => (s, false)
+      case BodyState.NotStarted => (BodyState.Abandoned, Claim.Won)
+      case s @ (BodyState.Started | BodyState.Abandoned) => (s, Claim.Lost)
     }
 
   private def logged(io: IO[Unit], what: String): IO[Unit] =

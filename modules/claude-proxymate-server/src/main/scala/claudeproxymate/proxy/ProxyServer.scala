@@ -34,12 +34,12 @@ object ProxyServer {
     loader: FilterConfigLoader,
   ): HttpApp[IO] = HttpApp[IO] { (req: Request[IO]) =>
     for {
-      // 1. Read request body
+      /* 1. Read request body */
       bodyBytes <- req.body.compile.to(Array)
       bodyJson = if (bodyBytes.isEmpty) none[Json]
                  else parseJson(new String(bodyBytes, StandardCharsets.UTF_8)).toOption
 
-      // 2. Apply the request filter (config re-read per request; a no-op keeps the original bytes)
+      /* 2. Apply the request filter (config re-read per request; a no-op keeps the original bytes) */
       cfg <- loader.load
       outcome   = bodyJson.map(RequestFilter(cfg, _))
       sendJson  = outcome.map(_.body).orElse(bodyJson)
@@ -47,13 +47,13 @@ object ProxyServer {
         if (outcome.exists(_.report.isDefined)) sendJson.fold(bodyBytes)(_.noSpaces.getBytes(StandardCharsets.UTF_8))
         else bodyBytes
 
-      // 3. Create request event (what is actually forwarded, plus the filter report)
+      /* 3. Create request event (what is actually forwarded, plus the filter report) */
       reqId    = System.currentTimeMillis()
       ts       = LocalTime.now().format(timeFormatter)
       proxyReq = ProxyRequest(reqId, ts, req.method.name, req.uri.renderString, sendJson, outcome.flatMap(_.report))
       _ <- EventEmitter.emit(ProxyEvent.RequestCaptured(proxyReq))
 
-      // 4. Forward to the upstream, 5. tee the response body to the client and to the capture
+      /* 4. Forward to the upstream, 5. tee the response body to the client and to the capture */
       resp <- AnthropicForwarder.forward(client, upstream, req, sendBytes).attempt.flatMap {
                 case Right(forwarded) =>
                   tee(reqId, forwarded.response, captured => EventEmitter.emit(ProxyEvent.ResponseCaptured(captured)))
