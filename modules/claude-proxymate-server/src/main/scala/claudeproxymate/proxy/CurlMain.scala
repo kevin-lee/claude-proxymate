@@ -22,10 +22,11 @@ object CurlMain extends IOApp {
   /* Upper bound on how long SIGTERM/SIGINT may take to actually end the
    * process. Cats Effect already has the hard-exit path
    * (`IO.sleep(shutdownHookTimeout) *> System.exit`), but its default is
-   * `Duration.Inf`, so the fallback never fires: a SIGTERM arriving while
-   * `CurlHttpClient`'s uncancelable `IO.blocking(curl_easy_perform)` is in
-   * flight leaves the graceful shutdown parked behind it for as long as
-   * `CURLOPT_TIMEOUT` (300s) allows. A finite value arms the fallback. */
+   * `Duration.Inf`, so the fallback never fires. A cancelled transfer of
+   * `CurlHttpClient` sets its abort flag, and libcurl stops within about one
+   * second, but `IO.blocking(curl_easy_perform)` itself cannot be cancelled.
+   * A finite value makes sure that a transfer that does not stop cannot hold
+   * the shutdown. */
   private val ShutdownDeadline: FiniteDuration = 5.seconds
 
   override protected def runtimeConfig: IORuntimeConfig =
@@ -36,14 +37,15 @@ object CurlMain extends IOApp {
     val filterConfigPath = FilterConfigArg.parse(args)
     val parentLink       = ParentLinkArg.parse(args)
 
-    FilterConfigLoader
-      .make(filterConfigPath)
+    (CurlHttpClient.globalInit *> FilterConfigLoader.make(filterConfigPath))
       .flatMap { loader =>
         EmberServerBuilder
           .default[IO]
           .withHost(ipv4"127.0.0.1")
           .withPort(port)
-          .withHttpApp(ProxyServer.routes(CurlHttpClient.client, loader))
+          .withHttpApp(
+            ProxyServer.routes(CurlHttpClient.client(CurlHttpClient.Settings.Default), Upstream.Anthropic, loader)
+          )
           .build
           .use { server =>
             for {

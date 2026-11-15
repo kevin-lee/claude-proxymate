@@ -13,8 +13,9 @@ import cats.effect.IO
   *
   * The exit is immediate rather than a graceful shutdown, on purpose. With the
   * parent gone there is nobody left to serve, and the graceful path is exactly
-  * what can stall: it waits on the in-flight `curl_easy_perform`, which
-  * `CurlHttpClient` caps at `CURLOPT_TIMEOUT` (300s).
+  * what can stall: it waits on the in-flight `curl_easy_perform`. That call
+  * stops within about one second after its abort flag is set, but only when
+  * the transfer is cancelled, and it has no total time limit.
   */
 object ParentWatch {
 

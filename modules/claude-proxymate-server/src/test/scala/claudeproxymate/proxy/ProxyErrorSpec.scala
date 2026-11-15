@@ -11,7 +11,8 @@ class ProxyErrorSpec extends munit.FunSuite {
     ProxyError.Upstream("u"),
     ProxyError.CurlInitFailed,
     ProxyError.CurlPerformFailed(7),
-    ProxyError.TmpFileFailed,
+    ProxyError.CurlOptionFailed(43),
+    ProxyError.PipeFailed,
     ProxyError.MalformedUpstreamResponse,
     ProxyError.CurlException("c"),
   )
@@ -50,8 +51,12 @@ class ProxyErrorSpec extends munit.FunSuite {
     assertEquals((ProxyError.CurlPerformFailed(42): ProxyError).message, "curl_easy_perform failed with code 42")
   }
 
-  test("TmpFileFailed has fixed message") {
-    assertEquals((ProxyError.TmpFileFailed: ProxyError).message, "tmpfile() returned null")
+  test("CurlOptionFailed carries the code in its message") {
+    assertEquals((ProxyError.CurlOptionFailed(43): ProxyError).message, "curl_easy_setopt failed with code 43")
+  }
+
+  test("PipeFailed has fixed message") {
+    assertEquals((ProxyError.PipeFailed: ProxyError).message, "pipe() or fdopen() failed")
   }
 
   test("MalformedUpstreamResponse has fixed message") {

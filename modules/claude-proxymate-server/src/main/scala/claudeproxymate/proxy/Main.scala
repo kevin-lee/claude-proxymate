@@ -36,7 +36,7 @@ object Main extends IOApp {
             .default[IO]
             .withHost(ipv4"127.0.0.1")
             .withPort(port)
-            .withHttpApp(ProxyServer.routes(client, loader))
+            .withHttpApp(ProxyServer.routes(client, Upstream.Anthropic, loader))
             .build
             .use { server =>
               for {

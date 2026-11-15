@@ -15,7 +15,8 @@ enum ProxyError {
   case Upstream(msg: String)
   case CurlInitFailed
   case CurlPerformFailed(code: Int)
-  case TmpFileFailed
+  case CurlOptionFailed(code: Int)
+  case PipeFailed
   case MalformedUpstreamResponse
   case CurlException(msg: String)
 
@@ -23,7 +24,8 @@ enum ProxyError {
     case ProxyError.Upstream(m) => m
     case ProxyError.CurlInitFailed => "curl_easy_init() returned null"
     case ProxyError.CurlPerformFailed(code) => s"curl_easy_perform failed with code $code"
-    case ProxyError.TmpFileFailed => "tmpfile() returned null"
+    case ProxyError.CurlOptionFailed(code) => s"curl_easy_setopt failed with code $code"
+    case ProxyError.PipeFailed => "pipe() or fdopen() failed"
     case ProxyError.MalformedUpstreamResponse => "malformed response from upstream"
     case ProxyError.CurlException(m) => m
   }
