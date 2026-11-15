@@ -585,6 +585,7 @@ claude-proxymate/
 │   │   │   ├── QueryParamMask.scala     # URL query-string masking
 │   │   │   ├── UrlScheme.scala          # Validate URLs before shell.openExternal
 │   │   │   ├── ProxyError.scala         # Typed proxy errors (platform-neutral)
+│   │   │   ├── UpstreamHead.scala       # Parse the status line and headers that libcurl writes before the body
 │   │   │   ├── JsonLineProtocol.scala   # Encode/decode ProxyEvent as JSON lines
 │   │   │   ├── RouteMode.scala          # Route Claude mode ADT (manual / vscode / global)
 │   │   │   ├── VsCodeEnv.scala          # Pure apply/remove decisions for VS Code settings
@@ -593,8 +594,12 @@ claude-proxymate/
 │   │   │   ├── HtmlIds.scala            # DOM element ID constants shared with renderer
 │   │   │   ├── SyncAction.scala         # Result of one settings-file sync, shared by main process and renderer
 │   │   │   ├── ProxyLifecycle.scala     # Main process view of the proxy child: idle / running / stopping
+│   │   │   ├── ProxyExit.scala          # Classify the exit of the proxy child: stopped / start failed / crashed
 │   │   │   ├── JsonIndent.scala         # Detected JSONC indentation, fed to jsonc-parser's formatting options
 │   │   │   ├── GettingStarted.scala     # Onboarding model: motion intro stages and guided-tour steps
+│   │   │   ├── update/                  # Self-update model, shared by the main process and the renderer
+│   │   │   │   ├── UpdateState.scala        # Update phases and the pure checks (canCheck, canDownload, canInstall)
+│   │   │   │   └── UpdateSettings.scala     # Persisted self-update settings (update-settings.json)
 │   │   │   └── filter/                  # Request Filter (pure, shared by the proxy and the renderer preview)
 │   │   │       ├── FilterConfig.scala       # Config ADT: category modes, Text / Regex / Tag rules, scopes
 │   │   │       ├── FilterConfigEdits.scala  # Pure edits the filter sheet applies to its draft config
@@ -611,21 +616,26 @@ claude-proxymate/
 │   │       ├── I18nGenerator.scala          # .properties → browser-consumable JSON
 │   │       └── I18nPropertiesLoader.scala   # Read .properties locale files
 │   ├── claude-proxymate-server/          # Scala Native only
-│   │   └── src/main/scala/claudeproxymate/proxy/
-│   │       ├── CurlMain.scala            # Entry point using libcurl FFI (default)
-│   │       ├── Main.scala                # Entry point using http4s Ember / s2n (fallback)
-│   │       ├── ProxyServer.scala         # http4s routes: intercept, forward, tee response
-│   │       ├── AnthropicForwarder.scala  # Forwarding logic to api.anthropic.com
-│   │       ├── CurlHttpClient.scala      # http4s Client[IO] backed by libcurl's easy API
-│   │       ├── LibCurl.scala             # libcurl FFI bindings
-│   │       ├── ProxyErrorHttp4s.scala    # http4s status/entity mapping for ProxyError
-│   │       ├── EventEmitter.scala        # Emit ProxyEvent JSON lines to stdout
-│   │       ├── PortArg.scala             # `--port` parsing
-│   │       ├── FilterConfigArg.scala     # `--filter-config` parsing
-│   │       ├── FilterConfigLoader.scala  # Re-read the filter config on every request
-│   │       ├── ParentLinkArg.scala       # `--exit-on-stdin-close` parsing
-│   │       ├── ParentLink.scala          # Whether the process is tied to a parent holding its stdin
-│   │       └── ParentWatch.scala         # Exit when the parent's stdin pipe closes
+│   │   ├── src/main/scala/claudeproxymate/proxy/
+│   │   │   ├── CurlMain.scala            # Entry point using libcurl FFI (default)
+│   │   │   ├── Main.scala                # Entry point using http4s Ember / s2n (fallback)
+│   │   │   ├── ProxyServer.scala         # http4s routes: intercept, forward, tee response
+│   │   │   ├── BodyGuard.scala           # Release the upstream transfer when the client never reads the body
+│   │   │   ├── AnthropicForwarder.scala  # Build the upstream request (Upstream, api.anthropic.com by default)
+│   │   │   ├── CurlHttpClient.scala      # http4s Client[IO] on libcurl's easy API, streams the body through a pipe
+│   │   │   ├── LibCurl.scala             # libcurl FFI bindings
+│   │   │   ├── ProxyErrorHttp4s.scala    # http4s status/entity mapping for ProxyError
+│   │   │   ├── ProxyErrorException.scala # ProxyError raised in IO (transfer set-up, body stream)
+│   │   │   ├── EventEmitter.scala        # Emit ProxyEvent JSON lines to stdout
+│   │   │   ├── PortArg.scala             # `--port` parsing
+│   │   │   ├── FilterConfigArg.scala     # `--filter-config` parsing
+│   │   │   ├── FilterConfigLoader.scala  # Re-read the filter config on every request
+│   │   │   ├── ParentLinkArg.scala       # `--exit-on-stdin-close` parsing
+│   │   │   ├── ParentLink.scala          # Whether the process is tied to a parent holding its stdin
+│   │   │   └── ParentWatch.scala         # Exit when the parent's stdin pipe closes
+│   │   └── src/main/resources/scala-native/
+│   │       ├── claudeproxymate_curl_transfer.c # libcurl abort-flag callback and SIGPIPE ignore (issue #100)
+│   │       └── claudeproxymate_evp_digest_darwin.c # EVP_Digest with Apple CommonCrypto on macOS (issue #95)
 │   ├── claude-proxymate-electron/        # Scala.js only
 │   │   └── src/main/scala/claudeproxymate/electron/
 │   │       ├── ElectronMain.scala        # BrowserWindow, app lifecycle, IPC, hardening
