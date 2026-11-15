@@ -44,7 +44,12 @@ object CurlMain extends IOApp {
           .withHost(ipv4"127.0.0.1")
           .withPort(port)
           .withHttpApp(
-            ProxyServer.routes(CurlHttpClient.client(CurlHttpClient.Settings.Default), Upstream.Anthropic, loader)
+            ProxyServer.routes(
+              CurlHttpClient.client(CurlHttpClient.Settings.Default),
+              Upstream.Anthropic,
+              ProxyServer.DefaultBodyStartTimeout,
+              loader
+            )
           )
           .build
           .use { server =>

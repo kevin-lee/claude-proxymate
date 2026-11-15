@@ -14,50 +14,67 @@ import claudeproxymate.core.filter.RequestFilter
 import java.nio.charset.StandardCharsets
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
+import scala.concurrent.duration.*
 
 /** HTTP proxy routes: intercept requests, apply the request filter, forward to the upstream, tee responses. */
 object ProxyServer {
 
   private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss")
 
-  def routes(client: Client[IO], upstream: Upstream, loader: FilterConfigLoader): HttpApp[IO] = HttpApp[IO] {
-    (req: Request[IO]) =>
-      for {
-        // 1. Read request body
-        bodyBytes <- req.body.compile.to(Array)
-        bodyJson = if (bodyBytes.isEmpty) none[Json]
-                   else parseJson(new String(bodyBytes, StandardCharsets.UTF_8)).toOption
+  /* The time limit for the start of a response body (see BodyGuard). Ember
+   * pulls the body right after it writes the head of the response (a few
+   * hundred bytes on a local socket), so 30 s is far more than needed, and a
+   * transfer that nobody reads is released after at most 30 s. */
+  val DefaultBodyStartTimeout: FiniteDuration = 30.seconds
 
-        // 2. Apply the request filter (config re-read per request; a no-op keeps the original bytes)
-        cfg <- loader.load
-        outcome   = bodyJson.map(RequestFilter(cfg, _))
-        sendJson  = outcome.map(_.body).orElse(bodyJson)
-        sendBytes =
-          if (outcome.exists(_.report.isDefined)) sendJson.fold(bodyBytes)(_.noSpaces.getBytes(StandardCharsets.UTF_8))
-          else bodyBytes
+  def routes(
+    client: Client[IO],
+    upstream: Upstream,
+    bodyStartTimeout: FiniteDuration,
+    loader: FilterConfigLoader,
+  ): HttpApp[IO] = HttpApp[IO] { (req: Request[IO]) =>
+    for {
+      // 1. Read request body
+      bodyBytes <- req.body.compile.to(Array)
+      bodyJson = if (bodyBytes.isEmpty) none[Json]
+                 else parseJson(new String(bodyBytes, StandardCharsets.UTF_8)).toOption
 
-        // 3. Create request event (what is actually forwarded, plus the filter report)
-        reqId    = System.currentTimeMillis()
-        ts       = LocalTime.now().format(timeFormatter)
-        proxyReq = ProxyRequest(reqId, ts, req.method.name, req.uri.renderString, sendJson, outcome.flatMap(_.report))
-        _ <- EventEmitter.emit(ProxyEvent.RequestCaptured(proxyReq))
+      // 2. Apply the request filter (config re-read per request; a no-op keeps the original bytes)
+      cfg <- loader.load
+      outcome   = bodyJson.map(RequestFilter(cfg, _))
+      sendJson  = outcome.map(_.body).orElse(bodyJson)
+      sendBytes =
+        if (outcome.exists(_.report.isDefined)) sendJson.fold(bodyBytes)(_.noSpaces.getBytes(StandardCharsets.UTF_8))
+        else bodyBytes
 
-        // 4. Forward to the upstream, 5. tee the response body to the client and to the capture
-        resp <- AnthropicForwarder.forward(client, upstream, req, sendBytes).attempt.flatMap {
-                  case Right(upstreamResp) =>
-                    tee(reqId, upstreamResp)
-                  case Left(err) =>
-                    val pe     = ProxyError.upstream(err)
-                    val errMsg = pe.message
-                    EventEmitter
-                      .emit(
-                        ProxyEvent.ResponseCaptured(
-                          ProxyResponse(reqId, ProxyErrorHttp4s.status(pe).code, errMsg.asLeft[Json], errMsg.some)
-                        )
+      // 3. Create request event (what is actually forwarded, plus the filter report)
+      reqId    = System.currentTimeMillis()
+      ts       = LocalTime.now().format(timeFormatter)
+      proxyReq = ProxyRequest(reqId, ts, req.method.name, req.uri.renderString, sendJson, outcome.flatMap(_.report))
+      _ <- EventEmitter.emit(ProxyEvent.RequestCaptured(proxyReq))
+
+      // 4. Forward to the upstream, 5. tee the response body to the client and to the capture
+      resp <- AnthropicForwarder.forward(client, upstream, req, sendBytes).attempt.flatMap {
+                case Right(forwarded) =>
+                  tee(reqId, forwarded.response).flatMap { teed =>
+                    BodyGuard(
+                      Forwarded(teed, forwarded.release),
+                      bodyStartTimeout,
+                      emitAbandoned(reqId, forwarded.response.status),
+                    )
+                  }
+                case Left(err) =>
+                  val pe     = ProxyError.upstream(err)
+                  val errMsg = pe.message
+                  EventEmitter
+                    .emit(
+                      ProxyEvent.ResponseCaptured(
+                        ProxyResponse(reqId, ProxyErrorHttp4s.status(pe).code, errMsg.asLeft[Json], errMsg.some)
                       )
-                      .as(ProxyErrorHttp4s.asResponse(pe))
-                }
-      } yield resp
+                    )
+                    .as(ProxyErrorHttp4s.asResponse(pe))
+              }
+    } yield resp
   }
 
   /** Give the response to the client as the upstream sends it, and keep a copy
@@ -83,6 +100,19 @@ object ProxyServer {
         }
       resp.withBodyStream(body)
     }
+
+  /** The `ResponseCaptured` event for a response whose body the client never read. */
+  private def emitAbandoned(reqId: Long, status: Status): IO[Unit] =
+    EventEmitter.emit(
+      ProxyEvent.ResponseCaptured(
+        ProxyResponse(
+          reqId,
+          status.code,
+          "".asLeft[Json],
+          "the client did not read the response, so the upstream transfer was stopped".some,
+        )
+      )
+    )
 
   private def streamError(exitCase: Resource.ExitCase): Option[String] =
     exitCase match {
