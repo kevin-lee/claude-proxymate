@@ -8,7 +8,7 @@ import io.circe.Json
 import io.circe.parser.{parse => parseJson}
 import org.http4s.*
 import org.http4s.client.Client
-import claudeproxymate.core.{ProxyError, ProxyEvent, ProxyRequest, ProxyResponse, SseParser}
+import claudeproxymate.core.{CaptureId, ProxyError, ProxyEvent, ProxyRequest, ProxyResponse, SseParser}
 import claudeproxymate.core.filter.RequestFilter
 
 import java.nio.charset.StandardCharsets
@@ -27,11 +27,20 @@ object ProxyServer {
    * transfer that nobody reads is released after at most 30 s. */
   val DefaultBodyStartTimeout: FiniteDuration = 30.seconds
 
+  /** The proxy routes.
+    *
+    * @param nextId gives the capture id of each request (see [[CaptureIds.make]]).
+    *               One source is shared by all requests of the proxy process.
+    * @param emit   receives the `RequestCaptured` and `ResponseCaptured` events.
+    *               It is `EventEmitter.emit` in production.
+    */
   def routes(
     client: Client[IO],
     upstream: Upstream,
     bodyStartTimeout: FiniteDuration,
     loader: FilterConfigLoader,
+    nextId: IO[CaptureId],
+    emit: ProxyEvent => IO[Unit],
   ): HttpApp[IO] = HttpApp[IO] { (req: Request[IO]) =>
     for {
       /* 1. Read request body */
@@ -48,31 +57,30 @@ object ProxyServer {
         else bodyBytes
 
       /* 3. Create request event (what is actually forwarded, plus the filter report) */
-      reqId    = System.currentTimeMillis()
+      reqId <- nextId
       ts       = LocalTime.now().format(timeFormatter)
       proxyReq = ProxyRequest(reqId, ts, req.method.name, req.uri.renderString, sendJson, outcome.flatMap(_.report))
-      _ <- EventEmitter.emit(ProxyEvent.RequestCaptured(proxyReq))
+      _ <- emit(ProxyEvent.RequestCaptured(proxyReq))
 
       /* 4. Forward to the upstream, 5. tee the response body to the client and to the capture */
       resp <- AnthropicForwarder.forward(client, upstream, req, sendBytes).attempt.flatMap {
                 case Right(forwarded) =>
-                  tee(reqId, forwarded.response, captured => EventEmitter.emit(ProxyEvent.ResponseCaptured(captured)))
+                  tee(reqId, forwarded.response, captured => emit(ProxyEvent.ResponseCaptured(captured)))
                     .flatMap { teed =>
                       BodyGuard(
                         Forwarded(teed, forwarded.release),
                         bodyStartTimeout,
-                        emitAbandoned(reqId, forwarded.response.status),
+                        emitAbandoned(emit, reqId, forwarded.response.status),
                       )
                     }
                 case Left(err) =>
                   val pe     = ProxyError.upstream(err)
                   val errMsg = pe.message
-                  EventEmitter
-                    .emit(
-                      ProxyEvent.ResponseCaptured(
-                        ProxyResponse(reqId, ProxyErrorHttp4s.status(pe).code, errMsg.asLeft[Json], errMsg.some)
-                      )
+                  emit(
+                    ProxyEvent.ResponseCaptured(
+                      ProxyResponse(reqId, ProxyErrorHttp4s.status(pe).code, errMsg.asLeft[Json], errMsg.some)
                     )
+                  )
                     .as(ProxyErrorHttp4s.asResponse(pe))
               }
     } yield resp
@@ -84,7 +92,7 @@ object ProxyServer {
     * error text, and the body is the part that was received.
     */
   private[proxy] def tee(
-    reqId: Long,
+    reqId: CaptureId,
     resp: Response[IO],
     onCaptured: ProxyResponse => IO[Unit],
   ): IO[Response[IO]] =
@@ -118,8 +126,8 @@ object ProxyServer {
     }
 
   /** The `ResponseCaptured` event for a response whose body the client never read. */
-  private def emitAbandoned(reqId: Long, status: Status): IO[Unit] =
-    EventEmitter.emit(
+  private def emitAbandoned(emit: ProxyEvent => IO[Unit], reqId: CaptureId, status: Status): IO[Unit] =
+    emit(
       ProxyEvent.ResponseCaptured(
         ProxyResponse(
           reqId,

@@ -59,6 +59,8 @@ lazy val core =
       libraryDependencies ++= List(
         libs.catsCore.value,
         libs.kittens.value,
+        libs.refined4sCore.value,
+        libs.refined4sCirce.value,
         libs.circeCore.value,
         libs.circeParser.value,
         libs.circeGeneric.value,
@@ -445,6 +447,8 @@ lazy val props = new {
 
   val KittensVersion = "3.5.0"
 
+  val Refined4sVersion = "1.21.0"
+
   val Http4sVersion = "0.23.37"
 
   val Fs2Version = "3.14.0"
@@ -478,6 +482,9 @@ lazy val libs = new {
     Def.setting("org.typelevel" %%% "cats-effect" % props.CatsEffectVersion)
 
   lazy val kittens = Def.setting("org.typelevel" %%% "kittens" % props.KittensVersion)
+
+  lazy val refined4sCore  = Def.setting("io.kevinlee" %%% "refined4s-core" % props.Refined4sVersion)
+  lazy val refined4sCirce = Def.setting("io.kevinlee" %%% "refined4s-circe" % props.Refined4sVersion)
 
   lazy val http4sEmberServer =
     Def.setting("org.http4s" %%% "http4s-ember-server" % props.Http4sVersion)

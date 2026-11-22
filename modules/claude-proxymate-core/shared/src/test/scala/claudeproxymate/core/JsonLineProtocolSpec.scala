@@ -39,7 +39,7 @@ object JsonLineProtocolSpec extends Properties {
     roundTrip(
       ProxyEvent.RequestCaptured(
         ProxyRequest(
-          id = 1234L,
+          id = CaptureId(1234L),
           ts = "12:34:56",
           method = "POST",
           path = "/v1/messages",
@@ -53,7 +53,7 @@ object JsonLineProtocolSpec extends Properties {
     roundTrip(
       ProxyEvent.RequestCaptured(
         ProxyRequest(
-          id = 1234L,
+          id = CaptureId(1234L),
           ts = "12:34:56",
           method = "POST",
           path = "/v1/messages",
@@ -79,7 +79,9 @@ object JsonLineProtocolSpec extends Properties {
     val decoded = JsonLineProtocol.decode(line)
     Result
       .assert(
-        decoded == Right(ProxyEvent.RequestCaptured(ProxyRequest(1L, "00:00:00", "POST", "/v1/messages", None, None)))
+        decoded == Right(
+          ProxyEvent.RequestCaptured(ProxyRequest(CaptureId(1L), "00:00:00", "POST", "/v1/messages", None, None))
+        )
       )
       .log(s"a line predating the filter field should decode with filter = None, got $decoded")
   }
@@ -88,7 +90,7 @@ object JsonLineProtocolSpec extends Properties {
     roundTrip(
       ProxyEvent.ResponseCaptured(
         ProxyResponse(
-          id = 1234L,
+          id = CaptureId(1234L),
           status = 200,
           body = Right(Json.obj("id" -> Json.fromString("msg_01ABCDEFGHIJKLMNOP"))),
           error = None,
@@ -103,7 +105,7 @@ object JsonLineProtocolSpec extends Properties {
     roundTrip(
       ProxyEvent.ResponseCaptured(
         ProxyResponse(
-          id = 7L,
+          id = CaptureId(7L),
           status = 502,
           body = Left("upstream exploded: not json"),
           error = Some("upstream exploded: not json"),
@@ -151,7 +153,7 @@ object JsonLineProtocolSpec extends Properties {
      * the consumer side). circe escapes it as \n inside the JSON
      * string, so the encoded line stays single-line. */
     val line = JsonLineProtocol.encode(
-      ProxyEvent.ResponseCaptured(ProxyResponse(1L, 200, Left("line1\nline2"), None))
+      ProxyEvent.ResponseCaptured(ProxyResponse(CaptureId(1L), 200, Left("line1\nline2"), None))
     )
     Result
       .assert(!line.contains("\n"))
