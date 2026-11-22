@@ -4,7 +4,7 @@ import cats.syntax.all.*
 import claudeproxymate.core.{HtmlIds, VsCodeEnv}
 import claudeproxymate.renderer.facades.ElectronApi
 import claudeproxymate.renderer.i18n.I18n
-import claudeproxymate.renderer.state.AppState
+import claudeproxymate.renderer.state.{AppState, ProxyCaptures}
 import claudeproxymate.renderer.util.Debounce
 import org.scalajs.dom
 
@@ -333,28 +333,7 @@ object ProxyControl {
             renderProxyStatus()
           } else {
             /* running state + true port arrive via the "started" event */
-            api.onProxyRequest { (data: js.Dynamic) =>
-              AppState.proxyCaptures = data :: AppState.proxyCaptures
-              if (AppState.proxyCaptures.length > 50) {
-                AppState.proxyCaptures = AppState.proxyCaptures.take(50)
-              }
-              debouncedRenderList(() => ProxyList.renderProxyList())
-            }
-            api.onProxyResponse { (data: js.Dynamic) =>
-              val id = data.id
-              AppState.proxyCaptures = AppState.proxyCaptures.map { e =>
-                if (e.id == id) {
-                  e.response = data
-                  e
-                } else e
-              }
-              debouncedRenderList(() => ProxyList.renderProxyList())
-              AppState.selectedProxyId.foreach { selId =>
-                if (selId === id.asInstanceOf[Double]) {
-                  debouncedRenderDetail(() => callRenderProxyDetail())
-                }
-              }
-            }
+            registerCaptureListeners(api)
           }
         }
       }
@@ -379,6 +358,22 @@ object ProxyControl {
   /** Trigger debounced proxy detail render. */
   def triggerDebouncedRenderDetail(): Unit =
     debouncedRenderDetail(() => callRenderProxyDetail())
+
+  /** Registers the handlers for the captured requests and responses.
+    *
+    * The caller calls `api.offProxy()` first.
+    */
+  def registerCaptureListeners(api: ElectronApi): Unit = {
+    api.onProxyRequest { (data: js.Dynamic) =>
+      AppState.proxyCaptures = ProxyCaptures.addRequest(AppState.proxyCaptures, data)
+      triggerDebouncedRenderList()
+    }
+    api.onProxyResponse { (data: js.Dynamic) =>
+      AppState.proxyCaptures = ProxyCaptures.addResponse(AppState.proxyCaptures, data)
+      triggerDebouncedRenderList()
+      if (ProxyCaptures.idOf(data).exists(id => AppState.selectedProxyId.contains(id))) triggerDebouncedRenderDetail()
+    }
+  }
 
   /** Calls renderProxyDetail from DetailView. */
   private[proxy] def callRenderProxyDetail(): Unit =

@@ -97,4 +97,9 @@ object AppState {
   def isRevealed(maskId: String): Boolean =
     if (presenterMaskAll) maskOverrides.contains(maskId)
     else !maskOverrides.contains(maskId)
+
+  /** The capture whose id is [[selectedProxyId]]. `None` when no capture is
+    * selected or when the selected capture is not in [[proxyCaptures]].
+    */
+  def selectedCapture: Option[js.Dynamic] = ProxyCaptures.findById(proxyCaptures, selectedProxyId)
 }

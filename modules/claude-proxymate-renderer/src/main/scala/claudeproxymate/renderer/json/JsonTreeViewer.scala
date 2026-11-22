@@ -101,7 +101,7 @@ object JsonTreeViewer {
     if (live == null) return false
 
     // Resolve the value at `path` against the active capture body.
-    val entry = AppState.proxyCaptures.find(e => e.id == AppState.selectedProxyId.map(_.asInstanceOf[js.Any]).orNull)
+    val entry            = AppState.selectedCapture
     val body: js.Dynamic = entry match {
       case None => null.asInstanceOf[js.Dynamic]
       case Some(e) =>
@@ -169,7 +169,7 @@ object JsonTreeViewer {
       try tokenId.substring(hashAt + 1).toInt
       catch { case _: NumberFormatException => return false }
 
-    val entry = AppState.proxyCaptures.find(e => e.id == AppState.selectedProxyId.map(_.asInstanceOf[js.Any]).orNull)
+    val entry            = AppState.selectedCapture
     val body: js.Dynamic = entry match {
       case None => null.asInstanceOf[js.Dynamic]
       case Some(e) =>
@@ -236,7 +236,7 @@ object JsonTreeViewer {
       try payload.substring(hashAt + 1).toInt
       catch { case _: NumberFormatException => return false }
 
-    val entry = AppState.proxyCaptures.find(e => e.id == AppState.selectedProxyId.map(_.asInstanceOf[js.Any]).orNull)
+    val entry            = AppState.selectedCapture
     val body: js.Dynamic = entry match {
       case None => null.asInstanceOf[js.Dynamic]
       case Some(e) =>

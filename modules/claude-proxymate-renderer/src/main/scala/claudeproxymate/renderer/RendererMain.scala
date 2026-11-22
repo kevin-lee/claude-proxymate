@@ -213,28 +213,7 @@ object RendererMain {
 
                 // Re-register event listeners
                 api.offProxy()
-                api.onProxyRequest { (data: js.Dynamic) =>
-                  AppState.proxyCaptures = data :: AppState.proxyCaptures
-                  if (AppState.proxyCaptures.length > 50) {
-                    AppState.proxyCaptures = AppState.proxyCaptures.take(50)
-                  }
-                  ProxyControl.triggerDebouncedRenderList()
-                }
-                api.onProxyResponse { (data: js.Dynamic) =>
-                  val id = data.id
-                  AppState.proxyCaptures = AppState.proxyCaptures.map { e =>
-                    if (e.id == id) {
-                      e.response = data
-                      e
-                    } else e
-                  }
-                  ProxyControl.triggerDebouncedRenderList()
-                  AppState.selectedProxyId.foreach { selId =>
-                    if (selId === id.asInstanceOf[Double]) {
-                      ProxyControl.triggerDebouncedRenderDetail()
-                    }
-                  }
-                }
+                ProxyControl.registerCaptureListeners(api)
                 ProxyControl.renderProxyStatus()
               }
             }
