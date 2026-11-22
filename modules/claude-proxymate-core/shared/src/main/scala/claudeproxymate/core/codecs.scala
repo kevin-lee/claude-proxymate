@@ -28,7 +28,7 @@ object codecs {
 
   given Decoder[ProxyResponse] = Decoder.instance { c =>
     for {
-      id       <- c.get[Long]("id")
+      id       <- c.get[CaptureId]("id")
       status   <- c.get[Int]("status")
       bodyJson <- c.get[Json]("body")
       error    <- c.get[Option[String]]("error")

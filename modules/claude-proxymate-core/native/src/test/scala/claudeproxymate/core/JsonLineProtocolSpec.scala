@@ -20,7 +20,7 @@ class JsonLineProtocolSpec extends munit.FunSuite {
     roundTrip(
       ProxyEvent.RequestCaptured(
         ProxyRequest(
-          id = 1234L,
+          id = CaptureId(1234L),
           ts = "12:34:56",
           method = "POST",
           path = "/v1/messages",
@@ -35,7 +35,7 @@ class JsonLineProtocolSpec extends munit.FunSuite {
     roundTrip(
       ProxyEvent.RequestCaptured(
         ProxyRequest(
-          id = 1234L,
+          id = CaptureId(1234L),
           ts = "12:34:56",
           method = "POST",
           path = "/v1/messages",
@@ -62,7 +62,7 @@ class JsonLineProtocolSpec extends munit.FunSuite {
     val decoded = JsonLineProtocol.decode(line)
     assertEquals(
       decoded,
-      Right(ProxyEvent.RequestCaptured(ProxyRequest(1L, "00:00:00", "POST", "/v1/messages", None, None))),
+      Right(ProxyEvent.RequestCaptured(ProxyRequest(CaptureId(1L), "00:00:00", "POST", "/v1/messages", None, None))),
       s"a line predating the filter field should decode with filter = None, got $decoded",
     )
   }
@@ -71,7 +71,7 @@ class JsonLineProtocolSpec extends munit.FunSuite {
     roundTrip(
       ProxyEvent.ResponseCaptured(
         ProxyResponse(
-          id = 1234L,
+          id = CaptureId(1234L),
           status = 200,
           body = Right(Json.obj("id" -> Json.fromString("msg_01ABCDEFGHIJKLMNOP"))),
           error = None,
@@ -87,7 +87,7 @@ class JsonLineProtocolSpec extends munit.FunSuite {
     roundTrip(
       ProxyEvent.ResponseCaptured(
         ProxyResponse(
-          id = 7L,
+          id = CaptureId(7L),
           status = 502,
           body = Left("upstream exploded: not json"),
           error = Some("upstream exploded: not json"),
@@ -131,7 +131,7 @@ class JsonLineProtocolSpec extends munit.FunSuite {
      * the consumer side). circe escapes it as \n inside the JSON
      * string, so the encoded line stays single-line. */
     val line = JsonLineProtocol.encode(
-      ProxyEvent.ResponseCaptured(ProxyResponse(1L, 200, Left("line1\nline2"), None))
+      ProxyEvent.ResponseCaptured(ProxyResponse(CaptureId(1L), 200, Left("line1\nline2"), None))
     )
     assert(!line.contains("\n"), s"encoded line leaked a newline: $line")
   }

@@ -10,7 +10,7 @@ import io.circe.Json
   * [[claudeproxymate.core.filter.RequestFilter]]).
   */
 final case class ProxyRequest(
-  id: Long,
+  id: CaptureId,
   ts: String,
   method: String,
   path: String,
@@ -20,7 +20,7 @@ final case class ProxyRequest(
 
 /** Data sent to renderer on each intercepted response. */
 final case class ProxyResponse(
-  id: Long,
+  id: CaptureId,
   status: Int,
   body: Either[String, Json],
   error: Option[String],

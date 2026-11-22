@@ -2,7 +2,7 @@ package claudeproxymate.proxy
 
 import cats.effect.{Deferred, IO, Ref}
 import cats.effect.unsafe.IORuntime
-import claudeproxymate.core.ProxyResponse
+import claudeproxymate.core.{CaptureId, ProxyResponse}
 import fs2.{text, Stream}
 import org.http4s.{Response, Status}
 
@@ -27,7 +27,7 @@ class ProxyServerTeeSpec extends munit.FunSuite {
     for {
       captured <- Ref.of[IO, List[ProxyResponse]](Nil)
       response <- ProxyServer.tee(
-                    1L,
+                    CaptureId(1L),
                     Response[IO](Status.Ok).withBodyStream(body),
                     r => captured.update(_ :+ r),
                   )

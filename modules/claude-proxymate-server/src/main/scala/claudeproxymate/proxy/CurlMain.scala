@@ -2,6 +2,7 @@ package claudeproxymate.proxy
 
 import cats.effect.{ExitCode, IO, IOApp}
 import cats.effect.unsafe.IORuntimeConfig
+import cats.syntax.all.*
 import com.comcast.ip4s.*
 import org.http4s.ember.server.EmberServerBuilder
 import claudeproxymate.core.ProxyEvent
@@ -37,31 +38,35 @@ object CurlMain extends IOApp {
     val filterConfigPath = FilterConfigArg.parse(args)
     val parentLink       = ParentLinkArg.parse(args)
 
-    (CurlHttpClient.globalInit *> FilterConfigLoader.make(filterConfigPath))
-      .flatMap { loader =>
-        EmberServerBuilder
-          .default[IO]
-          .withHost(ipv4"127.0.0.1")
-          .withPort(port)
-          .withHttpApp(
-            ProxyServer.routes(
-              CurlHttpClient.client(CurlHttpClient.Settings.Default),
-              Upstream.Anthropic,
-              ProxyServer.DefaultBodyStartTimeout,
-              loader
+    (CurlHttpClient.globalInit *>
+      (FilterConfigLoader.make(filterConfigPath), CaptureIds.make(CaptureIds.realTimeMillis)).tupled)
+      .flatMap {
+        case (loader, nextId) =>
+          EmberServerBuilder
+            .default[IO]
+            .withHost(ipv4"127.0.0.1")
+            .withPort(port)
+            .withHttpApp(
+              ProxyServer.routes(
+                CurlHttpClient.client(CurlHttpClient.Settings.Default),
+                Upstream.Anthropic,
+                ProxyServer.DefaultBodyStartTimeout,
+                loader,
+                nextId,
+                EventEmitter.emit,
+              )
             )
-          )
-          .build
-          .use { server =>
-            for {
-              _ <- EventEmitter.emit(ProxyEvent.ProxyStarted(server.address.port.value))
-              /* `.start`, never `.background`: a joined finalizer would wait
-               * on the uncancelable stdin read at shutdown and stall every
-               * SIGTERM until ShutdownDeadline. */
-              _ <- ParentWatch.run(parentLink).start
-              _ <- IO.never[Unit]
-            } yield ()
-          }
+            .build
+            .use { server =>
+              for {
+                _ <- EventEmitter.emit(ProxyEvent.ProxyStarted(server.address.port.value))
+                /* `.start`, never `.background`: a joined finalizer would wait
+                 * on the uncancelable stdin read at shutdown and stall every
+                 * SIGTERM until ShutdownDeadline. */
+                _ <- ParentWatch.run(parentLink).start
+                _ <- IO.never[Unit]
+              } yield ()
+            }
       }
       .handleErrorWith { e =>
         /* Bind/startup failures must reach the Electron main process as a
