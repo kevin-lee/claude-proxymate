@@ -17,7 +17,7 @@ object AppStateSpec extends Properties {
     example("default presenterMaskAll is true (safe-for-screen-share default)", testDefaultMaskAll),
     // Independence of state fields
     example("clearing maskOverrides does not flip presenterMaskAll", testClearOverridesKeepsFlag),
-    // selectedCapture
+    /* selectedCapture */
     example("selectedCapture is None when no capture is selected", testSelectedCaptureNoSelection),
     example("selectedCapture is the capture with the selected id", testSelectedCaptureFound),
     example("selectedCapture is None when the selected id is not in the list", testSelectedCaptureMissing),
