@@ -100,7 +100,8 @@ object MessageFilterMenuHandlerSpec extends Properties {
   def testKindButton: Result = {
     openMenu()
     clearSelection()
-    val _ = DomTestKit.click(DomTestKit.element(s"""#${HtmlIds.SelectionMenu} [${RequestFilterView.ValueAttr}="regex"]"""))
+    val _ =
+      DomTestKit.click(DomTestKit.element(s"""#${HtmlIds.SelectionMenu} [${RequestFilterView.ValueAttr}="regex"]"""))
     Result.all(
       List(
         Result.assert(menuOpen).log("the selection menu stays open"),
@@ -112,7 +113,9 @@ object MessageFilterMenuHandlerSpec extends Properties {
 
   def testKindNoMenu: Result = {
     DomTestKit.setUp(
-      s"""<div class="${MessageFilterView.BarClass}"><button id="kind" ${MessageFilterView.ActionAttr}="${MessageFilterView.Action.SelKind}" ${RequestFilterView.ValueAttr}="regex">r</button></div>"""
+      s"""<div class="${MessageFilterView.BarClass}"><button id="kind" ${MessageFilterView.ActionAttr}="${MessageFilterView
+          .Action
+          .SelKind}" ${RequestFilterView.ValueAttr}="regex">r</button></div>"""
     )
     val _ = DomTestKit.click(DomTestKit.element("#kind"))
     Result.all(List(Result.assert(!menuOpen).log("no selection menu"), DomTestKit.listenerErrors ==== Nil))

@@ -84,7 +84,9 @@ object BadgeToggleSpec extends Properties {
   def testToggleNoButton: Result = {
     DomTestKit.setUp("""<div id="bc_u1" style="display:none"></div>""")
     BadgeToggle.toggleBadge("u1")
-    Result.all(List(display("u1") ==== "block", AppState.activeBadgeUid ==== Some("u1"), AppState.activeBadgePart ==== None))
+    Result.all(
+      List(display("u1") ==== "block", AppState.activeBadgeUid ==== Some("u1"), AppState.activeBadgePart ==== None)
+    )
   }
 
   def testReopenNoButton: Result = {
@@ -94,7 +96,9 @@ object BadgeToggleSpec extends Properties {
   }
 
   def testReopenNoContent: Result = {
-    DomTestKit.setUp(s"""<span id="bb_u1" ${MessageView.BadgeDataAttr}="u1" ${MessageView.BadgePartAttr}="0.0">b</span>""")
+    DomTestKit.setUp(
+      s"""<span id="bb_u1" ${MessageView.BadgeDataAttr}="u1" ${MessageView.BadgePartAttr}="0.0">b</span>"""
+    )
     BadgeToggle.reopen("0.0")
     Result.all(List(Result.assert(!hasClass("bb_u1", "open")).log("not open"), AppState.activeBadgeUid ==== None))
   }

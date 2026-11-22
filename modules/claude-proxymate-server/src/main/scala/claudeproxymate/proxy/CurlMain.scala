@@ -53,6 +53,7 @@ object CurlMain extends IOApp {
                 ProxyServer.DefaultBodyStartTimeout,
                 loader,
                 nextId,
+                CaptureIds.realTimeMillis,
                 EventEmitter.emit,
               )
             )

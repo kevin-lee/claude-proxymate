@@ -24,9 +24,10 @@ object MechChipsHandlerSpec extends Properties {
     s"""<button class="${MechChipsView.ChipClass}" ${MechChipsView.ChipDataAttr}="mc_0"><span id="inner">c</span></button><button class="${MechChipsView.ChipClass}" ${MechChipsView.ChipDataAttr}="">e</button><i id="other"></i>"""
 
   private def mcpBody: js.Dynamic =
-    js.JSON.parse(
-      """{"messages":[{"role":"assistant","content":[{"type":"tool_use","id":"tu_3","name":"mcp__serena__find_symbol","input":{"name":"Foo"}}]}]}"""
-    )
+    js.JSON
+      .parse(
+        """{"messages":[{"role":"assistant","content":[{"type":"tool_use","id":"tu_3","name":"mcp__serena__find_symbol","input":{"name":"Foo"}}]}]}"""
+      )
 
   def testChipOn: Result = {
     DomTestKit.setUp(Page)

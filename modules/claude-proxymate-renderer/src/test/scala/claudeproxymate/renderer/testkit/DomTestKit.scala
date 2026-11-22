@@ -73,16 +73,18 @@ object DomTestKit {
   }
 
   private def addStandIns(): Unit = {
-    val window = dom.window.asInstanceOf[js.Dynamic] // scalafix:ok DisableSyntax.asInstanceOf
+    val window          = dom.window.asInstanceOf[js.Dynamic] // scalafix:ok DisableSyntax.asInstanceOf
     /* jsdom reports an exception in an event listener as an "error" event
      * on the window. preventDefault stops jsdom from also logging it. */
-    dom.window.addEventListener(
-      "error",
-      { (e: dom.ErrorEvent) =>
-        val _ = errors.push(e.message)
-        e.preventDefault()
-      },
-    )
+    dom
+      .window
+      .addEventListener(
+        "error",
+        { (e: dom.ErrorEvent) =>
+          val _ = errors.push(e.message)
+          e.preventDefault()
+        },
+      )
     window.requestAnimationFrame = { (callback: js.Function1[Double, Any]) =>
       animationFrames.push(callback)
     }: js.Function1[js.Function1[Double, Any], Int]
@@ -96,25 +98,30 @@ object DomTestKit {
       confirmReply(0)
     }: js.Function1[String, Boolean]
     window.matchMedia = { (_: String) =>
-      js.Dynamic.literal(
-        matches = false,
-        addEventListener = ({ (_: String, _: js.Any) => () }: js.Function2[String, js.Any, Unit]),
-        addListener = ({ (_: js.Any) => () }: js.Function1[js.Any, Unit]),
-      )
-    }: js.Function1[String, js.Dynamic]
-    val clipboardObject = js.Dynamic.literal(
-      writeText = ({ (text: String) =>
-        val _ = clipboard.push(text)
-        js.Promise.resolve[Unit](())
-      }: js.Function1[String, js.Promise[Unit]])
-    )
-    val _ = js.Object.defineProperty(
-      dom.window.navigator.asInstanceOf[js.Object], // scalafix:ok DisableSyntax.asInstanceOf
-      "clipboard",
       js.Dynamic
-        .literal(value = clipboardObject, configurable = true)
-        .asInstanceOf[js.PropertyDescriptor], // scalafix:ok DisableSyntax.asInstanceOf
-    )
+        .literal(
+          matches = false,
+          addEventListener = ({ (_: String, _: js.Any) => () }: js.Function2[String, js.Any, Unit]),
+          addListener = ({ (_: js.Any) => () }: js.Function1[js.Any, Unit]),
+        )
+    }: js.Function1[String, js.Dynamic]
+    val clipboardObject = js
+      .Dynamic
+      .literal(
+        writeText = ({ (text: String) =>
+          val _ = clipboard.push(text)
+          js.Promise.resolve[Unit](())
+        }: js.Function1[String, js.Promise[Unit]])
+      )
+    val _               = js
+      .Object
+      .defineProperty(
+        dom.window.navigator.asInstanceOf[js.Object], // scalafix:ok DisableSyntax.asInstanceOf
+        "clipboard",
+        js.Dynamic
+          .literal(value = clipboardObject, configurable = true)
+          .asInstanceOf[js.PropertyDescriptor], // scalafix:ok DisableSyntax.asInstanceOf
+      )
   }
 
   /** Install the handlers (once), reset `AppState`, the clipboard texts and
@@ -286,14 +293,15 @@ object DomTestKit {
     * `body`, and the `response` with its `status` and `body`.
     */
   def capture(id: Double, requestBody: js.Any, responseBody: js.Any): js.Dynamic =
-    js.Dynamic.literal(
-      id = id,
-      ts = "12:00:00",
-      method = "POST",
-      url = "/v1/messages",
-      body = requestBody,
-      response = js.Dynamic.literal(id = id, status = 200, body = responseBody),
-    )
+    js.Dynamic
+      .literal(
+        id = id,
+        capturedAt = 1794741364123.0,
+        method = "POST",
+        url = "/v1/messages",
+        body = requestBody,
+        response = js.Dynamic.literal(id = id, status = 200, body = responseBody),
+      )
 
   /** Make `entry` the only capture, and select it. */
   def select(entry: js.Dynamic): Unit = {

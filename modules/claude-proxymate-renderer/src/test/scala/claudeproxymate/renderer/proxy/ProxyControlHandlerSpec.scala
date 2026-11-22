@@ -30,7 +30,8 @@ object ProxyControlHandlerSpec extends Properties {
 
   private def storedPort: Option[String] = Option(dom.window.localStorage.getItem("ci-port"))
 
-  private def portInput: dom.html.Input = DomTestKit.html(s"#${HtmlIds.ProxyPort}").asInstanceOf[dom.html.Input] // scalafix:ok DisableSyntax.asInstanceOf
+  private def portInput: dom.html.Input =
+    DomTestKit.html(s"#${HtmlIds.ProxyPort}").asInstanceOf[dom.html.Input] // scalafix:ok DisableSyntax.asInstanceOf
 
   def testStartNoApi: Result = {
     DomTestKit.setUp(Page)
@@ -72,7 +73,10 @@ object ProxyControlHandlerSpec extends Properties {
   def testOtherInput: Result = {
     DomTestKit.setUp(Page)
     dom.window.localStorage.removeItem("ci-port")
-    val _ = DomTestKit.typeInto(DomTestKit.html("#other-input").asInstanceOf[dom.html.Input], "9000") // scalafix:ok DisableSyntax.asInstanceOf
+    val _ = DomTestKit.typeInto(
+      DomTestKit.html("#other-input").asInstanceOf[dom.html.Input],
+      "9000"
+    ) // scalafix:ok DisableSyntax.asInstanceOf
     Result.all(
       List(
         DomTestKit.element(s"#${HtmlIds.StatusPort}").textContent ==== "8888",
@@ -89,7 +93,9 @@ object ProxyControlHandlerSpec extends Properties {
     Result.all(
       List(
         DomTestKit.element(s"#${HtmlIds.ProxyStartBtn}").textContent ==== "Start",
-        Result.assert(!DomTestKit.element(s"#${HtmlIds.ProxyStartBtn}").classList.contains("running")).log("no running class"),
+        Result
+          .assert(!DomTestKit.element(s"#${HtmlIds.ProxyStartBtn}").classList.contains("running"))
+          .log("no running class"),
       )
     )
   }
@@ -101,7 +107,9 @@ object ProxyControlHandlerSpec extends Properties {
     Result.all(
       List(
         DomTestKit.element(s"#${HtmlIds.ProxyStatusText}").textContent ==== "-",
-        Result.assert(!DomTestKit.element(s"#${HtmlIds.ProxyStatus}").classList.contains("running")).log("no running class"),
+        Result
+          .assert(!DomTestKit.element(s"#${HtmlIds.ProxyStatus}").classList.contains("running"))
+          .log("no running class"),
       )
     )
   }
@@ -112,7 +120,9 @@ object ProxyControlHandlerSpec extends Properties {
     ProxyControl.renderProxyStatus()
     Result.all(
       List(
-        Result.assert(DomTestKit.element(s"#${HtmlIds.ProxyStatus}").classList.contains("running")).log("status running"),
+        Result
+          .assert(DomTestKit.element(s"#${HtmlIds.ProxyStatus}").classList.contains("running"))
+          .log("status running"),
         DomTestKit.element(s"#${HtmlIds.ProxyStatusText}").textContent ==== "status.running",
         DomTestKit.element(s"#${HtmlIds.ProxyStartBtn}").textContent ==== "proxy.stopProxy",
         portInput.disabled ==== true,
@@ -129,7 +139,9 @@ object ProxyControlHandlerSpec extends Properties {
     ProxyControl.renderProxyStatus()
     Result.all(
       List(
-        Result.assert(!DomTestKit.element(s"#${HtmlIds.ProxyStatus}").classList.contains("running")).log("status stopped"),
+        Result
+          .assert(!DomTestKit.element(s"#${HtmlIds.ProxyStatus}").classList.contains("running"))
+          .log("status stopped"),
         DomTestKit.element(s"#${HtmlIds.ProxyStatusText}").textContent ==== "status.stopped",
         DomTestKit.element(s"#${HtmlIds.ProxyStartBtn}").textContent ==== "proxy.startProxy",
         portInput.disabled ==== false,

@@ -21,7 +21,7 @@ class JsonLineProtocolSpec extends munit.FunSuite {
       ProxyEvent.RequestCaptured(
         ProxyRequest(
           id = CaptureId(1234L),
-          ts = "12:34:56",
+          capturedAt = EpochMillis(1794741364123L),
           method = "POST",
           path = "/v1/messages",
           body = Some(Json.obj("model" -> Json.fromString("claude"))),
@@ -36,7 +36,7 @@ class JsonLineProtocolSpec extends munit.FunSuite {
       ProxyEvent.RequestCaptured(
         ProxyRequest(
           id = CaptureId(1234L),
-          ts = "12:34:56",
+          capturedAt = EpochMillis(1794741364123L),
           method = "POST",
           path = "/v1/messages",
           body = Some(Json.obj("model" -> Json.fromString("claude"))),
@@ -58,13 +58,32 @@ class JsonLineProtocolSpec extends munit.FunSuite {
 
   test("RequestCaptured line without a filter field decodes to filter = None") {
     val line    =
-      """{"type":"request_captured","request":{"id":1,"ts":"00:00:00","method":"POST","path":"/v1/messages","body":null}}"""
+      """{"type":"request_captured","request":{"id":1,"capturedAt":0,"method":"POST","path":"/v1/messages","body":null}}"""
     val decoded = JsonLineProtocol.decode(line)
     assertEquals(
       decoded,
-      Right(ProxyEvent.RequestCaptured(ProxyRequest(CaptureId(1L), "00:00:00", "POST", "/v1/messages", None, None))),
+      Right(
+        ProxyEvent.RequestCaptured(ProxyRequest(CaptureId(1L), EpochMillis(0L), "POST", "/v1/messages", None, None))
+      ),
       s"a line predating the filter field should decode with filter = None, got $decoded",
     )
+  }
+
+  test("RequestCaptured encodes capturedAt as a JSON number") {
+    val line = JsonLineProtocol.encode(
+      ProxyEvent.RequestCaptured(
+        ProxyRequest(
+          id = CaptureId(1L),
+          capturedAt = EpochMillis(1794741364123L),
+          method = "POST",
+          path = "/v1/messages",
+          body = None,
+          filter = None,
+        )
+      )
+    )
+    assert(line.contains("\"capturedAt\":1794741364123"), s"capturedAt is not a number: $line")
+    assert(!line.contains("\"ts\""), s"the old ts field is still there: $line")
   }
 
   test("ResponseCaptured (Right body) round-trips") {

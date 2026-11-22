@@ -34,8 +34,8 @@ object DomProbeSpec extends Properties {
 
   private def testAnimationFrames: Result = {
     DomTestKit.setUp("")
-    val ran = js.Array[Int]()
-    val _   = dom.window.requestAnimationFrame(_ => { val _ = ran.push(1) })
+    val ran    = js.Array[Int]()
+    val _      = dom.window.requestAnimationFrame(_ => { val _ = ran.push(1) })
     val before = ran.length
     val count  = DomTestKit.runAnimationFrames()
     Result.all(List(before ==== 0, count ==== 1, ran.length ==== 1))
@@ -54,7 +54,7 @@ object DomProbeSpec extends Properties {
       val _ = seen.push(e.target.asInstanceOf[dom.Element].id) // scalafix:ok DisableSyntax.asInstanceOf
     }: js.Function1[dom.MouseEvent, Unit]
     dom.document.addEventListener("click", listener)
-    val _ = DomTestKit.click(DomTestKit.element("#inner"))
+    val _        = DomTestKit.click(DomTestKit.element("#inner"))
     dom.document.removeEventListener("click", listener)
     seen.toList ==== List("inner")
   }
@@ -65,7 +65,7 @@ object DomProbeSpec extends Properties {
       val _ = js.Dynamic.global.window.missingFunction()
     }: js.Function1[dom.MouseEvent, Unit]
     dom.document.addEventListener("click", listener)
-    val _ = DomTestKit.click(DomTestKit.element("#x"))
+    val _        = DomTestKit.click(DomTestKit.element("#x"))
     dom.document.removeEventListener("click", listener)
     DomTestKit.listenerErrors.length ==== 1
   }

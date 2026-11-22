@@ -7,7 +7,6 @@ import hedgehog.*
 import hedgehog.runner.*
 import org.scalajs.dom
 
-
 /** [[SearchNavigation]] in jsdom. */
 object SearchNavigationSpec extends Properties {
 
@@ -105,7 +104,9 @@ object SearchNavigationSpec extends Properties {
 
   def testNavDetailCode: Result = {
     DomTestKit.setUp(
-      s"""<span id="${HtmlIds.SearchCounter}">-</span><div id="${HtmlIds.ProxyDetailView}">${marks(1)}<div id="${HtmlIds.ProxyDetailCode}"><mark class="search-hl" id="c1">x</mark><mark class="search-hl" id="c2">x</mark></div></div>"""
+      s"""<span id="${HtmlIds.SearchCounter}">-</span><div id="${HtmlIds.ProxyDetailView}">${marks(
+          1
+        )}<div id="${HtmlIds.ProxyDetailCode}"><mark class="search-hl" id="c1">x</mark><mark class="search-hl" id="c2">x</mark></div></div>"""
     )
     AppState.proxyDetailTab = "request"
     SearchNavigation.navigateSearchMatch(0)
@@ -114,7 +115,9 @@ object SearchNavigationSpec extends Properties {
 
   def testNavAnalysis: Result = {
     DomTestKit.setUp(
-      s"""<span id="${HtmlIds.SearchCounter}">-</span>${marks(1)}<div class="analysis-view"><mark class="search-hl" id="a1">x</mark></div>"""
+      s"""<span id="${HtmlIds.SearchCounter}">-</span>${marks(
+          1
+        )}<div class="analysis-view"><mark class="search-hl" id="a1">x</mark></div>"""
     )
     AppState.proxyDetailTab = "analysis"
     SearchNavigation.navigateSearchMatch(0)

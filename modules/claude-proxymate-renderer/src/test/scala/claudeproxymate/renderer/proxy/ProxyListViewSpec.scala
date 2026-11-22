@@ -15,7 +15,9 @@ object ProxyListViewSpec extends Properties {
     example("buildListFrag one entry contains prx-entry class", testOneEntryClass),
     example("buildListFrag selected entry has selected suffix", testSelectedClass),
     example("buildListFrag entry includes data-id attribute", testDataIdAttr),
-    example("buildListFrag entry contains method/path/ts", testEntryFields),
+    example("buildListFrag entry contains method/path/time", testEntryFields),
+    example("buildListFrag entry puts dateTime in the title of prx-ts", testDateTimeTitle),
+    example("buildListFrag entry with empty dateTime has no title", testNoTitleWhenEmpty),
     example("buildListFrag with model Some renders prx-model", testModelShown),
     example("buildListFrag with model None omits prx-model", testModelOmitted),
     example("buildListFrag status 200 renders green", testStatus200),
@@ -37,12 +39,13 @@ object ProxyListViewSpec extends Properties {
     id: Double = 1.0,
     method: String = "POST",
     path: String = "/v1/messages",
-    ts: String = "12:34:56",
+    time: String = "12:34:56",
+    dateTime: String = "2026-11-15 12:34:56 UTC+00:00",
     model: Option[String] = Some("claude-opus-4-7"),
     status: Option[Int] = Some(200),
     selected: Boolean = false,
   ): ProxyListEntry =
-    ProxyListEntry(id, method, path, ts, model, status, selected)
+    ProxyListEntry(id, method, path, time, dateTime, model, status, selected)
 
   private def render(entries: List[ProxyListEntry], labels: ProxyListLabels = sampleLabels): String =
     ProxyListView.buildListFrag(entries, labels).render
@@ -101,14 +104,24 @@ object ProxyListViewSpec extends Properties {
   }
 
   def testEntryFields: Result = {
-    val html = render(List(sampleEntry(method = "GET", path = "/foo", ts = "00:00:01")))
+    val html = render(List(sampleEntry(method = "GET", path = "/foo", time = "00:00:01")))
     Result.all(
       List(
         Result.assert(html.contains("GET")).log("method missing"),
         Result.assert(html.contains("/foo")).log("path missing"),
-        Result.assert(html.contains("00:00:01")).log("ts missing"),
+        Result.assert(html.contains("00:00:01")).log("time missing"),
       )
     )
+  }
+
+  def testDateTimeTitle: Result = {
+    val html = render(List(sampleEntry(dateTime = "2026-11-15 22:16:04 UTC+11:00")))
+    Result.assert(html.contains("title=\"2026-11-15 22:16:04 UTC+11:00\"")).log(html)
+  }
+
+  def testNoTitleWhenEmpty: Result = {
+    val html = render(List(sampleEntry(dateTime = "")))
+    Result.assert(!html.contains("title=")).log(html)
   }
 
   def testModelShown: Result = {
@@ -166,7 +179,8 @@ object ProxyListViewSpec extends Properties {
           sampleEntry(
             method = payload,
             path = payload,
-            ts = payload,
+            time = payload,
+            dateTime = payload,
             model = Some(payload),
           )
         )

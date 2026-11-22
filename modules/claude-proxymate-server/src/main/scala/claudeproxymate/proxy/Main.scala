@@ -45,6 +45,7 @@ object Main extends IOApp {
                   ProxyServer.DefaultBodyStartTimeout,
                   loader,
                   nextId,
+                  CaptureIds.realTimeMillis,
                   EventEmitter.emit,
                 )
               )

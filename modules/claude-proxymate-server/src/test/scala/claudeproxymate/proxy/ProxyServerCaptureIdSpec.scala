@@ -3,7 +3,7 @@ package claudeproxymate.proxy
 import cats.effect.{IO, Ref}
 import cats.effect.unsafe.IORuntime
 import cats.syntax.all.*
-import claudeproxymate.core.ProxyEvent
+import claudeproxymate.core.{EpochMillis, ProxyEvent}
 import org.http4s.*
 import org.http4s.client.Client
 
@@ -21,6 +21,8 @@ class ProxyServerCaptureIdSpec extends munit.FunSuite {
   private val Count: Int = 50
 
   private val FrozenClockMillis: Long = 1000L
+
+  private val CapturedAtMillis: Long = 1794741364123L
 
   private val echo: HttpApp[IO] =
     HttpApp[IO](req => IO.pure(Response[IO](Status.Ok).withBodyStream(req.body)))
@@ -44,6 +46,7 @@ class ProxyServerCaptureIdSpec extends munit.FunSuite {
               ProxyServer.DefaultBodyStartTimeout,
               loader,
               nextId,
+              IO.pure(FrozenClockMillis),
               event => events.update(_ :+ event),
             )
       /* Read each body to the end, so the tee gives its ResponseCaptured. */
@@ -64,6 +67,29 @@ class ProxyServerCaptureIdSpec extends munit.FunSuite {
         responses.map(r => r.id -> r.body.toOption).toMap,
         requests.map(r => r.id -> r.body).toMap,
       )
+    })
+  }
+
+  test("each captured request has the capture time from the clock as epoch milliseconds") {
+    run(for {
+      events <- Ref.of[IO, List[ProxyEvent]](Nil)
+      loader <- FilterConfigLoader.make(none[String])
+      nextId <- CaptureIds.make(IO.pure(FrozenClockMillis))
+      app = ProxyServer.routes(
+              Client.fromHttpApp(echo),
+              Upstream.Anthropic,
+              ProxyServer.DefaultBodyStartTimeout,
+              loader,
+              nextId,
+              IO.pure(CapturedAtMillis),
+              event => events.update(_ :+ event),
+            )
+      /* Read the body to the end, so the tee gives its ResponseCaptured. */
+      _   <- app.run(post(1)).flatMap(_.bodyText.compile.string)
+      all <- events.get
+    } yield {
+      val requests = all.collect { case ProxyEvent.RequestCaptured(r) => r }
+      assertEquals(requests.map(_.capturedAt), List(EpochMillis(CapturedAtMillis)))
     })
   }
 }

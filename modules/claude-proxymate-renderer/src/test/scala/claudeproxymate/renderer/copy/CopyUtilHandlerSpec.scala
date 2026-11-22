@@ -123,7 +123,11 @@ object CopyUtilHandlerSpec extends Properties {
   }
 
   def testDetailMessages: Result = {
-    setUpCapture(js.JSON.parse("""{"messages":[{"role":"user","content":"hello there"}]}"""), js.Dynamic.literal(), "messages")
+    setUpCapture(
+      js.JSON.parse("""{"messages":[{"role":"user","content":"hello there"}]}"""),
+      js.Dynamic.literal(),
+      "messages"
+    )
     clickDetailCopy()
     val texts = DomTestKit.clipboardTexts
     Result.all(

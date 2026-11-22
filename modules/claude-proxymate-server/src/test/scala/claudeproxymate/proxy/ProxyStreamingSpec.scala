@@ -114,7 +114,15 @@ class ProxyStreamingSpec extends munit.FunSuite {
   ): IO[HttpApp[IO]] =
     CurlHttpClient.globalInit *>
       (FilterConfigLoader.make(none[String]), CaptureIds.make(CaptureIds.realTimeMillis)).mapN { (loader, nextId) =>
-        ProxyServer.routes(CurlHttpClient.client(settings), upstream, bodyStartTimeout, loader, nextId, emit)
+        ProxyServer.routes(
+          CurlHttpClient.client(settings),
+          upstream,
+          bodyStartTimeout,
+          loader,
+          nextId,
+          CaptureIds.realTimeMillis,
+          emit
+        )
       }
 
   private def run[A](io: IO[A]): Future[A] =

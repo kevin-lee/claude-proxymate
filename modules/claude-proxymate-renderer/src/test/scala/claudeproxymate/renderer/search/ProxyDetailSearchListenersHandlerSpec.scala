@@ -39,9 +39,12 @@ object ProxyDetailSearchListenersHandlerSpec extends Properties {
        |<span class="msg-search-clear" id="clear"><span class="search-nav-next" id="nested-next">n</span></span>
        |<input id="${HtmlIds.ProxyDetailSearchInput}" value="q"><input id="other-input"><i id="other"></i>""".stripMargin
 
-  private def input: dom.html.Input = DomTestKit.html(s"#${HtmlIds.ProxyDetailSearchInput}").asInstanceOf[dom.html.Input] // scalafix:ok DisableSyntax.asInstanceOf
+  private def input: dom.html.Input = DomTestKit
+    .html(s"#${HtmlIds.ProxyDetailSearchInput}")
+    .asInstanceOf[dom.html.Input] // scalafix:ok DisableSyntax.asInstanceOf
 
-  private def otherInput: dom.html.Input = DomTestKit.html("#other-input").asInstanceOf[dom.html.Input] // scalafix:ok DisableSyntax.asInstanceOf
+  private def otherInput: dom.html.Input =
+    DomTestKit.html("#other-input").asInstanceOf[dom.html.Input] // scalafix:ok DisableSyntax.asInstanceOf
 
   private def setUpAtFirstMatch(): Unit = {
     DomTestKit.setUp(Page)
@@ -121,7 +124,9 @@ object ProxyDetailSearchListenersHandlerSpec extends Properties {
   def testOtherInput: Result = DomTestKit.withFakeTimers {
     DomTestKit.setUp(Page)
     val _ = DomTestKit.typeInto(otherInput, "abc")
-    Result.all(List(AppState.proxyDetailSearch ==== "", DomTestKit.pendingTimers ==== 0, DomTestKit.listenerErrors ==== Nil))
+    Result.all(
+      List(AppState.proxyDetailSearch ==== "", DomTestKit.pendingTimers ==== 0, DomTestKit.listenerErrors ==== Nil)
+    )
   }
 
   def testCompositionStart: Result = {

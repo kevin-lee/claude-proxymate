@@ -198,7 +198,7 @@ object MechHighlightSpec extends Properties {
   }
 
   def testScFirst: Result = {
-    val c = render(scBody)
+    val c  = render(scBody)
     MechHighlight.highlightMechInJsonTree(c, scBody, "sc_0")
     val hl = c.querySelectorAll("span.mech-hl-text")
     Result.all(
@@ -211,7 +211,7 @@ object MechHighlightSpec extends Properties {
   }
 
   def testScSecond: Result = {
-    val c = render(scBody)
+    val c  = render(scBody)
     MechHighlight.highlightMechInJsonTree(c, scBody, "sc_1")
     val hl = c.querySelectorAll("span.mech-hl-text")
     Result.all(
