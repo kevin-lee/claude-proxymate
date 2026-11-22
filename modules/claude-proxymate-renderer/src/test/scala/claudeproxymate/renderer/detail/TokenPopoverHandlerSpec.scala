@@ -83,7 +83,9 @@ object TokenPopoverHandlerSpec extends Properties {
     Result.all(
       List(
         popoverCount ==== 1,
-        Result.assert(DomTestKit.element("#p1 .token-popover") != null).log("the popover is in the pill"), // scalafix:ok DisableSyntax.null
+        Result
+          .assert(DomTestKit.element("#p1 .token-popover") != null)
+          .log("the popover is in the pill"), // scalafix:ok DisableSyntax.null
         Result
           .assert(DomTestKit.element("#p1 .token-popover").textContent.contains("claude-x"))
           .log("the popover shows the model"),
@@ -99,7 +101,9 @@ object TokenPopoverHandlerSpec extends Properties {
     Result.all(
       List(
         popoverCount ==== 1,
-        Result.assert(DomTestKit.element("#p2 .token-popover") != null).log("the popover is in pill 2"), // scalafix:ok DisableSyntax.null
+        Result
+          .assert(DomTestKit.element("#p2 .token-popover") != null)
+          .log("the popover is in pill 2"), // scalafix:ok DisableSyntax.null
         DomTestKit.listenerErrors ==== Nil,
       )
     )

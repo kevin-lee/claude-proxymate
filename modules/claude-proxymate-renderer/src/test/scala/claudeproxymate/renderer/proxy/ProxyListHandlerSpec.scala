@@ -24,7 +24,10 @@ object ProxyListHandlerSpec extends Properties {
   )
 
   private def captures: List[js.Dynamic] =
-    List(DomTestKit.capture(1, js.Dynamic.literal(), js.Dynamic.literal()), DomTestKit.capture(2, js.Dynamic.literal(), js.Dynamic.literal()))
+    List(
+      DomTestKit.capture(1, js.Dynamic.literal(), js.Dynamic.literal()),
+      DomTestKit.capture(2, js.Dynamic.literal(), js.Dynamic.literal())
+    )
 
   private val Page: String =
     s"""<button id="${HtmlIds.ProxyClearBtn}">Clear</button><span id="${HtmlIds.ProxyCount}">-</span><div id="${HtmlIds.ProxyList}"><div class="${ProxyListView.EntryClass}" ${ProxyListView.EntryDataIdAttr}="2"><span id="inner">e</span></div><div class="${ProxyListView.EntryClass}" ${ProxyListView.EntryDataIdAttr}="x">bad</div></div><i id="other"></i>"""

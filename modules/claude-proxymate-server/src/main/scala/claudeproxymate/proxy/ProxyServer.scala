@@ -8,18 +8,14 @@ import io.circe.Json
 import io.circe.parser.{parse => parseJson}
 import org.http4s.*
 import org.http4s.client.Client
-import claudeproxymate.core.{CaptureId, ProxyError, ProxyEvent, ProxyRequest, ProxyResponse, SseParser}
+import claudeproxymate.core.{CaptureId, EpochMillis, ProxyError, ProxyEvent, ProxyRequest, ProxyResponse, SseParser}
 import claudeproxymate.core.filter.RequestFilter
 
 import java.nio.charset.StandardCharsets
-import java.time.LocalTime
-import java.time.format.DateTimeFormatter
 import scala.concurrent.duration.*
 
 /** HTTP proxy routes: intercept requests, apply the request filter, forward to the upstream, tee responses. */
 object ProxyServer {
-
-  private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss")
 
   /* The time limit for the start of a response body (see BodyGuard). Ember
    * pulls the body right after it writes the head of the response (a few
@@ -31,6 +27,8 @@ object ProxyServer {
     *
     * @param nextId gives the capture id of each request (see [[CaptureIds.make]]).
     *               One source is shared by all requests of the proxy process.
+    * @param nowMillis gives the wall clock in milliseconds for the capturedAt of each request.
+    *               It is CaptureIds.realTimeMillis in production.
     * @param emit   receives the `RequestCaptured` and `ResponseCaptured` events.
     *               It is `EventEmitter.emit` in production.
     */
@@ -40,6 +38,7 @@ object ProxyServer {
     bodyStartTimeout: FiniteDuration,
     loader: FilterConfigLoader,
     nextId: IO[CaptureId],
+    nowMillis: IO[Long],
     emit: ProxyEvent => IO[Unit],
   ): HttpApp[IO] = HttpApp[IO] { (req: Request[IO]) =>
     for {
@@ -57,9 +56,10 @@ object ProxyServer {
         else bodyBytes
 
       /* 3. Create request event (what is actually forwarded, plus the filter report) */
-      reqId <- nextId
-      ts       = LocalTime.now().format(timeFormatter)
-      proxyReq = ProxyRequest(reqId, ts, req.method.name, req.uri.renderString, sendJson, outcome.flatMap(_.report))
+      reqId      <- nextId
+      capturedAt <- nowMillis.map(EpochMillis(_))
+      proxyReq =
+        ProxyRequest(reqId, capturedAt, req.method.name, req.uri.renderString, sendJson, outcome.flatMap(_.report))
       _ <- emit(ProxyEvent.RequestCaptured(proxyReq))
 
       /* 4. Forward to the upstream, 5. tee the response body to the client and to the capture */

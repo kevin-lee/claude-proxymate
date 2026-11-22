@@ -67,12 +67,14 @@ object ProxyList {
     ProxyControl.renderReqCount()
 
     val entries = AppState.proxyCaptures.map { e =>
-      val id = e.id.asInstanceOf[Double]
+      val id         = e.id.asInstanceOf[Double]
+      val capturedAt = readCapturedAt(e)
       ProxyListEntry(
         id = id,
         method = readString(e, "method"),
         path = readString(e, "path"),
-        ts = readString(e, "ts"),
+        time = capturedAt.fold("")(ms => CaptureTime.formatTime(ms, CaptureTime.localOffsetMinutes(ms))),
+        dateTime = capturedAt.fold("")(ms => CaptureTime.formatDateTime(ms, CaptureTime.localOffsetMinutes(ms))),
         model = readModel(e),
         status = readStatus(e),
         selected = AppState.selectedProxyId.contains(id),
@@ -91,6 +93,12 @@ object ProxyList {
     val v = e.selectDynamic(key)
     if (js.isUndefined(v) || v == null) "" else v.toString
   }
+
+  private def readCapturedAt(e: js.Dynamic): Option[Double] =
+    (e.selectDynamic("capturedAt"): Any) match {
+      case d: Double if !d.isNaN && !d.isInfinite => d.some
+      case _ => none
+    }
 
   private def readModel(e: js.Dynamic): Option[String] = {
     val body = e.selectDynamic("body")

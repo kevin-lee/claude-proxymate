@@ -53,9 +53,10 @@ object MessageRendererHandlerSpec extends Properties {
   )
 
   private def body(): js.Dynamic =
-    js.JSON.parse(
-      """{"messages":[{"role":"user","content":"hello there <system-reminder>remember this</system-reminder>"},{"role":"assistant","content":[{"type":"text","text":"general kenobi"}]}]}"""
-    )
+    js.JSON
+      .parse(
+        """{"messages":[{"role":"user","content":"hello there <system-reminder>remember this</system-reminder>"},{"role":"assistant","content":[{"type":"text","text":"general kenobi"}]}]}"""
+      )
 
   private val DetailHtml: String =
     s"""<div id="${HtmlIds.ProxyDetailView}"><i id="marker"></i></div>"""
@@ -113,7 +114,9 @@ object MessageRendererHandlerSpec extends Properties {
   }
 
   def testFilterButton: Result = {
-    setUpMessages(s"""<button class="${MessageView.FilterButtonClass}" ${MessageView.FilterDataAttr}="user">u</button>""")
+    setUpMessages(
+      s"""<button class="${MessageView.FilterButtonClass}" ${MessageView.FilterDataAttr}="user">u</button>"""
+    )
     clickOn(s".${MessageView.FilterButtonClass}")
     Result.all(
       List(
@@ -136,7 +139,9 @@ object MessageRendererHandlerSpec extends Properties {
   }
 
   def testSearchClear: Result = DomTestKit.withFakeTimers {
-    setUpMessages(s"""<span class="${MessageView.SearchClearClass}" id="clear">x</span><input id="${HtmlIds.MsgSearchInput}">""")
+    setUpMessages(
+      s"""<span class="${MessageView.SearchClearClass}" id="clear">x</span><input id="${HtmlIds.MsgSearchInput}">"""
+    )
     AppState.msgSearchQuery = "q"
     clickOn("#clear")
     Result.all(
@@ -226,7 +231,7 @@ object MessageRendererHandlerSpec extends Properties {
   def testRerenderReopen: Result = {
     setUpMessages("")
     MessageRenderer.renderProxyMessages(entry, detailView)
-    val part = DomTestKit.element(s"[${MessageView.BadgePartAttr}]").getAttribute(MessageView.BadgePartAttr)
+    val part  = DomTestKit.element(s"[${MessageView.BadgePartAttr}]").getAttribute(MessageView.BadgePartAttr)
     AppState.activeBadgePart = Some(part)
     MessageRenderer.rerenderPreservingScroll()
     val badge = DomTestKit.element(s"[${MessageView.BadgePartAttr}]")
@@ -321,18 +326,25 @@ object MessageRendererHandlerSpec extends Properties {
 
   def testCardsNoMessages: Result = {
     DomTestKit.setUp("")
-    MessageRenderer.buildVisibleCards(DomTestKit.capture(1, js.JSON.parse("""{"messages":[]}"""), js.Dynamic.literal())) ==== Nil
+    MessageRenderer.buildVisibleCards(
+      DomTestKit.capture(1, js.JSON.parse("""{"messages":[]}"""), js.Dynamic.literal())
+    ) ==== Nil
   }
 
   def testCardsEmptyQuery: Result = {
     DomTestKit.setUp("")
-    MessageRenderer.buildVisibleCards(DomTestKit.capture(1, body(), js.Dynamic.literal())).map(_.role) ==== List("user", "assistant")
+    MessageRenderer.buildVisibleCards(DomTestKit.capture(1, body(), js.Dynamic.literal())).map(_.role) ==== List(
+      "user",
+      "assistant"
+    )
   }
 
   def testCardsQuery: Result = {
     DomTestKit.setUp("")
     AppState.msgSearchQuery = "KENOBI"
-    MessageRenderer.buildVisibleCards(DomTestKit.capture(1, body(), js.Dynamic.literal())).map(_.role) ==== List("assistant")
+    MessageRenderer.buildVisibleCards(DomTestKit.capture(1, body(), js.Dynamic.literal())).map(_.role) ==== List(
+      "assistant"
+    )
   }
 
   def testCardsQueryBadge: Result = {
@@ -374,7 +386,9 @@ object MessageRendererHandlerSpec extends Properties {
     Result.all(
       List(
         Result.assert(detailView.textContent.contains("proxy.noResults")).log(detailView.textContent),
-        Result.assert(dom.document.activeElement == input(HtmlIds.MsgSearchInput)).log("the search input has the focus"),
+        Result
+          .assert(dom.document.activeElement == input(HtmlIds.MsgSearchInput))
+          .log("the search input has the focus"),
       )
     )
   }

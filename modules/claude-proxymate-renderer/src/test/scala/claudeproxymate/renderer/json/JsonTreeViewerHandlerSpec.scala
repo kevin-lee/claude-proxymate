@@ -77,9 +77,10 @@ object JsonTreeViewerHandlerSpec extends Properties {
   private val MaskId: String  = "$.api_key"
 
   private def body(): js.Dynamic =
-    js.JSON.parse(
-      s"""{"api_key":"secret-value","text":"use sk-ant-abcdefghijklmnopqrstuvwxyz12345 now","id":"msg_01ABCDEFGHIJKLMNOP","nested":{"a":1},"long":"${"x" * 301}"}"""
-    )
+    js.JSON
+      .parse(
+        s"""{"api_key":"secret-value","text":"use sk-ant-abcdefghijklmnopqrstuvwxyz12345 now","id":"msg_01ABCDEFGHIJKLMNOP","nested":{"a":1},"long":"${"x" * 301}"}"""
+      )
 
   private val DetailShell: String =
     s"""<div id="${HtmlIds.ProxyDetailView}"><i id="marker"></i><div id="${HtmlIds.ProxyDetailCode}"></div></div>"""
@@ -469,7 +470,7 @@ object JsonTreeViewerHandlerSpec extends Properties {
 
   def testStringExpand: Result = {
     setUpTree(body())
-    val sid = stringId
+    val sid    = stringId
     clickOn(s"#$sid-btn")
     val frames = DomTestKit.runAnimationFrames()
     Result.all(
@@ -501,7 +502,7 @@ object JsonTreeViewerHandlerSpec extends Properties {
 
   def testStringExpandAgain: Result = {
     setUpTree(body())
-    val sid = stringId
+    val sid    = stringId
     clickOn(s"#$sid-btn")
     val first  = DomTestKit.runAnimationFrames()
     clickOn(s"#$sid-b .${JsonTreeView.StringToggleClass}")
@@ -562,7 +563,9 @@ object JsonTreeViewerHandlerSpec extends Properties {
     Result.all(
       List(
         Result.assert(container.classList.contains("jt-lined")).log("jt-lined class"),
-        Result.assert(container.querySelector(".jt-line-info") != null).log("line info"), // scalafix:ok DisableSyntax.null
+        Result
+          .assert(container.querySelector(".jt-line-info") != null)
+          .log("line info"), // scalafix:ok DisableSyntax.null
         Result.assert(container.textContent.contains("\"a\"")).log(s"key a is shown: ${container.textContent}"),
       )
     )

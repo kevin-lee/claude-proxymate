@@ -12,6 +12,7 @@ object JsonLineProtocolSpec extends Properties {
     example("RequestCaptured round-trips through encode/decode", testRoundTripRequest),
     example("RequestCaptured with a filter report round-trips", testRoundTripRequestWithReport),
     example("RequestCaptured line without a filter field decodes to filter = None", testRequestWithoutFilterField),
+    example("RequestCaptured encodes capturedAt as a JSON number", testCapturedAtIsNumber),
     example("ResponseCaptured (Right body) round-trips", testRoundTripResponseJson),
     example("ResponseCaptured (Left raw body) round-trips", testRoundTripResponseRaw),
     example("ProxyStarted round-trips", testRoundTripStarted),
@@ -40,7 +41,7 @@ object JsonLineProtocolSpec extends Properties {
       ProxyEvent.RequestCaptured(
         ProxyRequest(
           id = CaptureId(1234L),
-          ts = "12:34:56",
+          capturedAt = EpochMillis(1794741364123L),
           method = "POST",
           path = "/v1/messages",
           body = Some(Json.obj("model" -> Json.fromString("claude"))),
@@ -54,7 +55,7 @@ object JsonLineProtocolSpec extends Properties {
       ProxyEvent.RequestCaptured(
         ProxyRequest(
           id = CaptureId(1234L),
-          ts = "12:34:56",
+          capturedAt = EpochMillis(1794741364123L),
           method = "POST",
           path = "/v1/messages",
           body = Some(Json.obj("model" -> Json.fromString("claude"))),
@@ -75,15 +76,36 @@ object JsonLineProtocolSpec extends Properties {
 
   def testRequestWithoutFilterField: Result = {
     val line    =
-      """{"type":"request_captured","request":{"id":1,"ts":"00:00:00","method":"POST","path":"/v1/messages","body":null}}"""
+      """{"type":"request_captured","request":{"id":1,"capturedAt":0,"method":"POST","path":"/v1/messages","body":null}}"""
     val decoded = JsonLineProtocol.decode(line)
     Result
       .assert(
         decoded == Right(
-          ProxyEvent.RequestCaptured(ProxyRequest(CaptureId(1L), "00:00:00", "POST", "/v1/messages", None, None))
+          ProxyEvent.RequestCaptured(ProxyRequest(CaptureId(1L), EpochMillis(0L), "POST", "/v1/messages", None, None))
         )
       )
       .log(s"a line predating the filter field should decode with filter = None, got $decoded")
+  }
+
+  def testCapturedAtIsNumber: Result = {
+    val line = JsonLineProtocol.encode(
+      ProxyEvent.RequestCaptured(
+        ProxyRequest(
+          id = CaptureId(1L),
+          capturedAt = EpochMillis(1794741364123L),
+          method = "POST",
+          path = "/v1/messages",
+          body = None,
+          filter = None,
+        )
+      )
+    )
+    Result.all(
+      List(
+        Result.assert(line.contains("\"capturedAt\":1794741364123")).log(s"capturedAt is not a number: $line"),
+        Result.assert(!line.contains("\"ts\"")).log(s"the old ts field is still there: $line"),
+      )
+    )
   }
 
   def testRoundTripResponseJson: Result =

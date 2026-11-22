@@ -11,7 +11,8 @@ final case class ProxyListEntry(
   id: Double,
   method: String,
   path: String,
-  ts: String,
+  time: String,
+  dateTime: String,
   model: Option[String],
   status: Option[Int],
   selected: Boolean,
@@ -70,7 +71,8 @@ object ProxyListView {
         span(cls := "prx-method")(e.method),
         span(cls := "prx-path")(QueryParamMask.maskPath(e.path)),
         statusBadge,
-        span(cls := "prx-ts")(e.ts),
+        if (e.dateTime.isEmpty) span(cls := "prx-ts")(e.time)
+        else span(cls := "prx-ts", attr("title") := e.dateTime)(e.time),
       ),
       modelFrag,
     )

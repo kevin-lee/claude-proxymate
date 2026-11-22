@@ -8,10 +8,13 @@ import io.circe.Json
   * `body` is what was actually forwarded upstream. `filter` is present
   * only when the request filter changed it (see
   * [[claudeproxymate.core.filter.RequestFilter]]).
+  *
+  * `capturedAt` is the instant (UTC) when the proxy captured the request.
+  * The renderer shows it in the local time zone.
   */
 final case class ProxyRequest(
   id: CaptureId,
-  ts: String,
+  capturedAt: EpochMillis,
   method: String,
   path: String,
   body: Option[Json],

@@ -33,12 +33,16 @@ object DetailViewRenderSpec extends Properties {
     s"""<div id="${HtmlIds.ProxyDetailView}"><i id="marker"></i></div><span id="${HtmlIds.SearchCounter}">-</span>"""
 
   private def requestBody: js.Dynamic =
-    js.JSON.parse(
-      """{"model":"claude-x","messages":[{"role":"user","content":"hello there"},{"role":"assistant","content":[{"type":"text","text":"general kenobi"}]}]}"""
-    )
+    js.JSON
+      .parse(
+        """{"model":"claude-x","messages":[{"role":"user","content":"hello there"},{"role":"assistant","content":[{"type":"text","text":"general kenobi"}]}]}"""
+      )
 
   private def responseBody: js.Dynamic =
-    js.JSON.parse("""{"role":"assistant","content":[{"type":"text","text":"from the response"}],"usage":{"input_tokens":3,"output_tokens":4}}""")
+    js.JSON
+      .parse(
+        """{"role":"assistant","content":[{"type":"text","text":"from the response"}],"usage":{"input_tokens":3,"output_tokens":4}}"""
+      )
 
   private def setUpTab(tab: String, entry: js.Dynamic): Unit = {
     DomTestKit.setUp(Page)
