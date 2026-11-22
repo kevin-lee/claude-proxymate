@@ -274,34 +274,9 @@ class ProxyStreamingSpec extends munit.FunSuite {
 
   /* ── Capture ids (issue #99) ──────────────────────────────────────────── */
 
-  test("parallel requests get different capture ids, and each captured response has the id of its request") {
-    val count = 50
-    run(recorder.flatMap {
-      case (events, emit) =>
-        withProxy(Settings, ProxyServer.DefaultBodyStartTimeout, emit) { (app, _) =>
-          for {
-            /* Read each body to the end, so the tee gives its ResponseCaptured. */
-            _   <- (1 to count).toList.parTraverse { i =>
-                     app.run(post("/v1/echo", s"""{"n":$i}""")).flatMap(_.bodyText.compile.string)
-                   }
-            all <- events.get
-          } yield {
-            val requests  = requestsOf(all)
-            val responses = responsesOf(all)
-            assertEquals(requests.size, count)
-            assertEquals(requests.map(_.id).distinct.size, count, s"ids=${requests.map(_.id.value)}")
-            assertEquals(responses.size, count)
-            /* The echo upstream returns the request body. So when each id has the
-             * same body in its request and in its response, each response has the
-             * id of its own request. */
-            assertEquals(
-              responses.map(r => r.id -> r.body.toOption).toMap,
-              requests.map(r => r.id -> r.body).toMap,
-            )
-          }
-        }
-    })
-  }
+  /* The test for parallel requests is in ProxyServerCaptureIdSpec. It needs no
+   * sockets: fs2 on Scala Native listens with a backlog of 0, and on Linux many
+   * connections that arrive at the same time wait for SYN retries. */
 
   test("an upstream that is not reachable gives a captured response with the id of its request") {
     val closedPort = gates.flatMap(g => upstreamServer(g).use(upstream => IO.pure(upstream.port)))
