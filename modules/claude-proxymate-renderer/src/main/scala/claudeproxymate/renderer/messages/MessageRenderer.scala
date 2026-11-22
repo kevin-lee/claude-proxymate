@@ -113,7 +113,7 @@ object MessageRenderer {
     val savedScroll = containerEl.scrollTop
     val openPart    = AppState.activeBadgePart
 
-    val entry = AppState.proxyCaptures.find(e => e.id == AppState.selectedProxyId.map(_.asInstanceOf[js.Any]).orNull)
+    val entry = AppState.selectedCapture
     entry match {
       case None => ()
       case Some(e) =>
@@ -465,7 +465,7 @@ object MessageRenderer {
 
   def setMsgFilter(f: String): Unit = {
     AppState.msgFilter = f
-    val entry  = AppState.proxyCaptures.find(e => e.id == AppState.selectedProxyId.map(_.asInstanceOf[js.Any]).orNull)
+    val entry  = AppState.selectedCapture
     val detail = dom.document.getElementById(HtmlIds.ProxyDetailView)
     entry.foreach { e =>
       if (detail != null) renderProxyMessages(e, detail.asInstanceOf[dom.html.Element])
@@ -480,7 +480,7 @@ object MessageRenderer {
         case el: dom.html.Element => el.id === HtmlIds.MsgSearchInput
         case _ => false
       }
-      val entry  = AppState.proxyCaptures.find(e => e.id == AppState.selectedProxyId.map(_.asInstanceOf[js.Any]).orNull)
+      val entry  = AppState.selectedCapture
       val detail = dom.document.getElementById(HtmlIds.ProxyDetailView)
       entry.foreach { e =>
         if (detail != null && AppState.proxyDetailTab === "messages") {

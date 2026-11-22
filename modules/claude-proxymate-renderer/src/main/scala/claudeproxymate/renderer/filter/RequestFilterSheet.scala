@@ -241,12 +241,8 @@ object RequestFilterSheet {
 
   private def entryReport(entry: js.Dynamic): Option[FilterReport] = MessageRenderer.captureReport(entry)
 
-  private def currentPreviewEntry(): Option[js.Dynamic] = {
-    val selected = AppState.selectedProxyId.flatMap { id =>
-      AppState.proxyCaptures.find(e => e.selectDynamic("id").asInstanceOf[Double] === id)
-    }
-    selected.orElse(AppState.proxyCaptures.headOption)
-  }
+  private def currentPreviewEntry(): Option[js.Dynamic] =
+    AppState.selectedCapture.orElse(AppState.proxyCaptures.headOption)
 
   private def trafficItems(): List[InventoryItem] = {
     val recent = AppState.proxyCaptures.take(PreviewCaptures)

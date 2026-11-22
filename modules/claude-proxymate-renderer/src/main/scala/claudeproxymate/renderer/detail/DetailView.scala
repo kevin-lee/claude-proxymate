@@ -25,7 +25,7 @@ import scala.scalajs.js
 object DetailView {
 
   def renderProxyDetail(): Unit = {
-    val entry  = AppState.proxyCaptures.find(e => e.id == AppState.selectedProxyId.map(_.asInstanceOf[js.Any]).orNull)
+    val entry  = AppState.selectedCapture
     val detail = dom.document.getElementById(HtmlIds.ProxyDetailView)
     if (detail == null) return
 

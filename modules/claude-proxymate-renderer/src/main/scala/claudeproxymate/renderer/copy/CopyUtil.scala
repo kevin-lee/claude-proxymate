@@ -107,7 +107,7 @@ object CopyUtil {
     *     [[MaskedCopy.maskBody]].
     */
   def copyProxyDetail(): Unit = {
-    val entry = AppState.proxyCaptures.find(e => e.id == AppState.selectedProxyId.map(_.asInstanceOf[js.Any]).orNull)
+    val entry = AppState.selectedCapture
     entry match {
       case None => ()
       case Some(e) =>
